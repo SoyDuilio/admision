@@ -1,0 +1,258 @@
+{% extends "prueba_formal/base.html" %}
+
+{% block title %}POSTULANDO - Sistema de Captura{% endblock %}
+
+{% block content %}
+<!-- Iconos SVG -->
+<svg xmlns="http://www.w3.org/2000/svg" style="display: none;">
+  <symbol id="icon-camera" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 15.2a3.2 3.2 0 1 0 0-6.4a3.2 3.2 0 0 0 0 6.4zM9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5s5 2.24 5 5s-2.24 5-5 5z"/>
+  </symbol>
+  
+  <symbol id="icon-key" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M7 14c-1.66 0-3-1.34-3-3s1.34-3 3-3s3 1.34 3 3s-1.34 3-3 3zm0-4c-.55 0-1 .45-1 1s.45 1 1 1s1-.45 1-1s-.45-1-1-1zm12.93 0a1 1 0 0 0-.32-.7l-4.56-4.57l-.7.7l2.08 2.08l-1.41 1.41l-1.29-1.29l-.7.7l1.29 1.29l-1.41 1.41l-2.08-2.08l-.7.7l4.56 4.56c.2.2.44.3.7.3c.26 0 .51-.1.7-.29l3.54-3.54c.39-.39.39-1.02 0-1.41z"/>
+  </symbol>
+  
+  <symbol id="icon-chart" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zM9 17H7v-7h2v7zm4 0h-2V7h2v10zm4 0h-2v-4h2v4z"/>
+  </symbol>
+  
+  <symbol id="icon-check" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19L21 7l-1.41-1.41z"/>
+  </symbol>
+  
+  <symbol id="icon-users" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05c1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
+  </symbol>
+  
+  <symbol id="icon-document" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z"/>
+  </symbol>
+</svg>
+
+<div class="container">
+    <!-- Título Principal -->
+    <div class="page-header">
+        <h1 class="page-title">SISTEMA DE CAPTURA DE EXÁMENES</h1>
+        <p class="page-subtitle">Instituto Pedro A. Del Águila - Proceso de Admisión 2025</p>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-number" id="total-postulantes">100</div>
+            <div class="stat-label">Total Postulantes</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number" id="examenes-capturados">0</div>
+            <div class="stat-label">Exámenes Capturados</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number" id="examenes-calificados">0</div>
+            <div class="stat-label">Calificados</div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-number" id="clave-estado" style="color: #ef4444;">No</div>
+            <div class="stat-label">Clave Cargada</div>
+        </div>
+    </div>
+
+    <!-- Pestañas -->
+    <div class="tabs-wrapper">
+        <div class="tabs">
+            <button class="tab-btn active" data-tab="profesor">
+                <svg><use href="#icon-camera"></use></svg>
+                Captura Profesor
+            </button>
+            <button class="tab-btn" data-tab="director">
+                <svg><use href="#icon-key"></use></svg>
+                Clave (Director)
+            </button>
+            <button class="tab-btn" data-tab="resultados">
+                <svg><use href="#icon-chart"></use></svg>
+                Resultados
+            </button>
+        </div>
+    </div>
+
+    <!-- TAB 1: CAPTURA PROFESOR -->
+    <div id="tab-profesor" class="content-card">
+        <h2 class="section-title">
+            <svg><use href="#icon-camera"></use></svg>
+            Captura de Hojas de Respuesta
+        </h2>
+        
+        <div class="alert alert-info">
+            <svg><use href="#icon-check"></use></svg>
+            <div>
+                <strong>Instrucciones:</strong> Active la cámara, enfoque la hoja completa verificando que los 3 códigos sean visibles, capture la foto y confirme.
+            </div>
+        </div>
+        
+        <!-- API de Procesamiento -->
+        <div class="form-group">
+            <label class="form-label">API de Procesamiento:</label>
+            <select id="api-vision" class="form-select">
+                <option value="google">Google Cloud Vision</option>
+                <option value="openai">OpenAI GPT-4 Vision</option>
+                <option value="anthropic">Anthropic Claude Vision</option>
+            </select>
+        </div>
+        
+        <!-- Cámara -->
+        <div class="camera-wrapper" id="camera-container">
+            <video id="camera-video" autoplay playsinline></video>
+            <div class="camera-overlay"></div>
+            
+            <!-- Botón iniciar -->
+            <div id="btn-start-wrapper" class="flex-center" style="position: absolute; inset: 0;">
+                <button class="btn btn-primary btn-lg" id="btn-start-camera">
+                    <svg><use href="#icon-camera"></use></svg>
+                    Activar Cámara
+                </button>
+            </div>
+            
+            <!-- Botón capturar -->
+            <div class="camera-controls hidden" id="camera-controls">
+                <button class="btn-capture" id="btn-capture"></button>
+            </div>
+        </div>
+        
+        <!-- Preview -->
+        <div id="preview-container" class="hidden">
+            <div class="preview-wrapper">
+                <img id="preview-image" src="" alt="Preview">
+            </div>
+            
+            <div class="flex gap-2">
+                <button class="btn btn-warning" id="btn-retake">
+                    <svg><use href="#icon-camera"></use></svg>
+                    Retomar
+                </button>
+                <button class="btn btn-success btn-lg" id="btn-confirm">
+                    <svg><use href="#icon-check"></use></svg>
+                    Confirmar y Procesar
+                </button>
+            </div>
+        </div>
+        
+        <!-- Resultado -->
+        <div id="result-container" class="hidden mt-3"></div>
+    </div>
+
+    <!-- TAB 2: CAPTURA DIRECTOR -->
+    <div id="tab-director" class="content-card hidden">
+        <h2 class="section-title">
+            <svg><use href="#icon-key"></use></svg>
+            Carga de Clave de Respuestas Correctas
+        </h2>
+        
+        <div class="alert alert-danger">
+            <svg style="width: 24px; height: 24px;">
+                <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10s10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+            </svg>
+            <div>
+                <strong>PROCESO CRÍTICO - SOLO AUTORIDADES</strong><br>
+                Esta acción debe ser realizada únicamente por el Director o Decano en presencia de veedores al momento de abrir el sobre lacrado.
+            </div>
+        </div>
+        
+        <div class="alert alert-warning">
+            <svg><use href="#icon-check"></use></svg>
+            <div>
+                <strong>Requisitos previos:</strong>
+                <ul style="margin: 0.5rem 0 0 1.5rem;">
+                    <li>Todos los exámenes de postulantes capturados</li>
+                    <li>Presencia de autoridades y veedores</li>
+                    <li>Grabación del proceso (recomendado)</li>
+                </ul>
+            </div>
+        </div>
+        
+        <!-- API de Procesamiento para Clave -->
+        <div class="form-group">
+            <label class="form-label">API de Procesamiento:</label>
+            <select id="api-vision-clave" class="form-select">
+                <option value="google">Google Cloud Vision</option>
+                <option value="openai">OpenAI GPT-4 Vision</option>
+                <option value="anthropic">Anthropic Claude Vision</option>
+            </select>
+        </div>
+        
+        <!-- Cámara para Clave -->
+        <div class="camera-wrapper" id="camera-container-clave">
+            <video id="camera-video-clave" autoplay playsinline></video>
+            <div class="camera-overlay"></div>
+            
+            <!-- Botón iniciar clave -->
+            <div id="btn-start-wrapper-clave" class="flex-center" style="position: absolute; inset: 0;">
+                <button class="btn btn-danger btn-lg" id="btn-start-camera-clave">
+                    <svg><use href="#icon-key"></use></svg>
+                    Activar Cámara para Clave
+                </button>
+            </div>
+            
+            <!-- Botón capturar clave -->
+            <div class="camera-controls hidden" id="camera-controls-clave">
+                <button class="btn-capture" id="btn-capture-clave"></button>
+            </div>
+        </div>
+        
+        <!-- Preview Clave -->
+        <div id="preview-container-clave" class="hidden">
+            <div class="preview-wrapper">
+                <img id="preview-image-clave" src="" alt="Preview Clave">
+            </div>
+            
+            <div class="flex gap-2">
+                <button class="btn btn-warning" id="btn-retake-clave">
+                    <svg><use href="#icon-camera"></use></svg>
+                    Retomar
+                </button>
+                <button class="btn btn-danger btn-lg" id="btn-confirm-clave">
+                    <svg><use href="#icon-check"></use></svg>
+                    Procesar Clave de Respuestas
+                </button>
+            </div>
+        </div>
+        
+        <!-- Resultado Clave -->
+        <div id="result-container-clave" class="hidden mt-3"></div>
+    </div>
+
+    <!-- TAB 3: RESULTADOS -->
+    <div id="tab-resultados" class="content-card hidden">
+        <h2 class="section-title">
+            <svg><use href="#icon-chart"></use></svg>
+            Calificación y Resultados
+        </h2>
+        
+        <div class="alert alert-info">
+            <svg><use href="#icon-check"></use></svg>
+            <div>
+                <strong>Estado del Proceso:</strong><br>
+                La calificación se ejecutará automáticamente una vez que se cargue la clave de respuestas correctas.
+            </div>
+        </div>
+        
+        <div style="text-align: center; padding: 4rem 2rem;">
+            <svg style="width: 80px; height: 80px; color: #9ca3af; margin-bottom: 1.5rem;">
+                <use href="#icon-chart"></use>
+            </svg>
+            <h3 style="font-size: 1.5rem; font-weight: 700; color: #374151; margin-bottom: 0.5rem;">
+                En Espera de Clave
+            </h3>
+            <p style="color: #6b7280;">
+                Los resultados se generarán automáticamente al procesar la clave de respuestas
+            </p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='js/camera_capture.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}Resultados - Postulando{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>📊 RESULTADOS DEL EXAMEN</h1>
+    <p>Ranking de Postulantes</p>
+</div>
+
+<div class="card">
+    <!-- Estadísticas Generales -->
+    <div class="stats-grid mb-4">
+        <div class="stat-card">
+            <div class="stat-value">{{ total_postulantes }}</div>
+            <div class="stat-label">Total Postulantes</div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <div class="stat-value">{{ examenes_calificados }}</div>
+            <div class="stat-label">Exámenes Calificados</div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #2563eb, #1e40af);">
+            <div class="stat-value">{{ nota_promedio }}</div>
+            <div class="stat-label">Nota Promedio</div>
+        </div>
+        
+        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+            <div class="stat-value">{{ aprobados }}</div>
+            <div class="stat-label">Aprobados (≥60)</div>
+        </div>
+    </div>
+    
+    <!-- Filtros -->
+    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center;">
+        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
+            <input type="text" 
+                   id="search-input" 
+                   class="form-control" 
+                   placeholder="🔍 Buscar por DNI o nombre..."
+                   onkeyup="filtrarTabla()">
+        </div>
+        
+        <div class="form-group" style="margin-bottom: 0;">
+            <select id="filter-estado" class="form-control" onchange="filtrarTabla()">
+                <option value="">Todos los estados</option>
+                <option value="calificado">Calificados</option>
+                <option value="pendiente">Pendientes</option>
+            </select>
+        </div>
+        
+        <button onclick="window.location.reload()" class="btn btn-primary">
+            🔄 Actualizar
+        </button>
+        
+        <button onclick="exportarCSV()" class="btn btn-success">
+            📥 Exportar CSV
+        </button>
+    </div>
+    
+    <!-- Tabla de Resultados -->
+    <div style="overflow-x: auto;">
+        <table class="results-table" id="tabla-resultados">
+            <thead>
+                <tr>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(0)">
+                        # <span id="sort-0">↕️</span>
+                    </th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(1)">
+                        DNI <span id="sort-1">↕️</span>
+                    </th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(2)">
+                        Nombre Completo <span id="sort-2">↕️</span>
+                    </th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(3)">
+                        Programa <span id="sort-3">↕️</span>
+                    </th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(4)">
+                        Nota <span id="sort-4">↕️</span>
+                    </th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(5)">
+                        Correctas <span id="sort-5">↕️</span>
+                    </th>
+                    <th>Estado</th>
+                    <th style="cursor: pointer;" onclick="ordenarTabla(7)">
+                        Fecha <span id="sort-7">↕️</span>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for postulante in postulantes %}
+                <tr data-estado="{{ postulante.estado }}">
+                    <td style="font-weight: 700;">{{ postulante.ranking }}</td>
+                    <td>{{ postulante.dni }}</td>
+                    <td style="font-weight: 600;">{{ postulante.nombre_completo }}</td>
+                    <td>{{ postulante.programa_educativo }}</td>
+                    <td>
+                        {% if postulante.nota is not none %}
+                            <span style="font-size: 1.2rem; font-weight: 700; color: {{ 'var(--success)' if postulante.nota >= 60 else 'var(--danger)' }};">
+                                {{ postulante.nota }}
+                            </span>
+                        {% else %}
+                            <span style="color: #9ca3af;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if postulante.respuestas_correctas is not none %}
+                            {{ postulante.respuestas_correctas }}/100
+                        {% else %}
+                            <span style="color: #9ca3af;">-</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if postulante.estado == 'calificado' %}
+                            <span class="badge badge-success">✅ Calificado</span>
+                        {% else %}
+                            <span class="badge badge-pending">⏳ Pendiente</span>
+                        {% endif %}
+                    </td>
+                    <td style="font-size: 0.875rem; color: #6b7280;">
+                        {% if postulante.fecha_examen %}
+                            {{ postulante.fecha_examen }}
+                        {% else %}
+                            <span style="color: #9ca3af;">-</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    
+    {% if not postulantes %}
+    <div style="text-align: center; padding: 3rem; color: #6b7280;">
+        <div style="font-size: 4rem; margin-bottom: 1rem;">📭</div>
+        <h3>No hay resultados disponibles</h3>
+        <p style="margin-top: 0.5rem;">Aún no se han capturado exámenes</p>
+        <a href="/demo" class="btn btn-primary" style="margin-top: 1.5rem;">
+            🚀 Ir a la Demo
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div style="text-align: center; margin-top: 2rem;">
+    <a href="/" class="btn btn-primary">
+        🏠 Volver al Inicio
+    </a>
+    <a href="/demo" class="btn btn-success" style="margin-left: 1rem;">
+        📸 Capturar Más Exámenes
+    </a>
+</div>
+
+<script>
+// ==============================================
+// FILTRADO DE TABLA
+// ==============================================
+
+function filtrarTabla() {
+    const searchInput = document.getElementById('search-input').value.toLowerCase();
+    const filterEstado = document.getElementById('filter-estado').value;
+    const tabla = document.getElementById('tabla-resultados');
+    const filas = tabla.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+    
+    let visibles = 0;
+    
+    for (let i = 0; i < filas.length; i++) {
+        const fila = filas[i];
+        const dni = fila.cells[1].textContent.toLowerCase();
+        const nombre = fila.cells[2].textContent.toLowerCase();
+        const estado = fila.getAttribute('data-estado');
+        
+        const matchBusqueda = dni.includes(searchInput) || nombre.includes(searchInput);
+        const matchEstado = !filterEstado || estado === filterEstado;
+        
+        if (matchBusqueda && matchEstado) {
+            fila.style.display = '';
+            visibles++;
+        } else {
+            fila.style.display = 'none';
+        }
+    }
+    
+    // Renumerar rankings visibles
+    let ranking = 1;
+    for (let i = 0; i < filas.length; i++) {
+        if (filas[i].style.display !== 'none') {
+            filas[i].cells[0].textContent = ranking++;
+        }
+    }
+}
+
+// ==============================================
+// ORDENAMIENTO DE TABLA
+// ==============================================
+
+let ordenActual = { columna: 4, direccion: 'desc' }; // Inicialmente ordenado por nota descendente
+
+function ordenarTabla(columna) {
+    const tabla = document.getElementById('tabla-resultados');
+    const tbody = tabla.getElementsByTagName('tbody')[0];
+    const filas = Array.from(tbody.getElementsByTagName('tr'));
+    
+    // Determinar dirección
+    if (ordenActual.columna === columna) {
+        ordenActual.direccion = ordenActual.direccion === 'asc' ? 'desc' : 'asc';
+    } else {
+        ordenActual.columna = columna;
+        ordenActual.direccion = 'asc';
+    }
+    
+    // Ordenar filas
+    filas.sort((a, b) => {
+        let valorA = a.cells[columna].textContent.trim();
+        let valorB = b.cells[columna].textContent.trim();
+        
+        // Convertir a número si es posible
+        if (!isNaN(valorA) && !isNaN(valorB)) {
+            valorA = parseFloat(valorA) || 0;
+            valorB = parseFloat(valorB) || 0;
+        }
+        
+        if (valorA < valorB) return ordenActual.direccion === 'asc' ? -1 : 1;
+        if (valorA > valorB) return ordenActual.direccion === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    // Limpiar y volver a agregar filas
+    while (tbody.firstChild) {
+        tbody.removeChild(tbody.firstChild);
+    }
+    filas.forEach(fila => tbody.appendChild(fila));
+    
+    // Actualizar iconos de ordenamiento
+    for (let i = 0; i < 8; i++) {
+        const sortIcon = document.getElementById('sort-' + i);
+        if (sortIcon) {
+            if (i === columna) {
+                sortIcon.textContent = ordenActual.direccion === 'asc' ? '⬆️' : '⬇️';
+            } else {
+                sortIcon.textContent = '↕️';
+            }
+        }
+    }
+    
+    // Renumerar rankings
+    let ranking = 1;
+    filas.forEach(fila => {
+        if (fila.style.display !== 'none') {
+            fila.cells[0].textContent = ranking++;
+        }
+    });
+}
+
+// ==============================================
+// EXPORTAR A CSV
+// ==============================================
+
+function exportarCSV() {
+    const tabla = document.getElementById('tabla-resultados');
+    const filas = tabla.getElementsByTagName('tr');
+    
+    let csv = [];
+    
+    // Headers
+    const headers = [];
+    for (let cell of filas[0].cells) {
+        headers.push(cell.textContent.replace(/[↕️⬆️⬇️]/g, '').trim());
+    }
+    csv.push(headers.join(','));
+    
+    // Datos
+    for (let i = 1; i < filas.length; i++) {
+        if (filas[i].style.display !== 'none') {
+            const row = [];
+            for (let cell of filas[i].cells) {
+                let text = cell.textContent.trim();
+                // Limpiar badges y emojis
+                text = text.replace(/[✅⏳]/g, '').trim();
+                row.push('"' + text + '"');
+            }
+            csv.push(row.join(','));
+        }
+    }
+    
+    // Crear y descargar archivo
+    const csvContent = csv.join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    const url = URL.createObjectURL(blob);
+    
+    const fecha = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `resultados_examen_${fecha}.csv`);
+    link.style.visibility = 'hidden';
+    
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// Aplicar orden inicial por nota al cargar
+window.addEventListener('DOMContentLoaded', function() {
+    ordenarTabla(4); // Ordenar por nota
+    ordenarTabla(4); // Segunda vez para que sea descendente
+});
+</script>
+{% endblock %}

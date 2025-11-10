@@ -1,0 +1,661 @@
+/* ==============================================
+   POSTULANDO - SISTEMA FORMAL DE EXÁMENES
+   Diseño profesional e institucional
+   ============================================== */
+
+:root {
+    /* Colores institucionales */
+    --primary: #1e3a8a;
+    --primary-light: #3b82f6;
+    --primary-dark: #1e40af;
+    
+    --secondary: #059669;
+    --secondary-light: #10b981;
+    
+    --accent: #d97706;
+    --accent-light: #f59e0b;
+    
+    --danger: #dc2626;
+    --danger-light: #ef4444;
+    
+    --success: #059669;
+    --warning: #f59e0b;
+    --error: #dc2626;
+    
+    /* Neutrales */
+    --dark: #1f2937;
+    --gray: #6b7280;
+    --light-gray: #f3f4f6;
+    --white: #ffffff;
+    --border: #e5e7eb;
+    
+    /* Sombras */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+    --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+    min-height: 100vh;
+    padding: 1rem;
+    color: var(--dark);
+}
+
+/* ==============================================
+   HEADER FORMAL
+   ============================================== */
+
+.header-formal {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    padding: 2rem;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    margin-bottom: 2rem;
+    text-align: center;
+    color: var(--white);
+}
+
+.institution-header h1 {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.institution-name {
+    font-size: 1.25rem;
+    margin-bottom: 0.25rem;
+    font-weight: 500;
+}
+
+.exam-date {
+    font-size: 0.95rem;
+    opacity: 0.9;
+}
+
+/* ==============================================
+   PANEL DE ESTADÍSTICAS
+   ============================================== */
+
+.stats-panel {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card-formal {
+    background: var(--white);
+    border-radius: 12px;
+    padding: 1.5rem;
+    box-shadow: var(--shadow);
+    border-left: 4px solid var(--primary);
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    transition: all 0.3s ease;
+}
+
+.stat-card-formal:hover {
+    box-shadow: var(--shadow-lg);
+    transform: translateY(-2px);
+}
+
+.stat-card-formal.stat-processing {
+    border-left-color: var(--accent);
+}
+
+.stat-card-formal.stat-graded {
+    border-left-color: var(--success);
+}
+
+.stat-card-formal.stat-key {
+    border-left-color: var(--danger);
+}
+
+.stat-icon {
+    font-size: 2.5rem;
+}
+
+.stat-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+}
+
+.stat-description {
+    font-size: 0.875rem;
+    color: var(--gray);
+    font-weight: 500;
+}
+
+/* ==============================================
+   MÓDULOS PRINCIPALES
+   ============================================== */
+
+.modules-container {
+    display: grid;
+    gap: 2rem;
+    margin-bottom: 2rem;
+}
+
+.module-card {
+    background: var(--white);
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+}
+
+.module-header {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: var(--white);
+    padding: 1.5rem 2rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.module-header-critical {
+    background: linear-gradient(135deg, var(--danger) 0%, var(--danger-light) 100%);
+}
+
+.module-icon {
+    font-size: 2rem;
+}
+
+.module-header h2 {
+    font-size: 1.5rem;
+    font-weight: 600;
+}
+
+.module-body {
+    padding: 2rem;
+}
+
+.module-critical {
+    border: 3px solid var(--danger);
+}
+
+.module-results {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+}
+
+/* ==============================================
+   INFO BLOCKS
+   ============================================== */
+
+.info-block {
+    padding: 1.25rem;
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border-left: 4px solid;
+}
+
+.info-block strong {
+    display: block;
+    margin-bottom: 0.75rem;
+    font-size: 1rem;
+}
+
+.info-block p {
+    margin-bottom: 0.75rem;
+    line-height: 1.6;
+}
+
+.info-block ul, .info-block ol {
+    margin-left: 1.5rem;
+    line-height: 1.8;
+}
+
+.info-primary {
+    background: #eff6ff;
+    border-left-color: var(--primary);
+    color: #1e40af;
+}
+
+.info-warning {
+    background: #fffbeb;
+    border-left-color: var(--warning);
+    color: #92400e;
+}
+
+.info-danger {
+    background: #fef2f2;
+    border-left-color: var(--danger);
+    color: #991b1b;
+}
+
+.info-success {
+    background: #f0fdf4;
+    border-left-color: var(--success);
+    color: #065f46;
+}
+
+/* ==============================================
+   BOTONES FORMALES
+   ============================================== */
+
+.btn-formal {
+    padding: 0.875rem 1.75rem;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.75rem;
+    text-decoration: none;
+    box-shadow: var(--shadow);
+}
+
+.btn-formal:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-formal:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-icon {
+    font-size: 1.25rem;
+}
+
+.btn-primary-formal {
+    background: var(--primary);
+    color: var(--white);
+}
+
+.btn-primary-formal:hover:not(:disabled) {
+    background: var(--primary-dark);
+}
+
+.btn-secondary-formal {
+    background: var(--gray);
+    color: var(--white);
+}
+
+.btn-success-formal {
+    background: var(--success);
+    color: var(--white);
+}
+
+.btn-critical-formal {
+    background: var(--danger);
+    color: var(--white);
+}
+
+.btn-formal-large {
+    padding: 1.25rem 2.5rem;
+    font-size: 1.125rem;
+    width: 100%;
+    justify-content: center;
+}
+
+.btn-icon-large {
+    font-size: 1.75rem;
+}
+
+.btn-success-large {
+    background: linear-gradient(135deg, var(--success) 0%, var(--secondary-light) 100%);
+    color: var(--white);
+}
+
+.btn-primary-large {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: var(--white);
+}
+
+.btn-secondary-large {
+    background: var(--gray);
+    color: var(--white);
+}
+
+.action-group {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    margin-top: 1.5rem;
+}
+
+.action-group-large {
+    display: grid;
+    gap: 1.25rem;
+    margin-top: 1.5rem;
+}
+
+/* ==============================================
+   CÁMARA
+   ============================================== */
+
+.camera-section {
+    margin: 1.5rem 0;
+}
+
+.camera-viewport {
+    position: relative;
+    border-radius: 12px;
+    overflow: hidden;
+    background: #000;
+    max-width: 100%;
+    margin: 0 auto;
+}
+
+.camera-viewport video {
+    width: 100%;
+    display: block;
+}
+
+.camera-viewport-key {
+    border: 4px solid var(--danger);
+}
+
+.camera-guides {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 90%;
+    height: 80%;
+    pointer-events: none;
+}
+
+.guide-corner {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border: 3px solid var(--white);
+}
+
+.guide-corner.tl {
+    top: 0;
+    left: 0;
+    border-right: none;
+    border-bottom: none;
+}
+
+.guide-corner.tr {
+    top: 0;
+    right: 0;
+    border-left: none;
+    border-bottom: none;
+}
+
+.guide-corner.bl {
+    bottom: 0;
+    left: 0;
+    border-right: none;
+    border-top: none;
+}
+
+.guide-corner.br {
+    bottom: 0;
+    right: 0;
+    border-left: none;
+    border-top: none;
+}
+
+.guide-text {
+    position: absolute;
+    bottom: -40px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--white);
+    font-weight: 600;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+    white-space: nowrap;
+}
+
+.camera-controls-formal {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    padding: 1.5rem;
+    background: var(--light-gray);
+}
+
+.btn-camera-control {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border: 2px solid var(--primary);
+    background: var(--white);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-weight: 600;
+}
+
+.btn-camera-control:hover {
+    background: var(--primary);
+    color: var(--white);
+}
+
+.btn-danger-control {
+    border-color: var(--danger);
+}
+
+.btn-danger-control:hover {
+    background: var(--danger);
+    color: var(--white);
+}
+
+.btn-camera-capture {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1.5rem 2.5rem;
+    border: none;
+    background: var(--success);
+    color: var(--white);
+    border-radius: 50%;
+    cursor: pointer;
+    font-size: 1.125rem;
+    font-weight: 700;
+    transition: all 0.3s ease;
+    box-shadow: var(--shadow-lg);
+}
+
+.btn-camera-capture:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-xl);
+}
+
+.btn-camera-capture-key {
+    background: var(--danger);
+}
+
+/* ==============================================
+   PREVIEW
+   ============================================== */
+
+.preview-section {
+    margin: 1.5rem 0;
+}
+
+.preview-image-formal {
+    width: 100%;
+    max-width: 800px;
+    border-radius: 12px;
+    box-shadow: var(--shadow-lg);
+    display: block;
+    margin: 0 auto 1.5rem;
+}
+
+.preview-actions {
+    display: flex;
+    gap: 1rem;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+/* ==============================================
+   RESULTADOS
+   ============================================== */
+
+.result-panel {
+    background: var(--light-gray);
+    border-radius: 12px;
+    padding: 1.5rem;
+    margin-top: 1.5rem;
+    border-left: 4px solid var(--success);
+}
+
+.result-panel-large {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-radius: 12px;
+    padding: 2rem;
+    margin-top: 1.5rem;
+    border: 2px solid var(--success);
+}
+
+/* ==============================================
+   INDICADORES
+   ============================================== */
+
+.live-indicator-formal {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 1rem 1.5rem;
+    background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+    border-radius: 8px;
+    margin-bottom: 1.5rem;
+    border: 2px solid var(--danger);
+}
+
+.live-pulse {
+    width: 16px;
+    height: 16px;
+    background: var(--danger);
+    border-radius: 50%;
+    animation: pulse-animation 2s infinite;
+}
+
+@keyframes pulse-animation {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.5;
+        transform: scale(1.2);
+    }
+}
+
+.live-text {
+    font-weight: 700;
+    color: var(--danger);
+    font-size: 1.125rem;
+}
+
+.session-counter {
+    margin-top: 1.5rem;
+    padding: 1rem;
+    background: var(--light-gray);
+    border-radius: 8px;
+    text-align: center;
+}
+
+.helper-text {
+    font-size: 0.875rem;
+    color: var(--gray);
+    margin-top: 0.5rem;
+    text-align: center;
+}
+
+/* ==============================================
+   LOADING OVERLAY FORMAL
+   ============================================== */
+
+.loading-overlay-formal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(31, 41, 55, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+}
+
+.loading-content-formal {
+    text-align: center;
+    color: var(--white);
+}
+
+.loading-spinner-formal {
+    width: 80px;
+    height: 80px;
+    border: 6px solid rgba(255, 255, 255, 0.2);
+    border-top-color: var(--white);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto 1.5rem;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loading-text-formal {
+    font-size: 1.5rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.loading-subtext {
+    font-size: 1rem;
+    opacity: 0.8;
+}
+
+/* ==============================================
+   RESPONSIVE
+   ============================================== */
+
+@media (max-width: 768px) {
+    .header-formal {
+        padding: 1.5rem 1rem;
+    }
+    
+    .institution-header h1 {
+        font-size: 1.5rem;
+    }
+    
+    .stats-panel {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 1rem;
+    }
+    
+    .module-body {
+        padding: 1.5rem 1rem;
+    }
+    
+    .camera-controls-formal {
+        flex-wrap: wrap;
+    }
+    
+    .btn-camera-control {
+        flex: 1;
+        min-width: 100px;
+    }
+}

@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}POSTULANDO - Sistema de Exámenes{% endblock %}</title>
+    
+    <!-- CSS Base -->
+    <link rel="stylesheet" href="{{ url_for('static', path='/css/styles.css') }}">
+    
+    <!-- CSS específico de cada página -->
+    {% block extra_css %}{% endblock %}
+    
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    
+    <!-- Hyperscript -->
+    <script src="https://unpkg.com/hyperscript.org@0.9.12"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <h1>🎓 POSTULANDO</h1>
+                    <p class="subtitle">{{ instituto }}</p>
+                </div>
+                <nav class="nav">
+                    <a href="/" class="nav-link">Demo</a>
+                    <a href="/resultados" class="nav-link">Resultados</a>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            {% block content %}{% endblock %}
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <p>&copy; 2025 POSTULANDO - Sistema de Exámenes de Admisión</p>
+            <p class="footer-small">Desarrollado por <a href="https://duilio.store" target="_blank">Duilio</a></p>
+        </div>
+    </footer>
+
+    <!-- JavaScript base -->
+    <!--<script src="{{ url_for('static', path='/js/base.js') }}"></script>-->
+    
+    <!-- JavaScript específico -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,164 @@
+{% extends "base.html" %}
+
+{% block title %}Demo - Postulando{% endblock %}
+
+{% block content %}
+<div class="header">
+    <h1>🎓 DEMO DEL SISTEMA</h1>
+    <p>Captura y calificación de exámenes</p>
+</div>
+
+<!-- Estadísticas con HTMX -->
+<div class="card">
+    <div class="stats-grid" id="estadisticas" 
+        hx-get="/api/estadisticas-html" 
+        hx-trigger="load, every 5s" 
+        hx-swap="innerHTML">
+        <div class="stat-card">
+            <div class="stat-value">100</div>
+            <div class="stat-label">Total Postulantes</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #059669);">
+            <div class="stat-value">0</div>
+            <div class="stat-label">Exámenes Capturados</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
+            <div class="stat-value">0</div>
+            <div class="stat-label">Exámenes Calificados</div>
+        </div>
+        <div class="stat-card" style="background: linear-gradient(135deg, #8b5cf6, #7c3aed);">
+            <div class="stat-value">3</div>
+            <div class="stat-label">APIs Vision</div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <!-- Tabs -->
+    <div class="tabs">
+        <button class="tab active" data-tab="captura">📸 Capturar Exámenes</button>
+        <button class="tab" data-tab="clave">🔑 Clave de Respuestas</button>
+        <button class="tab" data-tab="calificar">🎯 Calificar</button>
+    </div>
+
+    <!-- Tab: Captura de Exámenes -->
+    <div id="captura" class="tab-content active">
+        <h2 style="margin-bottom: 1.5rem;">📝 Capturar Hoja de Respuestas</h2>
+        
+        <div class="form-group">
+            <label for="postulante">Seleccionar Postulante:</label>
+            <select id="postulante" class="form-control">
+                <option value="">-- Cargando postulantes --</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="api-vision">API de Vision:</label>
+            <select id="api-vision" class="form-control">
+                <option value="google">Google Cloud Vision</option>
+                <option value="openai">OpenAI GPT-4 Vision</option>
+                <option value="claude">Anthropic Claude Vision</option>
+            </select>
+        </div>
+
+        <div id="capture-area" class="capture-area">
+            <div class="camera-icon">📷</div>
+            <h3>Arrastra una imagen o haz click para seleccionar</h3>
+            <p>Formatos: JPG, PNG (máx 5MB)</p>
+            <button class="btn btn-primary">📂 Seleccionar Archivo</button>
+        </div>
+
+        <input type="file" id="file-input" accept="image/*" style="display: none;">
+
+        <div id="image-preview" class="image-preview">
+            <div class="preview-container">
+                <img id="preview-image" alt="Preview">
+            </div>
+            <div id="preview-info" class="preview-info"></div>
+        </div>
+
+        <div class="button-group">
+            <button id="btn-procesar" class="btn btn-success btn-large" disabled>
+                ⚡ Procesar Imagen
+            </button>
+        </div>
+
+        <div id="resultado-procesamiento" class="result-box" style="display: none;"></div>
+    </div>
+
+    <!-- Tab: Clave de Respuestas -->
+    <div id="clave" class="tab-content">
+        <h2 style="margin-bottom: 1.5rem;">🔑 Capturar Clave de Respuestas</h2>
+        
+        <div class="alert alert-warning">
+            <strong>⚠️ Importante:</strong> Esta es la hoja con las respuestas correctas del sobre lacrado.
+        </div>
+
+        <div class="form-group">
+            <label for="api-vision-clave">API de Vision:</label>
+            <select id="api-vision-clave" class="form-control">
+                <option value="google">Google Cloud Vision</option>
+                <option value="openai">OpenAI GPT-4 Vision</option>
+                <option value="claude">Anthropic Claude Vision</option>
+            </select>
+        </div>
+
+        <div id="capture-area-clave" class="capture-area">
+            <div class="camera-icon">📷</div>
+            <h3>Arrastra la imagen de la clave o haz click</h3>
+            <p>Esta acción procesará las respuestas correctas</p>
+            <button class="btn btn-primary">📂 Seleccionar Clave</button>
+        </div>
+
+        <input type="file" id="file-input-clave" accept="image/*" style="display: none;">
+
+        <div id="image-preview-clave" class="image-preview">
+            <div class="preview-container">
+                <img id="preview-image-clave" alt="Preview Clave">
+            </div>
+            <div id="preview-info-clave" class="preview-info"></div>
+        </div>
+
+        <div class="button-group">
+            <button id="btn-procesar-clave" class="btn btn-success btn-large" disabled>
+                ⚡ Procesar Clave
+            </button>
+        </div>
+
+        <div id="resultado-clave" class="result-box" style="display: none;"></div>
+    </div>
+
+    <!-- Tab: Calificar -->
+    <div id="calificar" class="tab-content">
+        <h2 style="margin-bottom: 1.5rem;">🎯 Calificación Automática</h2>
+        
+        <div class="alert alert-info">
+            <strong>ℹ️ Nota:</strong> Primero debes procesar hojas de estudiantes y la clave de respuestas.
+        </div>
+
+        <div class="button-group">
+            <button id="btn-calificar-todos" class="btn btn-large btn-success" disabled>
+                🚀 Calificar Todos los Exámenes
+            </button>
+            <button id="btn-ver-resultados" class="btn btn-large btn-primary">
+                📊 Ver Resultados
+            </button>
+            <button id="btn-limpiar" class="btn btn-large btn-danger">
+                🧹 Limpiar Demo
+            </button>
+        </div>
+
+        <div id="resultado-calificacion" class="result-box" style="display: none;"></div>
+    </div>
+</div>
+
+<!-- Loading Overlay -->
+<div id="loading-overlay" class="loading-overlay" style="display: none;">
+    <div class="loading-spinner"></div>
+    <p class="loading-text">Procesando...</p>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/demo.js') }}"></script>
+{% endblock %}

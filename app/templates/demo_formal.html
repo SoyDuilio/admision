@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema de Exámenes - {{ settings.instituto_nombre }}{% endblock %}
+
+{% block content %}
+<div class="header-formal">
+    <div class="institution-header">
+        <h1>🎓 SISTEMA DE EXÁMENES DE ADMISIÓN</h1>
+        <p class="institution-name">{{ settings.instituto_nombre }}</p>
+        <p class="exam-date">Proceso de Admisión {{ fecha_actual }}</p>
+    </div>
+</div>
+
+<!-- Panel de Estadísticas -->
+<div class="stats-panel">
+    <div class="stat-card-formal">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+            <div class="stat-number" id="total-postulantes">100</div>
+            <div class="stat-description">Postulantes Inscritos</div>
+        </div>
+    </div>
+    
+    <div class="stat-card-formal stat-processing">
+        <div class="stat-icon">📝</div>
+        <div class="stat-content">
+            <div class="stat-number" id="examenes-capturados">0</div>
+            <div class="stat-description">Exámenes Capturados</div>
+        </div>
+    </div>
+    
+    <div class="stat-card-formal stat-graded">
+        <div class="stat-icon">✅</div>
+        <div class="stat-content">
+            <div class="stat-number" id="examenes-calificados">0</div>
+            <div class="stat-description">Exámenes Calificados</div>
+        </div>
+    </div>
+    
+    <div class="stat-card-formal stat-key">
+        <div class="stat-icon">🔑</div>
+        <div class="stat-content">
+            <div class="stat-number" id="clave-estado">❌</div>
+            <div class="stat-description">Clave Cargada</div>
+        </div>
+    </div>
+</div>
+
+<!-- Sección Principal: 3 Módulos -->
+<div class="modules-container">
+    
+    <!-- MÓDULO 1: GENERACIÓN DE HOJAS -->
+    <section class="module-card">
+        <div class="module-header">
+            <span class="module-icon">📄</span>
+            <h2>Generar Hojas de Respuestas</h2>
+        </div>
+        
+        <div class="module-body">
+            <div class="info-block info-primary">
+                <strong>ℹ️ Información:</strong>
+                <p>Este módulo genera las hojas de respuestas individuales para cada postulante inscrito. Cada hoja incluye:</p>
+                <ul>
+                    <li>Código QR único</li>
+                    <li>Espacios para DNI del postulante</li>
+                    <li>Código de aula</li>
+                    <li>DNI del profesor supervisor</li>
+                    <li>100 espacios para respuestas (A-E)</li>
+                </ul>
+            </div>
+            
+            <div class="action-group">
+                <button id="btn-generar-hojas" class="btn-formal btn-primary-formal">
+                    <span class="btn-icon">📄</span>
+                    Generar Hojas de Respuestas
+                </button>
+                <button id="btn-descargar-pdf" class="btn-formal btn-secondary-formal" disabled>
+                    <span class="btn-icon">⬇️</span>
+                    Descargar PDF
+                </button>
+            </div>
+            
+            <div id="resultado-generacion" class="result-panel" style="display: none;"></div>
+        </div>
+    </section>
+    
+    <!-- MÓDULO 2: CAPTURA DE EXÁMENES -->
+    <section class="module-card">
+        <div class="module-header">
+            <span class="module-icon">📸</span>
+            <h2>Capturar Exámenes de Postulantes</h2>
+        </div>
+        
+        <div class="module-body">
+            <div class="info-block info-warning">
+                <strong>⚠️ Instrucciones para el Profesor:</strong>
+                <ol>
+                    <li>Verificar que la hoja contenga los 3 códigos (DNI Postulante, Aula, DNI Profesor)</li>
+                    <li>Activar la cámara del dispositivo</li>
+                    <li>Capturar foto clara de la hoja completa</li>
+                    <li>El sistema extraerá automáticamente el código y las respuestas</li>
+                </ol>
+            </div>
+            
+            <div class="camera-section" id="camera-section-exam" style="display: none;">
+                <div class="camera-viewport">
+                    <video id="video-exam" autoplay playsinline></video>
+                    <canvas id="canvas-exam" style="display: none;"></canvas>
+                    
+                    <!-- Guías de encuadre -->
+                    <div class="camera-guides">
+                        <div class="guide-corner tl"></div>
+                        <div class="guide-corner tr"></div>
+                        <div class="guide-corner bl"></div>
+                        <div class="guide-corner br"></div>
+                        <p class="guide-text">Centra la hoja dentro del marco</p>
+                    </div>
+                </div>
+                
+                <div class="camera-controls-formal">
+                    <button id="btn-switch-camera-exam" class="btn-camera-control">
+                        <span>🔄</span>
+                        <span>Cambiar Cámara</span>
+                    </button>
+                    <button id="btn-capture-exam" class="btn-camera-capture">
+                        <span>📸</span>
+                        <span>CAPTURAR</span>
+                    </button>
+                    <button id="btn-close-camera-exam" class="btn-camera-control btn-danger-control">
+                        <span>❌</span>
+                        <span>Cerrar</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="preview-exam" class="preview-section" style="display: none;">
+                <img id="preview-img-exam" class="preview-image-formal">
+                <div class="preview-actions">
+                    <button id="btn-retry-exam" class="btn-formal btn-secondary-formal">
+                        <span class="btn-icon">🔄</span>
+                        Tomar Otra Foto
+                    </button>
+                    <button id="btn-process-exam" class="btn-formal btn-success-formal">
+                        <span class="btn-icon">⚡</span>
+                        Procesar Examen
+                    </button>
+                </div>
+            </div>
+            
+            <div class="action-group">
+                <button id="btn-activar-camara-exam" class="btn-formal btn-primary-formal">
+                    <span class="btn-icon">📷</span>
+                    Activar Cámara
+                </button>
+            </div>
+            
+            <div id="resultado-examen" class="result-panel" style="display: none;"></div>
+            
+            <!-- Contador de exámenes capturados hoy -->
+            <div class="session-counter">
+                <p><strong>📊 Exámenes capturados en esta sesión:</strong> <span id="contador-sesion">0</span></p>
+            </div>
+        </div>
+    </section>
+    
+    <!-- MÓDULO 3: CLAVE DE RESPUESTAS -->
+    <section class="module-card module-critical">
+        <div class="module-header module-header-critical">
+            <span class="module-icon">🔐</span>
+            <h2>Capturar Clave de Respuestas Correctas</h2>
+        </div>
+        
+        <div class="module-body">
+            <div class="info-block info-danger">
+                <strong>🔒 PROCESO CRÍTICO - Solo Director/Decano</strong>
+                <p>Esta sección debe ser utilizada únicamente por el Director o Decano al momento de la <strong>apertura del sobre lacrado</strong> que contiene las respuestas correctas.</p>
+                <ul>
+                    <li>✅ Verificar que todos los exámenes estén capturados</li>
+                    <li>✅ Presencia de autoridades y veedores</li>
+                    <li>✅ Grabar el proceso de apertura (opcional pero recomendado)</li>
+                </ul>
+            </div>
+            
+            <div class="live-indicator-formal">
+                <span class="live-pulse"></span>
+                <span class="live-text">🔴 PROCESO EN VIVO</span>
+            </div>
+            
+            <div class="camera-section" id="camera-section-key" style="display: none;">
+                <div class="camera-viewport camera-viewport-key">
+                    <video id="video-key" autoplay playsinline></video>
+                    <canvas id="canvas-key" style="display: none;"></canvas>
+                    
+                    <div class="camera-guides">
+                        <div class="guide-corner tl"></div>
+                        <div class="guide-corner tr"></div>
+                        <div class="guide-corner bl"></div>
+                        <div class="guide-corner br"></div>
+                        <p class="guide-text">HOJA DE RESPUESTAS CORRECTAS</p>
+                    </div>
+                </div>
+                
+                <div class="camera-controls-formal">
+                    <button id="btn-switch-camera-key" class="btn-camera-control">
+                        <span>🔄</span>
+                        <span>Cambiar Cámara</span>
+                    </button>
+                    <button id="btn-capture-key" class="btn-camera-capture btn-camera-capture-key">
+                        <span>🔐</span>
+                        <span>CAPTURAR CLAVE</span>
+                    </button>
+                    <button id="btn-close-camera-key" class="btn-camera-control btn-danger-control">
+                        <span>❌</span>
+                        <span>Cerrar</span>
+                    </button>
+                </div>
+            </div>
+            
+            <div id="preview-key" class="preview-section" style="display: none;">
+                <img id="preview-img-key" class="preview-image-formal">
+                <div class="preview-actions">
+                    <button id="btn-retry-key" class="btn-formal btn-secondary-formal">
+                        <span class="btn-icon">🔄</span>
+                        Tomar Otra Foto
+                    </button>
+                    <button id="btn-process-key" class="btn-formal btn-critical-formal">
+                        <span class="btn-icon">🔐</span>
+                        Procesar Clave Oficial
+                    </button>
+                </div>
+            </div>
+            
+            <div class="action-group">
+                <button id="btn-activar-camara-key" class="btn-formal btn-critical-formal" disabled>
+                    <span class="btn-icon">🔐</span>
+                    Iniciar Apertura del Sobre
+                </button>
+                <p class="helper-text">Se habilitará cuando se hayan capturado al menos 10 exámenes</p>
+            </div>
+            
+            <div id="resultado-clave" class="result-panel" style="display: none;"></div>
+        </div>
+    </section>
+    
+</div>
+
+<!-- MÓDULO 4: CALIFICACIÓN Y RESULTADOS -->
+<section class="module-card module-results">
+    <div class="module-header">
+        <span class="module-icon">🏆</span>
+        <h2>Calificación y Publicación de Resultados</h2>
+    </div>
+    
+    <div class="module-body">
+        <div class="info-block info-success">
+            <strong>✅ Requisitos para Calificar:</strong>
+            <ul>
+                <li id="req-examenes">❌ Exámenes de postulantes capturados</li>
+                <li id="req-clave">❌ Clave de respuestas correctas cargada</li>
+            </ul>
+        </div>
+        
+        <div class="action-group-large">
+            <button id="btn-calificar-todos" class="btn-formal-large btn-success-large" disabled>
+                <span class="btn-icon-large">🚀</span>
+                <span>CALIFICAR TODOS LOS EXÁMENES</span>
+            </button>
+            
+            <button id="btn-ver-resultados" class="btn-formal-large btn-primary-large">
+                <span class="btn-icon-large">📊</span>
+                <span>VER RANKING DE INGRESANTES</span>
+            </button>
+            
+            <button id="btn-exportar-resultados" class="btn-formal-large btn-secondary-large" disabled>
+                <span class="btn-icon-large">📥</span>
+                <span>EXPORTAR RESULTADOS (Excel)</span>
+            </button>
+        </div>
+        
+        <div id="resultado-calificacion" class="result-panel-large" style="display: none;"></div>
+    </div>
+</section>
+
+<!-- Loading Overlay Profesional -->
+<div id="loading-overlay-formal" class="loading-overlay-formal" style="display: none;">
+    <div class="loading-content-formal">
+        <div class="loading-spinner-formal"></div>
+        <p class="loading-text-formal" id="loading-message">Procesando...</p>
+        <p class="loading-subtext" id="loading-subtext">Por favor espere</p>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/camera-handler.js') }}"></script>
+<script src="{{ url_for('static', path='/js/exam-processor.js') }}"></script>
+{% endblock %}

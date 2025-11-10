@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}POSTULANDO - Sistema Profesional{% endblock %}</title>
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="{{ url_for('static', path='css/styles_pro.css') }}">
+    
+    {% block extra_css %}{% endblock %}
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <h1>POSTULANDO</h1>
+                <p class="subtitle">Instituto Pedro A. Del Águila - Admisión 2025</p>
+            </div>
+            <nav class="nav">
+                <a href="/prueba-formal" class="nav-link">Demo</a>
+                <a href="/resultados" class="nav-link">Resultados</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- Content -->
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p style="font-weight: 600;">© 2025 POSTULANDO</p>
+        <p>Sistema Profesional de Exámenes de Admisión</p>
+        <p>Desarrollado por <a href="https://duilio.store" target="_blank">SigcoSystems</a></p>
+    </footer>
+
+    <!-- JavaScript -->
+    {% block extra_js %}{% endblock %}
+</body>
+</html>
