@@ -1,3 +1,9 @@
-from app.api import demo
+"""
+Endpoints de la API REST para POSTULANDO
+"""
 
-__all__ = ["demo"]
+from app.api.demo import router as demo_router
+
+__all__ = [
+    "demo_router"
+]
