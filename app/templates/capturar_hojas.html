@@ -1,0 +1,438 @@
+{% extends "base.html" %}
+
+{% block title %}Capturar Hojas{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/camera-styles.css') }}">
+<style>
+    :root {
+        --primary-blue: #2563eb;
+        --bg-dark: #0f172a;
+        --bg-card: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+    }
+
+    body {
+        background: var(--bg-dark);
+        color: var(--text-light);
+    }
+
+    .page-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .btn-volver {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        margin-bottom: 20px;
+    }
+
+    .btn-volver:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 30px;
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        margin-bottom: 8px;
+    }
+
+    .progress-bar {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .progress-info {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .progress-track {
+        height: 12px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 6px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: var(--primary-blue);
+        transition: width 0.3s ease;
+    }
+
+    .estadisticas-rapidas {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 30px;
+    }
+
+    .stat-box {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        padding: 16px;
+        border-radius: 8px;
+        text-align: center;
+    }
+
+    .stat-box .value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary-blue);
+    }
+
+    .stat-box .label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        margin-top: 4px;
+    }
+
+    .resultado-section {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 30px;
+        margin-top: 30px;
+    }
+
+    .resultado-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 24px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .resultado-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 24px;
+    }
+
+    .resultado-item {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 16px;
+        border-radius: 8px;
+    }
+
+    .resultado-item dt {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 4px;
+    }
+
+    .resultado-item dd {
+        font-size: 1.125rem;
+        color: var(--text-light);
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .nota-destacada {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
+        margin-bottom: 24px;
+    }
+
+    .nota-destacada .value {
+        font-size: 3rem;
+        font-weight: 700;
+    }
+
+    .btn-siguiente {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+    }
+
+    .btn-siguiente:hover {
+        background: #1d4ed8;
+    }
+
+    /* CORRECCIÓN DEFINITIVA PARA CÁMARA */
+    #cameraContainer {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer .camera-container {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer .camera-view,
+    #cameraContainer .photo-preview {
+        max-width: 600px !important;
+        max-height: 480px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer video,
+    #cameraContainer canvas,
+    #cameraContainer img {
+        max-width: 100% !important;
+        max-height: 480px !important;
+        width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto !important;
+    }
+
+    #cameraContainer .camera-controls {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+    }
+
+    @media (max-width: 768px) {
+        #cameraContainer .camera-view,
+        #cameraContainer .photo-preview {
+            max-height: 420px !important;
+        }
+        
+        #cameraContainer video,
+        #cameraContainer canvas,
+        #cameraContainer img {
+            max-height: 420px !important;
+        }
+    }
+
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <a href="/" class="btn-volver">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver
+    </a>
+
+    <div class="page-header">
+        <h1>📸 Capturar Hojas de Respuestas</h1>
+        <p>Sistema de captura automática con visión artificial</p>
+    </div>
+
+    <div class="progress-bar">
+        <div class="progress-info">
+            <span>Progreso de Captura</span>
+            <span><span id="contadorProcesados">{{ hojas_procesadas }}</span> / {{ total_postulantes }}</span>
+        </div>
+        <div class="progress-track">
+            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <div class="estadisticas-rapidas">
+        <div class="stat-box">
+            <div class="value" id="statProcesadas">{{ hojas_procesadas }}</div>
+            <div class="label">Procesadas</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="statPendientes">{{ total_postulantes - hojas_procesadas }}</div>
+            <div class="label">Pendientes</div>
+        </div>
+        <div class="stat-box">
+            <div class="value" id="statTiempoPromedio">-</div>
+            <div class="label">Tiempo Promedio</div>
+        </div>
+    </div>
+
+    <div style="max-width: 600px; margin: 0 auto; overflow: hidden;">
+        <div id="cameraContainer"></div>
+    </div>
+
+    <div class="resultado-section" id="resultadoSection" style="display: none;">
+        <div class="resultado-header">
+            <h3>✅ Hoja Procesada Exitosamente</h3>
+        </div>
+
+        <div class="nota-destacada">
+            <div class="label">Nota Final</div>
+            <div class="value" id="resultadoNota">-</div>
+        </div>
+
+        <div class="resultado-grid">
+            <div class="resultado-item">
+                <dt>Postulante</dt>
+                <dd id="resultadoNombre">-</dd>
+            </div>
+            <div class="resultado-item">
+                <dt>DNI</dt>
+                <dd id="resultadoDni">-</dd>
+            </div>
+            <div class="resultado-item">
+                <dt>Programa</dt>
+                <dd id="resultadoPrograma">-</dd>
+            </div>
+            <div class="resultado-item">
+                <dt>Respuestas Correctas</dt>
+                <dd id="resultadoCorrectas">-</dd>
+            </div>
+        </div>
+
+        <button type="button" class="btn-siguiente" onclick="siguienteHoja()">
+            Procesar Siguiente Hoja →
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/camera-capture.js') }}"></script>
+<script>
+let camera;
+let contadorProcesados = parseInt('{{ hojas_procesadas }}');
+let tiemposTotales = [];
+const totalPostulantes = parseInt('{{ total_postulantes }}');
+
+window.addEventListener('load', () => {
+    console.log('Página cargada');
+    
+    if (typeof CameraCapture === 'undefined') {
+        console.error('CameraCapture no disponible');
+        alert('Error: Sistema de cámara no disponible. Verifique que camera-capture.js existe en app/static/js/');
+        return;
+    }
+    
+    console.log('CameraCapture disponible');
+    setTimeout(() => {
+        inicializarCamara();
+    }, 500);
+});
+
+function inicializarCamara() {
+    console.log('Inicializando cámara...');
+    
+    try {
+        camera = new CameraCapture('cameraContainer', {
+            width: 1920,
+            height: 1440,
+            imageQuality: 0.85,
+            facingMode: 'environment',
+            
+            texts: {
+                capture: 'Capturar Hoja',
+                retake: 'Tomar Otra',
+                confirm: 'Confirmar y Procesar',
+                switchCamera: 'Cambiar Cámara',
+                loading: 'Procesando...'
+            },
+            
+            onCameraReady: (settings) => {
+                console.log('Cámara lista:', settings);
+            },
+            
+            onError: (error, message) => {
+                console.error('Error:', error);
+                alert(message);
+            }
+        });
+        
+        camera.startCamera().then(() => {
+            console.log('Cámara iniciada');
+        }).catch(err => {
+            console.error('Error al iniciar:', err);
+            alert('No se pudo acceder a la cámara. Asegúrese de dar permisos en HTTPS.');
+        });
+        
+    } catch (error) {
+        console.error('Error al crear CameraCapture:', error);
+        alert('Error: ' + error.message);
+    }
+}
+
+async function procesarHoja() {
+    try {
+        const result = await camera.confirmPhoto();
+        
+        const response = await fetch('/api/procesar-hoja', {
+            method: 'POST',
+            body: result.formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al procesar hoja');
+        }
+        
+        const data = await response.json();
+        mostrarResultado(data);
+        actualizarEstadisticas(data);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error: ' + error.message);
+        camera.retakePhoto();
+    }
+}
+
+function mostrarResultado(data) {
+    document.getElementById('resultadoNombre').textContent = data.postulante;
+    document.getElementById('resultadoDni').textContent = data.dni;
+    document.getElementById('resultadoPrograma').textContent = data.programa || '-';
+    document.getElementById('resultadoNota').textContent = data.nota.toFixed(2);
+    document.getElementById('resultadoCorrectas').textContent = data.respuestas_correctas + ' / 100';
+    
+    document.getElementById('cameraContainer').style.display = 'none';
+    document.getElementById('resultadoSection').style.display = 'block';
+}
+
+function actualizarEstadisticas(data) {
+    contadorProcesados++;
+    document.getElementById('contadorProcesados').textContent = contadorProcesados;
+    document.getElementById('statProcesadas').textContent = contadorProcesados;
+    document.getElementById('statPendientes').textContent = totalPostulantes - contadorProcesados;
+    
+    const porcentaje = (contadorProcesados / totalPostulantes) * 100;
+    document.getElementById('progressFill').style.width = porcentaje + '%';
+    
+    tiemposTotales.push(data.tiempo_procesamiento);
+    const promedio = tiemposTotales.reduce((a, b) => a + b, 0) / tiemposTotales.length;
+    document.getElementById('statTiempoPromedio').textContent = promedio.toFixed(1) + 's';
+}
+
+function siguienteHoja() {
+    document.getElementById('resultadoSection').style.display = 'none';
+    document.getElementById('cameraContainer').style.display = 'block';
+    camera.reset();
+    camera.startCamera();
+}
+</script>
+{% endblock %}

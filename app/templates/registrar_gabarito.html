@@ -1,0 +1,433 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar Gabarito{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/camera-styles.css') }}">
+<style>
+    :root {
+        --primary-blue: #2563eb;
+        --bg-dark: #0f172a;
+        --bg-card: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+    }
+
+    body {
+        background: var(--bg-dark);
+        color: var(--text-light);
+    }
+
+    .page-container {
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .btn-volver {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+
+    .method-selector {
+        display: flex;
+        gap: 16px;
+        margin-bottom: 30px;
+        justify-content: center;
+    }
+
+    .method-card {
+        flex: 1;
+        max-width: 300px;
+        padding: 24px;
+        background: var(--bg-card);
+        border: 2px solid var(--border-color);
+        border-radius: 12px;
+        cursor: pointer;
+        transition: all 0.3s;
+        text-align: center;
+    }
+
+    .method-card:hover {
+        border-color: var(--primary-blue);
+        background: rgba(37, 99, 235, 0.05);
+    }
+
+    .method-card.active {
+        border-color: var(--primary-blue);
+        background: rgba(37, 99, 235, 0.1);
+    }
+
+    .method-icon {
+        font-size: 3rem;
+        margin-bottom: 12px;
+    }
+
+    .method-title {
+        font-size: 1.125rem;
+        font-weight: 600;
+        margin-bottom: 8px;
+    }
+
+    .method-description {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .section-content {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 30px;
+    }
+
+    .manual-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+        margin-top: 20px;
+    }
+
+    .pregunta-input {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .pregunta-input label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        font-weight: 600;
+    }
+
+    .pregunta-input select {
+        padding: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-light);
+        font-size: 0.875rem;
+    }
+
+    .btn-guardar {
+        width: 100%;
+        padding: 14px;
+        background: var(--primary-blue);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-size: 1rem;
+        font-weight: 600;
+        cursor: pointer;
+        margin-top: 24px;
+    }
+
+    .btn-guardar:hover {
+        background: #1d4ed8;
+    }
+
+
+    /* CORRECCIÓN DEFINITIVA PARA CÁMARA */
+    #cameraContainer {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer .camera-container {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer .camera-view,
+    #cameraContainer .photo-preview {
+        max-width: 600px !important;
+        max-height: 420px !important;
+        margin: 0 auto !important;
+        overflow: hidden !important;
+    }
+
+    #cameraContainer video,
+    #cameraContainer canvas,
+    #cameraContainer img {
+        max-width: 100% !important;
+        max-height: 420px !important;
+        width: 100% !important;
+        height: auto !important;
+        object-fit: contain !important;
+        display: block !important;
+        margin: 0 auto !important;
+    }
+
+    #cameraContainer .camera-controls {
+        max-width: 600px !important;
+        margin: 0 auto !important;
+    }
+
+    @media (max-width: 768px) {
+        #cameraContainer .camera-view,
+        #cameraContainer .photo-preview {
+            max-height: 420px !important;
+        }
+        
+        #cameraContainer video,
+        #cameraContainer canvas,
+        #cameraContainer img {
+            max-height: 420px !important;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <a href="/" class="btn-volver">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver
+    </a>
+
+    <div class="page-header">
+        <h1>✅ Registrar Respuestas Correctas</h1>
+        <p>Ingresa el gabarito del examen</p>
+    </div>
+
+    <!-- Selector de método -->
+    <div class="method-selector">
+        <div class="method-card active" id="methodCamera" onclick="selectMethod('camera')">
+            <div class="method-icon">📸</div>
+            <div class="method-title">Capturar con Cámara</div>
+            <div class="method-description">Usa la cámara para escanear el gabarito</div>
+        </div>
+
+        <div class="method-card" id="methodManual" onclick="selectMethod('manual')">
+            <div class="method-icon">⌨️</div>
+            <div class="method-title">Ingreso Manual</div>
+            <div class="method-description">Ingresa las respuestas manualmente</div>
+        </div>
+    </div>
+
+    <!-- Sección de cámara -->
+    <div id="cameraSection" class="section-content" style="display: block;">
+        <div class="camera-info">
+            Coloca la hoja de respuestas correctas dentro del marco y captura
+        </div>
+        
+        <div style="max-width: 600px; margin: 0 auto; overflow: hidden;">
+            <div id="cameraContainer"></div>
+        </div>
+
+    </div>
+
+    <!-- Sección de ingreso manual -->
+    <div id="manualSection" class="section-content" style="display: none;">
+        <h3>Ingresa las respuestas correctas (100 preguntas)</h3>
+        
+        <div class="manual-grid">
+            {% for i in range(1, 101) %}
+            <div class="pregunta-input">
+                <label>{{ i }}</label>
+                <select name="respuesta_{{ i }}" id="respuesta_{{ i }}">
+                    <option value="">-</option>
+                    <option value="A">A</option>
+                    <option value="B">B</option>
+                    <option value="C">C</option>
+                    <option value="D">D</option>
+                    <option value="E">E</option>
+                </select>
+            </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="btn-guardar" onclick="guardarGabarito()">
+            Guardar Gabarito
+        </button>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', path='/js/camera-capture.js') }}"></script>
+<script>
+let camera;
+let currentMethod = 'camera';
+
+window.addEventListener('load', () => {
+    console.log('Página de gabarito cargada');
+    
+    if (typeof CameraCapture !== 'undefined') {
+        console.log('✅ CameraCapture disponible');
+        setTimeout(() => {
+            selectMethod('camera');
+        }, 300);
+    } else {
+        console.error('❌ CameraCapture no disponible');
+        // Cambiar a método manual por defecto
+        selectMethod('manual');
+    }
+});
+
+function selectMethod(method) {
+    currentMethod = method;
+    console.log('Método seleccionado:', method);
+    
+    const methodCamera = document.getElementById('methodCamera');
+    const methodManual = document.getElementById('methodManual');
+    const cameraSection = document.getElementById('cameraSection');
+    const manualSection = document.getElementById('manualSection');
+    
+    // Actualizar UI
+    methodCamera.classList.remove('active');
+    methodManual.classList.remove('active');
+    
+    if (method === 'camera') {
+        methodCamera.classList.add('active');
+        cameraSection.style.display = 'block';
+        manualSection.style.display = 'none';
+        
+        // Inicializar cámara
+        if (typeof CameraCapture === 'undefined') {
+            alert('Error: Sistema de cámara no disponible');
+            selectMethod('manual');
+            return;
+        }
+        
+        if (!camera) {
+            setTimeout(() => {
+                inicializarCamara();
+            }, 300);
+        } else {
+            camera.startCamera();
+        }
+    } else {
+        methodManual.classList.add('active');
+        cameraSection.style.display = 'none';
+        manualSection.style.display = 'block';
+        
+        if (camera) {
+            camera.stopCamera();
+        }
+    }
+}
+
+function inicializarCamara() {
+    console.log('Inicializando cámara para gabarito...');
+    
+    try {
+        camera = new CameraCapture('cameraContainer', {
+            width: 1920,
+            height: 1440,
+            imageQuality: 0.85,
+            facingMode: 'environment',
+            
+            texts: {
+                capture: 'Capturar Gabarito',
+                retake: 'Tomar Otra',
+                confirm: 'Confirmar y Procesar',
+                switchCamera: 'Cambiar Cámara',
+                loading: 'Procesando gabarito...'
+            },
+            
+            onCameraReady: (settings) => {
+                console.log('✅ Cámara lista para gabarito:', settings);
+            },
+            
+            onError: (error, message) => {
+                console.error('❌ Error:', error);
+                alert(message);
+            }
+        });
+        
+        camera.startCamera().then(() => {
+            console.log('✅ Cámara iniciada para gabarito');
+        }).catch(err => {
+            console.error('❌ Error al iniciar:', err);
+            alert('No se pudo acceder a la cámara. Cambiando a ingreso manual...');
+            selectMethod('manual');
+        });
+        
+    } catch (error) {
+        console.error('❌ Error al crear CameraCapture:', error);
+        alert('Error: ' + error.message);
+        selectMethod('manual');
+    }
+}
+
+async function procesarGabarito() {
+    try {
+        const result = await camera.confirmPhoto();
+        
+        const response = await fetch('/api/registrar-gabarito', {
+            method: 'POST',
+            body: result.formData
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al procesar gabarito');
+        }
+        
+        const data = await response.json();
+        alert('✅ Gabarito registrado exitosamente\n' + data.total + ' respuestas guardadas');
+        window.location.href = '/';
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al procesar: ' + error.message);
+        camera.retakePhoto();
+    }
+}
+
+async function guardarGabarito() {
+    const respuestas = [];
+    
+    for (let i = 1; i <= 100; i++) {
+        const select = document.getElementById('respuesta_' + i);
+        const valor = select.value;
+        
+        if (!valor) {
+            alert('Por favor complete todas las respuestas (falta pregunta ' + i + ')');
+            select.focus();
+            return;
+        }
+        
+        respuestas.push(valor);
+    }
+    
+    try {
+        const response = await fetch('/api/registrar-gabarito-manual', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                respuestas: respuestas
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al guardar gabarito');
+        }
+        
+        const data = await response.json();
+        alert('✅ Gabarito guardado exitosamente\n' + data.total + ' respuestas registradas');
+        window.location.href = '/';
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al guardar: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
