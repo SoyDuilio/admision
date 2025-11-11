@@ -17,6 +17,7 @@ class EstadoProcesamiento(enum.Enum):
     procesando = "procesando"
     completado = "completado"
     error = "error"
+    observado = "observado"
 
 class APIVision(enum.Enum):
     """APIs de Vision disponibles"""
@@ -35,6 +36,7 @@ class HojaRespuesta(Base):
     - Qué API se usó para procesarla
     - Tiempo de procesamiento
     - Estado del procesamiento
+    - Validación de códigos (DNI profesor, código aula)
     """
     
     __tablename__ = "hojas_respuestas"
@@ -42,13 +44,19 @@ class HojaRespuesta(Base):
     id = Column(Integer, primary_key=True, index=True)
     postulante_id = Column(Integer, ForeignKey('postulantes.id', ondelete='CASCADE'), nullable=False)
     
+    # Validación y códigos (NUEVO)
+    dni_profesor = Column(String(8), index=True)
+    codigo_aula = Column(String(20), index=True)
+    codigo_hoja = Column(String(20), unique=True, index=True)
+    proceso_admision = Column(String(10), default="2025-1", index=True)
+    
     # Imagen
     imagen_url = Column(String(500))
     imagen_original_nombre = Column(String(200))
     
     # Procesamiento
     api_utilizada = Column(String(20))  # 'google', 'openai', 'anthropic'
-    estado = Column(String(20), default='procesando')  # 'procesando', 'completado', 'error'
+    estado = Column(String(20), default='procesando')  # 'procesando', 'completado', 'error', 'observado'
     respuestas_detectadas = Column(Integer, default=0)
     tiempo_procesamiento = Column(Float)
     metadata_json = Column(Text)
@@ -56,6 +64,9 @@ class HojaRespuesta(Base):
     # Calificación
     nota_final = Column(Float)
     respuestas_correctas_count = Column(Integer, default=0)
+    
+    # Observaciones (NUEVO)
+    observaciones = Column(Text)
     
     # Timestamps
     fecha_captura = Column(DateTime(timezone=True), server_default=func.now())
@@ -68,17 +79,7 @@ class HojaRespuesta(Base):
     respuestas = relationship("Respuesta", back_populates="hoja_respuesta", cascade="all, delete-orphan")
     
     def __repr__(self):
-        return f"<HojaRespuesta(id={self.id}, postulante_id={self.postulante_id}, estado='{self.estado}')>"
-    
-    @property
-    def estado(self) -> str:
-        """Retorna el estado del procesamiento"""
-        if self.error_message:
-            return "error"
-        elif self.procesada:
-            return "procesada"
-        else:
-            return "pendiente"
+        return f"<HojaRespuesta(id={self.id}, codigo_hoja='{self.codigo_hoja}', postulante_id={self.postulante_id}, estado='{self.estado}')>"
     
     @property
     def api_display(self) -> str:
@@ -86,24 +87,30 @@ class HojaRespuesta(Base):
         api_names = {
             "google": "Google Vision",
             "openai": "OpenAI GPT-4 Vision",
+            "anthropic": "Anthropic Claude Vision",
             "claude": "Anthropic Claude Vision"
         }
-        return api_names.get(self.api_usada, self.api_usada or "N/A")
+        return api_names.get(self.api_utilizada, self.api_utilizada or "N/A")
     
     def to_dict(self) -> dict:
         """Convierte el modelo a diccionario"""
         return {
             "id": self.id,
             "postulante_id": self.postulante_id,
-            "imagen_path": self.imagen_path,
-            "procesada": self.procesada,
-            "api_usada": self.api_usada,
+            "codigo_hoja": self.codigo_hoja,
+            "dni_profesor": self.dni_profesor,
+            "codigo_aula": self.codigo_aula,
+            "proceso_admision": self.proceso_admision,
+            "imagen_url": self.imagen_url,
+            "imagen_original_nombre": self.imagen_original_nombre,
+            "api_utilizada": self.api_utilizada,
             "api_display": self.api_display,
+            "estado": self.estado,
             "tiempo_procesamiento": self.tiempo_procesamiento,
             "respuestas_detectadas": self.respuestas_detectadas,
-            "confianza_promedio": self.confianza_promedio,
-            "estado": self.estado,
-            "gps_valido": self.gps_valido,
+            "nota_final": self.nota_final,
+            "respuestas_correctas_count": self.respuestas_correctas_count,
+            "observaciones": self.observaciones,
             "created_at": self.created_at.isoformat() if self.created_at else None,
-            "processed_at": self.processed_at.isoformat() if self.processed_at else None,
+            "fecha_calificacion": self.fecha_calificacion.isoformat() if self.fecha_calificacion else None,
         }
