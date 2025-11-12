@@ -36,12 +36,7 @@
         border-radius: 8px;
         text-decoration: none;
         font-weight: 600;
-        font-size: 0.9375rem;
         margin-bottom: 20px;
-    }
-
-    .btn-volver:hover {
-        background: rgba(255, 255, 255, 0.05);
     }
 
     .page-header {
@@ -49,66 +44,100 @@
         margin-bottom: 30px;
     }
 
-    .page-header h1 {
-        font-size: 1.75rem;
-        margin-bottom: 8px;
+    /* INSTRUCCIONES DE VOZ */
+    .voice-instructions {
+        text-align: center;
+        padding: 16px;
+        background: rgba(37, 99, 235, 0.1);
+        border: 1px solid rgba(37, 99, 235, 0.3);
+        border-radius: 8px;
+        color: #60a5fa;
+        margin-bottom: 20px;
+        font-size: 1.125rem;
     }
 
-    .progress-bar {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        border-radius: 12px;
-        padding: 20px;
-        margin-bottom: 30px;
+    .voice-instructions strong {
+        color: #3b82f6;
+        font-size: 1.25rem;
     }
 
-    .progress-info {
+    /* CÁMARA MEJORADA */
+    #cameraContainer {
+        max-width: 900px !important;
+        margin: 0 auto !important;
+    }
+
+    #cameraContainer .camera-view,
+    #cameraContainer .photo-preview {
+        min-height: 650px !important;
+        max-height: 650px !important;
+    }
+
+    #cameraContainer video,
+    #cameraContainer img {
+        min-height: 650px !important;
+        max-height: 650px !important;
+    }
+
+    /* INDICADOR DE VOZ ACTIVO */
+    .voice-active {
+        position: fixed;
+        bottom: 30px;
+        right: 30px;
+        background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+        color: white;
+        padding: 12px 24px;
+        border-radius: 50px;
+        font-weight: 700;
+        display: none;
+        align-items: center;
+        gap: 10px;
+        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+        animation: pulse-voice 1.5s infinite;
+        z-index: 1000;
+    }
+
+    .voice-active.active {
         display: flex;
-        justify-content: space-between;
-        margin-bottom: 12px;
     }
 
-    .progress-track {
-        height: 12px;
+    .voice-active::before {
+        content: '🎤';
+        font-size: 1.5rem;
+    }
+
+    @keyframes pulse-voice {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.05); }
+    }
+
+    /* METADATA INDICATOR */
+    .metadata-status {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-bottom: 20px;
+        font-size: 0.875rem;
+    }
+
+    .metadata-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
         background: rgba(0, 0, 0, 0.3);
         border-radius: 6px;
-        overflow: hidden;
     }
 
-    .progress-fill {
-        height: 100%;
-        background: var(--primary-blue);
-        transition: width 0.3s ease;
+    .metadata-item.ok {
+        color: #22c55e;
     }
 
-    .estadisticas-rapidas {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-bottom: 30px;
+    .metadata-item.loading {
+        color: #94a3b8;
     }
 
-    .stat-box {
-        background: var(--bg-card);
-        border: 1px solid var(--border-color);
-        padding: 16px;
-        border-radius: 8px;
-        text-align: center;
-    }
-
-    .stat-box .value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--primary-blue);
-    }
-
-    .stat-box .label {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        text-transform: uppercase;
-        margin-top: 4px;
-    }
-
+    /* RESULTADOS */
     .resultado-section {
         background: var(--bg-card);
         border: 1px solid var(--border-color);
@@ -117,13 +146,18 @@
         margin-top: 30px;
     }
 
-    .resultado-header {
-        display: flex;
-        align-items: center;
-        gap: 12px;
+    .nota-destacada {
+        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
         margin-bottom: 24px;
-        padding-bottom: 20px;
-        border-bottom: 1px solid var(--border-color);
+    }
+
+    .nota-destacada .value {
+        font-size: 3rem;
+        font-weight: 700;
     }
 
     .resultado-grid {
@@ -152,20 +186,6 @@
         margin: 0;
     }
 
-    .nota-destacada {
-        background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
-        color: white;
-        padding: 24px;
-        border-radius: 12px;
-        text-align: center;
-        margin-bottom: 24px;
-    }
-
-    .nota-destacada .value {
-        font-size: 3rem;
-        font-weight: 700;
-    }
-
     .btn-siguiente {
         width: 100%;
         padding: 14px;
@@ -178,61 +198,19 @@
         cursor: pointer;
     }
 
-    .btn-siguiente:hover {
-        background: #1d4ed8;
-    }
-
-    /* CORRECCIÓN DEFINITIVA PARA CÁMARA */
-    #cameraContainer {
-        max-width: 600px !important;
-        margin: 0 auto !important;
-        overflow: hidden !important;
-    }
-
-    #cameraContainer .camera-container {
-        max-width: 600px !important;
-        margin: 0 auto !important;
-        overflow: hidden !important;
-    }
-
-    #cameraContainer .camera-view,
-    #cameraContainer .photo-preview {
-        max-width: 600px !important;
-        max-height: 480px !important;
-        margin: 0 auto !important;
-        overflow: hidden !important;
-    }
-
-    #cameraContainer video,
-    #cameraContainer canvas,
-    #cameraContainer img {
-        max-width: 100% !important;
-        max-height: 480px !important;
-        width: 100% !important;
-        height: auto !important;
-        object-fit: contain !important;
-        display: block !important;
-        margin: 0 auto !important;
-    }
-
-    #cameraContainer .camera-controls {
-        max-width: 600px !important;
-        margin: 0 auto !important;
-    }
-
     @media (max-width: 768px) {
         #cameraContainer .camera-view,
         #cameraContainer .photo-preview {
-            max-height: 420px !important;
+            min-height: 500px !important;
+            max-height: 500px !important;
         }
-        
+
         #cameraContainer video,
-        #cameraContainer canvas,
         #cameraContainer img {
-            max-height: 420px !important;
+            min-height: 500px !important;
+            max-height: 500px !important;
         }
     }
-
 </style>
 {% endblock %}
 
@@ -247,40 +225,38 @@
 
     <div class="page-header">
         <h1>📸 Capturar Hojas de Respuestas</h1>
-        <p>Sistema de captura automática con visión artificial</p>
+        <p>Sistema de captura con IA y reconocimiento de voz</p>
     </div>
 
-    <div class="progress-bar">
-        <div class="progress-info">
-            <span>Progreso de Captura</span>
-            <span><span id="contadorProcesados">{{ hojas_procesadas }}</span> / {{ total_postulantes }}</span>
-        </div>
-        <div class="progress-track">
-            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
-        </div>
+    <!-- INSTRUCCIONES DE VOZ -->
+    <div class="voice-instructions">
+        🎤 Di <strong>"CAPTURAR"</strong> para tomar la foto sin usar las manos
     </div>
 
-    <div class="estadisticas-rapidas">
-        <div class="stat-box">
-            <div class="value" id="statProcesadas">{{ hojas_procesadas }}</div>
-            <div class="label">Procesadas</div>
+    <!-- ESTADO DE METADATA -->
+    <div class="metadata-status">
+        <div class="metadata-item loading" id="statusGPS">
+            📍 GPS: Obteniendo...
         </div>
-        <div class="stat-box">
-            <div class="value" id="statPendientes">{{ total_postulantes - hojas_procesadas }}</div>
-            <div class="label">Pendientes</div>
+        <div class="metadata-item loading" id="statusDevice">
+            📱 Dispositivo: Verificando...
         </div>
-        <div class="stat-box">
-            <div class="value" id="statTiempoPromedio">-</div>
-            <div class="label">Tiempo Promedio</div>
+        <div class="metadata-item ok" id="statusVoz">
+            🎤 Voz: Activo
         </div>
     </div>
 
-    <div style="max-width: 600px; margin: 0 auto; overflow: hidden;">
-        <div id="cameraContainer"></div>
+    <!-- CÁMARA -->
+    <div id="cameraContainer"></div>
+
+    <!-- INDICADOR DE VOZ ACTIVO -->
+    <div class="voice-active" id="voiceActive">
+        Escuchando...
     </div>
 
+    <!-- RESULTADOS -->
     <div class="resultado-section" id="resultadoSection" style="display: none;">
-        <div class="resultado-header">
+        <div class="resultado-header" style="margin-bottom: 24px;">
             <h3>✅ Hoja Procesada Exitosamente</h3>
         </div>
 
@@ -306,6 +282,14 @@
                 <dt>Respuestas Correctas</dt>
                 <dd id="resultadoCorrectas">-</dd>
             </div>
+            <div class="resultado-item">
+                <dt>Código Hoja</dt>
+                <dd id="resultadoCodigoHoja">-</dd>
+            </div>
+            <div class="resultado-item">
+                <dt>Tiempo Procesamiento</dt>
+                <dd id="resultadoTiempo">-</dd>
+            </div>
         </div>
 
         <button type="button" class="btn-siguiente" onclick="siguienteHoja()">
@@ -319,22 +303,165 @@
 <script src="{{ url_for('static', path='/js/camera-capture.js') }}"></script>
 <script>
 let camera;
-let contadorProcesados = parseInt('{{ hojas_procesadas }}');
-let tiemposTotales = [];
-const totalPostulantes = parseInt('{{ total_postulantes }}');
+let recognition;
+let metadataCaptura = {};
 
-window.addEventListener('load', () => {
+// ============================================================================
+// CAPTURA DE METADATA DE SEGURIDAD
+// ============================================================================
+
+async function capturarMetadata() {
+    metadataCaptura = {
+        timestamp: new Date().toISOString(),
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        user_agent: navigator.userAgent,
+        device_fingerprint: await generarDeviceFingerprint(),
+        screen: {
+            width: screen.width,
+            height: screen.height,
+            colorDepth: screen.colorDepth
+        }
+    };
+
+    // Capturar GPS
+    try {
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true,
+                timeout: 10000,
+                maximumAge: 0
+            });
+        });
+
+        metadataCaptura.gps = {
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+            altitude: position.coords.altitude,
+            timestamp: position.timestamp
+        };
+
+        document.getElementById('statusGPS').className = 'metadata-item ok';
+        document.getElementById('statusGPS').textContent = '📍 GPS: Capturado ✓';
+    } catch (error) {
+        console.warn('GPS no disponible:', error);
+        metadataCaptura.gps = null;
+        document.getElementById('statusGPS').className = 'metadata-item';
+        document.getElementById('statusGPS').textContent = '📍 GPS: No disponible';
+    }
+
+    // Capturar IP (se obtiene en el backend)
+    document.getElementById('statusDevice').className = 'metadata-item ok';
+    document.getElementById('statusDevice').textContent = '📱 Dispositivo: Verificado ✓';
+
+    console.log('Metadata capturada:', metadataCaptura);
+    return metadataCaptura;
+}
+
+async function generarDeviceFingerprint() {
+    // Generar huella única del dispositivo
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    ctx.textBaseline = 'top';
+    ctx.font = '14px Arial';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = '#f60';
+    ctx.fillRect(125, 1, 62, 20);
+    ctx.fillStyle = '#069';
+    ctx.fillText('Device Fingerprint', 2, 15);
+    
+    const dataURL = canvas.toDataURL();
+    const hash = await sha256(dataURL + navigator.userAgent + screen.width + screen.height);
+    
+    return hash.substring(0, 32);
+}
+
+async function sha256(message) {
+    const msgBuffer = new TextEncoder().encode(message);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// ============================================================================
+// RECONOCIMIENTO DE VOZ
+// ============================================================================
+
+function iniciarReconocimientoVoz() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        console.log('Reconocimiento de voz no disponible');
+        document.getElementById('statusVoz').className = 'metadata-item';
+        document.getElementById('statusVoz').textContent = '🎤 Voz: No disponible';
+        return;
+    }
+
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    
+    recognition.lang = 'es-ES';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+
+    recognition.onstart = () => {
+        console.log('🎤 Reconocimiento de voz iniciado');
+        document.getElementById('voiceActive').classList.add('active');
+    };
+
+    recognition.onresult = (event) => {
+        const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
+        console.log('Voz detectada:', transcript);
+
+        if (transcript.includes('capturar') || transcript.includes('captura') || transcript.includes('foto')) {
+            console.log('✅ Comando CAPTURAR detectado');
+            
+            // Feedback visual
+            document.getElementById('voiceActive').textContent = '✓ Capturando...';
+            setTimeout(() => {
+                document.getElementById('voiceActive').textContent = 'Escuchando...';
+            }, 2000);
+            
+            capturarFoto();
+        }
+    };
+
+    recognition.onerror = (event) => {
+        console.error('Error en reconocimiento de voz:', event.error);
+        if (event.error === 'no-speech') {
+            // Reintentar automáticamente
+            recognition.stop();
+            setTimeout(() => recognition.start(), 1000);
+        }
+    };
+
+    recognition.onend = () => {
+        // Reiniciar automáticamente si se detiene
+        if (camera && !document.getElementById('resultadoSection').style.display === 'block') {
+            recognition.start();
+        }
+    };
+
+    recognition.start();
+}
+
+// ============================================================================
+// INICIALIZACIÓN
+// ============================================================================
+
+window.addEventListener('load', async () => {
     console.log('Página cargada');
+    
+    // Capturar metadata inicial
+    await capturarMetadata();
     
     if (typeof CameraCapture === 'undefined') {
         console.error('CameraCapture no disponible');
-        alert('Error: Sistema de cámara no disponible. Verifique que camera-capture.js existe en app/static/js/');
+        alert('Error: Sistema de cámara no disponible.');
         return;
     }
     
-    console.log('CameraCapture disponible');
     setTimeout(() => {
         inicializarCamara();
+        iniciarReconocimientoVoz();
     }, 500);
 });
 
@@ -345,13 +472,13 @@ function inicializarCamara() {
         camera = new CameraCapture('cameraContainer', {
             width: 1920,
             height: 1440,
-            imageQuality: 0.85,
+            imageQuality: 0.92,
             facingMode: 'environment',
             
             texts: {
                 capture: 'Capturar Hoja',
                 retake: 'Tomar Otra',
-                confirm: 'Confirmar y Procesar',  // ← Este texto aparece en el botón
+                confirm: 'Confirmar y Procesar',
                 switchCamera: 'Cambiar Cámara',
                 loading: 'Procesando...'
             },
@@ -368,9 +495,22 @@ function inicializarCamara() {
         
         camera.startCamera().then(() => {
             console.log('Cámara iniciada');
-        }).catch(err => {
-            console.error('Error al iniciar:', err);
-            alert('No se pudo acceder a la cámara. Asegúrese de dar permisos en HTTPS.');
+            
+            // Interceptar botón confirmar
+            setTimeout(() => {
+                const btnConfirm = document.getElementById('btnConfirm');
+                if (btnConfirm) {
+                    btnConfirm.replaceWith(btnConfirm.cloneNode(true));
+                    const btnConfirmNuevo = document.getElementById('btnConfirm');
+                    
+                    btnConfirmNuevo.addEventListener('click', async (e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        console.log('Click en Confirmar y Procesar');
+                        await procesarHoja();
+                    });
+                }
+            }, 1000);
         });
         
     } catch (error) {
@@ -379,121 +519,113 @@ function inicializarCamara() {
     }
 }
 
+function capturarFoto() {
+    if (camera) {
+        camera.capturePhoto();
+    }
+}
+
+// ============================================================================
+// PROCESAMIENTO
+// ============================================================================
+
 async function procesarHoja() {
     try {
-        // 1. CONFIRMAR FOTO Y OBTENER FormData
         const result = await camera.confirmPhoto();
         
         if (!result || !result.formData) {
             throw new Error('No se pudo obtener la imagen');
         }
+
+        // AGREGAR METADATA DE SEGURIDAD
+        result.formData.append('metadata_captura', JSON.stringify(metadataCaptura));
+        
+        // Calcular hash de la imagen
+        const imageHash = await sha256(result.dataUrl);
+        result.formData.append('image_hash', imageHash);
         
         // Mostrar estado de carga
         document.getElementById('cameraContainer').innerHTML = `
-            <div class="loading-state" style="display: flex; min-height: 300px;">
+            <div class="loading-state" style="display: flex; min-height: 300px; flex-direction: column; align-items: center; justify-content: center;">
                 <div class="spinner"></div>
-                <p>Subiendo y procesando hoja...</p>
+                <p style="margin-top: 20px; font-size: 1.125rem;">Procesando con Claude AI...</p>
+                <p style="color: #94a3b8; font-size: 0.875rem; margin-top: 8px;">Extrayendo códigos y respuestas</p>
             </div>
         `;
         
-        // 2. CAPTURAR HOJA (subir imagen + validar)
-        const capturaResponse = await fetch('/api/capturar-hoja', {
+        // Detener reconocimiento de voz temporalmente
+        if (recognition) {
+            recognition.stop();
+        }
+        document.getElementById('voiceActive').classList.remove('active');
+        
+        // ENVIAR A BACKEND
+        const response = await fetch('/api/procesar-hoja-completa', {
             method: 'POST',
             body: result.formData
         });
         
-        if (!capturaResponse.ok) {
-            throw new Error('Error al capturar hoja');
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error al procesar hoja');
         }
         
-        const datosCaptura = await capturaResponse.json();
-        console.log('Hoja capturada:', datosCaptura);
+        const resultado = await response.json();
+        console.log('Resultado:', resultado);
         
-        // Verificar si la validación fue exitosa
-        if (datosCaptura.estado !== "completado") {
-            alert(`⚠️ Advertencia:\n${datosCaptura.mensajes.join('\n')}`);
-            // Aún así, intentar procesar
-        }
-        
-        // 3. PROCESAR CON CLAUDE API
-        document.getElementById('cameraContainer').innerHTML = `
-            <div class="loading-state" style="display: flex; min-height: 300px;">
-                <div class="spinner"></div>
-                <p>Procesando con Claude AI...<br>Esto puede tomar 5-10 segundos</p>
-            </div>
-        `;
-        
-        const procesamientoResponse = await fetch(`/api/procesar-hoja/${datosCaptura.id}`, {
-            method: 'POST'
-        });
-        
-        if (!procesamientoResponse.ok) {
-            const error = await procesamientoResponse.json();
-            throw new Error(error.detail || 'Error al procesar con Claude');
-        }
-        
-        const resultado = await procesamientoResponse.json();
-        console.log('Resultado procesamiento:', resultado);
-        
-        // 4. MOSTRAR RESULTADOS
         mostrarResultado(resultado);
-        actualizarEstadisticas(resultado);
         
     } catch (error) {
         console.error('Error:', error);
         alert('Error: ' + error.message);
         
-        // Resetear cámara en caso de error
         document.getElementById('cameraContainer').style.display = 'block';
         if (camera) {
             camera.retakePhoto();
+        }
+        
+        // Reiniciar reconocimiento de voz
+        if (recognition) {
+            recognition.start();
         }
     }
 }
 
 function mostrarResultado(data) {
-    // Llenar datos del postulante
     if (data.postulante) {
         document.getElementById('resultadoNombre').textContent = data.postulante.nombres;
         document.getElementById('resultadoDni').textContent = data.postulante.dni;
         document.getElementById('resultadoPrograma').textContent = data.postulante.programa || '-';
     }
     
-    // Llenar datos de calificación
     if (data.calificacion) {
         document.getElementById('resultadoNota').textContent = data.calificacion.nota.toFixed(2);
-        document.getElementById('resultadoCorrectas').textContent = 
-            `${data.calificacion.correctas} / 100`;
+        document.getElementById('resultadoCorrectas').textContent = `${data.calificacion.correctas} / 100`;
     }
     
-    // Ocultar cámara y mostrar resultados
+    if (data.codigo_hoja) {
+        document.getElementById('resultadoCodigoHoja').textContent = data.codigo_hoja;
+    }
+    
+    if (data.procesamiento && data.procesamiento.tiempo) {
+        document.getElementById('resultadoTiempo').textContent = data.procesamiento.tiempo;
+    }
+    
     document.getElementById('cameraContainer').style.display = 'none';
     document.getElementById('resultadoSection').style.display = 'block';
-}
-
-function actualizarEstadisticas(data) {
-    contadorProcesados++;
-    document.getElementById('contadorProcesados').textContent = contadorProcesados;
-    document.getElementById('statProcesadas').textContent = contadorProcesados;
-    document.getElementById('statPendientes').textContent = totalPostulantes - contadorProcesados;
-    
-    const porcentaje = (contadorProcesados / totalPostulantes) * 100;
-    document.getElementById('progressFill').style.width = porcentaje + '%';
-    
-    // Actualizar tiempo promedio si está disponible
-    if (data.procesamiento && data.procesamiento.tiempo) {
-        const tiempo = parseFloat(data.procesamiento.tiempo);
-        tiemposTotales.push(tiempo);
-        const promedio = tiemposTotales.reduce((a, b) => a + b, 0) / tiemposTotales.length;
-        document.getElementById('statTiempoPromedio').textContent = promedio.toFixed(1) + 's';
-    }
 }
 
 function siguienteHoja() {
     document.getElementById('resultadoSection').style.display = 'none';
     document.getElementById('cameraContainer').style.display = 'block';
+    
     camera.reset();
     camera.startCamera();
+    
+    // Reiniciar reconocimiento de voz
+    if (recognition) {
+        recognition.start();
+    }
 }
 </script>
 {% endblock %}
