@@ -1027,66 +1027,119 @@ def calcular_calificacion(respuestas_alumno: List, respuestas_correctas_db, db) 
 # ENDPOINT: PROCESAR HOJA CON CLAUDE
 # ============================================================================
 
-@app.post("/api/procesar-hoja/{hoja_id}")
-async def procesar_hoja_con_claude(hoja_id: int):
+# ============================================================================
+# AGREGAR ESTE ENDPOINT A app/main.py (REEMPLAZA /api/procesar-hoja)
+# ============================================================================
+
+@app.post("/api/procesar-hoja-completa")
+async def procesar_hoja_completa(
+    file: UploadFile = File(...),
+    metadata_captura: str = Form(None),
+    image_hash: str = Form(None),
+    request: Request = None
+):
     """
-    Procesa una hoja de respuestas usando Claude API
-    
-    Flujo:
-    1. Obtener hoja de BD
-    2. Leer imagen
-    3. Enviar a Claude para extraer respuestas
-    4. Obtener gabarito
-    5. Calcular nota
-    6. Guardar resultados
+    Endpoint COMPLETO que:
+    1. Recibe la foto
+    2. Claude extrae CÓDIGOS (DNI postulante, DNI profesor, código aula) + RESPUESTAS
+    3. Valida códigos en BD
+    4. Calcula nota
+    5. Guarda todo con metadata de seguridad
     """
     db = SessionLocal()
     inicio = time.time()
     
     try:
-        # 1. OBTENER HOJA
-        hoja = db.query(HojaRespuesta).filter_by(id=hoja_id).first()
-        if not hoja:
-            raise HTTPException(status_code=404, detail="Hoja no encontrada")
+        # 1. GUARDAR FOTO TEMPORALMENTE
+        filepath, filename = guardar_foto_temporal(file)
         
-        # Verificar que tenga imagen
-        if not hoja.imagen_url:
-            raise HTTPException(status_code=400, detail="La hoja no tiene imagen asociada")
+        # 2. PARSEAR METADATA
+        metadata = {}
+        if metadata_captura:
+            try:
+                metadata = json.loads(metadata_captura)
+            except:
+                pass
         
-        # Actualizar estado
-        hoja.estado = "procesando"
-        db.commit()
+        # Agregar IP del servidor
+        if request:
+            metadata['ip_address'] = request.client.host
         
-        # 2. PROCESAR CON CLAUDE
-        resultado_claude = await procesar_imagen_con_claude(hoja.imagen_url)
+        metadata['image_hash'] = image_hash
+        metadata['filename_original'] = file.filename
+        
+        # 3. PROCESAR CON CLAUDE - EXTRAER TODO
+        print("📸 Procesando imagen con Claude...")
+        resultado_claude = await extraer_todo_con_claude(filepath)
         
         if not resultado_claude["success"]:
-            hoja.estado = "error"
-            hoja.observaciones = resultado_claude["error"]
-            db.commit()
             raise HTTPException(status_code=500, detail=resultado_claude["error"])
         
-        respuestas_alumno = resultado_claude["respuestas"]
+        # 4. EXTRAER DATOS
+        datos_extraidos = resultado_claude["datos"]
+        dni_postulante = datos_extraidos.get("dni_postulante")
+        dni_profesor = datos_extraidos.get("dni_profesor")
+        codigo_aula = datos_extraidos.get("codigo_aula")
+        codigo_hoja = datos_extraidos.get("codigo_hoja")
+        proceso_admision = datos_extraidos.get("proceso_admision", "2025-1")
+        respuestas_alumno = datos_extraidos.get("respuestas", [])
         
-        # 3. OBTENER GABARITO
+        print(f"✅ Extraído - DNI Postulante: {dni_postulante}, Profesor: {dni_profesor}, Aula: {codigo_aula}")
+        
+        # 5. VALIDAR CÓDIGOS EN BD
+        estado, mensajes, datos_validados = validar_codigos(
+            dni_postulante, dni_profesor, codigo_aula, db
+        )
+        
+        # 6. OBTENER GABARITO
         gabarito_query = db.query(ClaveRespuesta).filter_by(
-            proceso_admision=hoja.proceso_admision
+            proceso_admision=proceso_admision
         )
         
         if gabarito_query.count() == 0:
             raise HTTPException(
                 status_code=400, 
-                detail=f"No existe gabarito para el proceso {hoja.proceso_admision}"
+                detail=f"No existe gabarito para el proceso {proceso_admision}"
             )
         
-        # 4. CALCULAR NOTA
+        # 7. CALCULAR NOTA
         calificacion = calcular_calificacion(respuestas_alumno, gabarito_query, db)
         
-        # 5. GUARDAR RESPUESTAS INDIVIDUALES
-        # Borrar respuestas anteriores si existen
-        db.query(Respuesta).filter_by(hoja_respuesta_id=hoja.id).delete()
+        # 8. GUARDAR HOJA EN BD
+        hoja = HojaRespuesta(
+            postulante_id=datos_validados["postulante"].id if datos_validados["postulante"] else None,
+            dni_profesor=dni_profesor,
+            codigo_aula=codigo_aula,
+            codigo_hoja=codigo_hoja,
+            proceso_admision=proceso_admision,
+            imagen_url=filepath,
+            imagen_original_nombre=filename,
+            estado=estado,
+            api_utilizada="anthropic",
+            respuestas_detectadas=len([r for r in respuestas_alumno if r]),
+            nota_final=calificacion["nota"],
+            respuestas_correctas_count=calificacion["correctas"],
+            tiempo_procesamiento=time.time() - inicio,
+            fecha_calificacion=datetime.utcnow(),
+            observaciones=", ".join(mensajes),
+            metadata_json=json.dumps({
+                "captura": metadata,
+                "claude": {
+                    "confianza": resultado_claude.get("confianza_promedio", 0.95),
+                    "tokens": resultado_claude.get("tokens_usados", 0)
+                },
+                "validacion": {
+                    "estado": estado,
+                    "mensajes": mensajes
+                }
+            })
+        )
         
-        # Guardar nuevas respuestas
+        db.add(hoja)
+        db.commit()
+        db.refresh(hoja)
+        
+        # 9. GUARDAR RESPUESTAS INDIVIDUALES
         gabarito = gabarito_query.order_by(ClaveRespuesta.numero_pregunta).all()
         for i, resp_alumno in enumerate(respuestas_alumno, 1):
             respuesta = Respuesta(
@@ -1094,44 +1147,44 @@ async def procesar_hoja_con_claude(hoja_id: int):
                 numero_pregunta=i,
                 respuesta_marcada=resp_alumno if resp_alumno else None,
                 es_correcta=(resp_alumno and resp_alumno.upper() == gabarito[i-1].respuesta_correcta.upper()),
-                confianza=resultado_claude["confianza_promedio"]
+                confianza=resultado_claude.get("confianza_promedio", 0.95)
             )
             db.add(respuesta)
         
-        # 6. ACTUALIZAR HOJA
+        db.commit()
+        
         tiempo_total = time.time() - inicio
         
-        hoja.estado = "completado"
-        hoja.api_utilizada = "anthropic"
-        hoja.respuestas_detectadas = resultado_claude["respuestas_detectadas"]
-        hoja.nota_final = calificacion["nota"]
-        hoja.respuestas_correctas_count = calificacion["correctas"]
-        hoja.tiempo_procesamiento = tiempo_total
-        hoja.fecha_calificacion = datetime.utcnow()
-        hoja.observaciones = resultado_claude.get("notas", "")
-        hoja.metadata_json = json.dumps({
-            "confianza_promedio": resultado_claude["confianza_promedio"],
-            "respuestas_vacias": resultado_claude["respuestas_vacias"],
-            "tokens_usados": resultado_claude["tokens_usados"]
-        })
+        # 10. RESPUESTA
+        postulante = datos_validados["postulante"]
         
-        db.commit()
-        db.refresh(hoja)
-        
-        # 7. OBTENER DATOS DEL POSTULANTE
-        postulante = db.query(Postulante).filter_by(id=hoja.postulante_id).first()
-        
-        # 8. RESPUESTA
         return {
             "success": True,
             "hoja_id": hoja.id,
-            "codigo_hoja": hoja.codigo_hoja,
+            "codigo_hoja": codigo_hoja,
             "postulante": {
                 "id": postulante.id,
                 "dni": postulante.dni,
                 "nombres": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
                 "programa": postulante.programa_educativo
-            } if postulante else None,
+            } if postulante else {
+                "dni": dni_postulante,
+                "error": "DNI no encontrado en base de datos"
+            },
+            "profesor": {
+                "dni": dni_profesor,
+                "nombres": f"{datos_validados['profesor'].apellido_paterno} {datos_validados['profesor'].apellido_materno}, {datos_validados['profesor'].nombres}"
+            } if datos_validados["profesor"] else {
+                "dni": dni_profesor,
+                "error": "DNI no encontrado"
+            },
+            "aula": {
+                "codigo": codigo_aula,
+                "nombre": datos_validados["aula"].nombre
+            } if datos_validados["aula"] else {
+                "codigo": codigo_aula,
+                "error": "Aula no encontrada"
+            },
             "calificacion": {
                 "nota": calificacion["nota"],
                 "correctas": calificacion["correctas"],
@@ -1141,27 +1194,175 @@ async def procesar_hoja_con_claude(hoja_id: int):
             "procesamiento": {
                 "api": "Claude Sonnet 4",
                 "tiempo": f"{tiempo_total:.2f}s",
-                "confianza": resultado_claude["confianza_promedio"],
-                "tokens": resultado_claude["tokens_usados"]
+                "confianza": resultado_claude.get("confianza_promedio", 0.95),
+                "tokens": resultado_claude.get("tokens_usados", 0)
             },
-            "observaciones": hoja.observaciones
+            "validacion": {
+                "estado": estado,
+                "mensajes": mensajes
+            },
+            "metadata": {
+                "gps": metadata.get("gps"),
+                "timestamp": metadata.get("timestamp"),
+                "device": metadata.get("device_fingerprint")
+            }
         }
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
-        # Marcar hoja con error
-        if 'hoja' in locals():
-            hoja.estado = "error"
-            hoja.observaciones = str(e)
-            db.commit()
-        
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
+
+
+# ============================================================================
+# FUNCIÓN: EXTRAER TODO CON CLAUDE (CÓDIGOS + RESPUESTAS)
+# ============================================================================
+
+async def extraer_todo_con_claude(imagen_path: str) -> Dict:
+    """
+    Usa Claude para extraer:
+    - DNI Postulante (8 dígitos de los cuadros superiores)
+    - DNI Profesor (8 dígitos)
+    - Código Aula (4 dígitos)
+    - Código Hoja (alfanumérico 9 caracteres)
+    - 100 respuestas (A, B, C, D, E)
+    """
+    try:
+        # Leer imagen y convertir a base64
+        with open(imagen_path, "rb") as image_file:
+            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
+        
+        # Detectar tipo de imagen
+        ext = imagen_path.split(".")[-1].lower()
+        media_types = {
+            "jpg": "image/jpeg",
+            "jpeg": "image/jpeg",
+            "png": "image/png",
+            "webp": "image/webp"
+        }
+        media_type = media_types.get(ext, "image/jpeg")
+        
+        # Inicializar cliente de Anthropic
+        client = anthropic.Anthropic(
+            api_key=os.environ.get("ANTHROPIC_API_KEY")
+        )
+        
+        # Prompt para Claude
+        prompt = """Analiza esta hoja de respuestas de examen de admisión del INSTITUTO SUPERIOR TECNOLÓGICO SANTANA.
+
+IMPORTANTE: La hoja tiene DOS secciones:
+
+## SECCIÓN 1: CÓDIGOS EN LA PARTE SUPERIOR (en cuadros individuales)
+- **DNI Alumno**: 8 dígitos en cuadros individuales
+- **Código Aula**: 4 dígitos en cuadros individuales
+- **DNI Profesor**: 8 dígitos en cuadros individuales
+- **Código Hoja**: 9 caracteres alfanuméricos (ejemplo: "A2iDñ5RsW") que dice "Hoja: XXXXXXXXX"
+
+## SECCIÓN 2: RESPUESTAS (100 preguntas numeradas)
+Cada pregunta tiene un paréntesis con UNA letra: A, B, C, D o E.
+
+INSTRUCCIONES:
+1. Lee TODOS los códigos de los cuadros superiores
+2. Lee las 100 respuestas de los paréntesis
+3. Si una respuesta está vacía, usa null
+4. Si no puedes leer algo con seguridad, usa null
+5. Retorna SOLO un JSON válido, sin texto adicional
+
+FORMATO DE RESPUESTA (JSON):
+{
+  "dni_postulante": "12345678",
+  "dni_profesor": "87654321",
+  "codigo_aula": "A101",
+  "codigo_hoja": "A2iDñ5RsW",
+  "proceso_admision": "2025-1",
+  "respuestas": ["A", "B", "C", "D", "E", null, "A", ...],
+  "confianza_promedio": 0.95,
+  "respuestas_detectadas": 98,
+  "notas": "Observaciones si hay dificultad"
+}
+
+CRÍTICO:
+- DNI postulante: 8 dígitos NUMÉRICOS
+- DNI profesor: 8 dígitos NUMÉRICOS
+- Código aula: texto/números (ej: "A101", "B205")
+- Código hoja: 9 caracteres alfanuméricos
+- Respuestas: array de EXACTAMENTE 100 elementos
+- Solo letras mayúsculas: A, B, C, D, E o null"""
+
+        # Llamada a Claude API
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data,
+                            },
+                        },
+                        {
+                            "type": "text",
+                            "text": prompt
+                        }
+                    ],
+                }
+            ],
+        )
+        
+        # Extraer respuesta
+        respuesta_texto = message.content[0].text
+        
+        # Limpiar respuesta
+        respuesta_texto = respuesta_texto.strip()
+        if respuesta_texto.startswith("```json"):
+            respuesta_texto = respuesta_texto[7:]
+        if respuesta_texto.startswith("```"):
+            respuesta_texto = respuesta_texto[3:]
+        if respuesta_texto.endswith("```"):
+            respuesta_texto = respuesta_texto[:-3]
+        respuesta_texto = respuesta_texto.strip()
+        
+        # Parsear JSON
+        resultado = json.loads(respuesta_texto)
+        
+        # Validar estructura
+        required_fields = ["dni_postulante", "dni_profesor", "codigo_aula", "respuestas"]
+        for field in required_fields:
+            if field not in resultado:
+                raise ValueError(f"Respuesta de Claude no contiene el campo '{field}'")
+        
+        if len(resultado["respuestas"]) != 100:
+            raise ValueError(f"Se esperaban 100 respuestas, se obtuvieron {len(resultado['respuestas'])}")
+        
+        return {
+            "success": True,
+            "datos": resultado,
+            "confianza_promedio": resultado.get("confianza_promedio", 0.95),
+            "tokens_usados": message.usage.input_tokens + message.usage.output_tokens
+        }
+        
+    except json.JSONDecodeError as e:
+        return {
+            "success": False,
+            "error": f"Error al parsear JSON de Claude: {str(e)}",
+            "respuesta_cruda": respuesta_texto if 'respuesta_texto' in locals() else None
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 
 # ============================================================================
 # ENDPOINT: OBTENER RESULTADOS (RANKING)
