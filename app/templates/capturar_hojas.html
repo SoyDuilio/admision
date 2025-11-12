@@ -748,20 +748,46 @@ async function procesarHoja() {
     }
 }
 
+// ============================================================================
+// ACTUALIZAR LA FUNCIÓN mostrarResultado() EN EL HTML
+// ============================================================================
+
 function mostrarResultado(data) {
     document.getElementById('loadingOverlay').classList.remove('active');
     
+    // Postulante
     if (data.postulante) {
         document.getElementById('resultadoNombre').textContent = data.postulante.nombres;
         document.getElementById('resultadoDni').textContent = data.postulante.dni;
         document.getElementById('resultadoPrograma').textContent = data.postulante.programa || '-';
     }
     
+    // Calificación (si existe gabarito)
     if (data.calificacion) {
         document.getElementById('resultadoNota').textContent = data.calificacion.nota.toFixed(2);
         document.getElementById('resultadoCorrectas').textContent = `${data.calificacion.correctas} / 100`;
+    } else {
+        // Sin gabarito aún
+        document.getElementById('resultadoNota').textContent = '⏳';
+        document.getElementById('resultadoNota').style.fontSize = '2rem';
+        document.getElementById('resultadoCorrectas').textContent = 'Pendiente';
+        
+        // Cambiar título
+        document.querySelector('.nota-destacada .label').textContent = 'Estado';
+        
+        // Mostrar mensaje
+        if (data.mensaje) {
+            const messageDiv = document.createElement('div');
+            messageDiv.style.cssText = 'background: rgba(234, 179, 8, 0.2); color: #fbbf24; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.875rem;';
+            messageDiv.innerHTML = '⏳ ' + data.mensaje;
+            document.querySelector('.resultado-content').insertBefore(
+                messageDiv, 
+                document.querySelector('.nota-destacada')
+            );
+        }
     }
     
+    // Otros datos
     if (data.codigo_hoja) {
         document.getElementById('resultadoCodigoHoja').textContent = data.codigo_hoja;
     }
