@@ -67,35 +67,42 @@
         border-radius: 6px;
     }
 
-    /* CÁMARA FULLSCREEN */
+    /* CÁMARA FULLSCREEN - CORREGIDO */
     .camera-fullscreen {
         position: relative;
-        height: calc(100vh - 104px);
+        height: calc(100vh - 44px - 60px); /* Header + Botones */
         background: #000;
         overflow: hidden;
     }
 
-    #cameraView {
-        width: 100%;
+    .camera-fullscreen #cameraView,
+    .camera-fullscreen #photoPreview {
         height: 100%;
+        width: 100%;
+    }
+
+    #cameraView {
+        display: block;
     }
 
     #cameraVideo {
         width: 100%;
         height: 100%;
         object-fit: contain;
+        display: block;
     }
 
     #photoPreview {
+        display: none;
         width: 100%;
         height: 100%;
-        display: none;
     }
 
     #photoImage {
         width: 100%;
         height: 100%;
         object-fit: contain;
+        display: block;
     }
 
     /* MARCO AZUL */
@@ -447,17 +454,38 @@ let vozActiva = false;
 let photoBlob = null;
 let gpsObtenido = false;
 
+// ============================================================================
+// DETECCIÓN DE CALIDAD DEL DISPOSITIVO
+// ============================================================================
+function detectarCalidadDispositivo() {
+    const screenWidth = screen.width;
+    const screenHeight = screen.height;
+    const pixelRatio = window.devicePixelRatio || 1;
+    
+    const score = (screenWidth * screenHeight * pixelRatio) / 1000000;
+    
+    if (score > 5) {
+        return 'high';
+    } else if (score > 2) {
+        return 'medium';
+    } else {
+        return 'low';
+    }
+}
+
+// ============================================================================
 // CAPTURA DE METADATA CON GPS OBLIGATORIO
+// ============================================================================
 async function capturarMetadata() {
     metadataCaptura = {
         timestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         user_agent: navigator.userAgent,
         device_fingerprint: await generarDeviceFingerprint(),
-        screen: { width: screen.width, height: screen.height }
+        screen: { width: screen.width, height: screen.height },
+        device_quality: detectarCalidadDispositivo()
     };
 
-    // GPS OBLIGATORIO
     await solicitarGPS();
 }
 
@@ -498,7 +526,9 @@ async function generarDeviceFingerprint() {
     return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').substring(0, 32);
 }
 
+// ============================================================================
 // RECONOCIMIENTO DE VOZ
+// ============================================================================
 function iniciarReconocimientoVoz() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
         document.getElementById('btnVoiceToggle').disabled = true;
@@ -544,7 +574,9 @@ function toggleVoz() {
     }
 }
 
+// ============================================================================
 // INICIALIZACIÓN
+// ============================================================================
 window.addEventListener('load', async () => {
     try {
         await capturarMetadata();
@@ -555,19 +587,63 @@ window.addEventListener('load', async () => {
     }
 });
 
+// ============================================================================
+// CÁMARA CON ADAPTACIÓN SEGÚN DISPOSITIVO
+// ============================================================================
 async function iniciarCamara() {
     try {
+        const calidadDispositivo = detectarCalidadDispositivo();
+        
+        let videoConstraints;
+        
+        switch(calidadDispositivo) {
+            case 'high':
+                videoConstraints = {
+                    width: { ideal: 1920, min: 1280 },
+                    height: { ideal: 1440, min: 720 },
+                    facingMode: 'environment'
+                };
+                break;
+            case 'medium':
+                videoConstraints = {
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 960, min: 480 },
+                    facingMode: 'environment'
+                };
+                break;
+            case 'low':
+                videoConstraints = {
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 960, min: 480 },
+                    facingMode: 'environment'
+                };
+                break;
+        }
+        
         stream = await navigator.mediaDevices.getUserMedia({
-            video: { width: 1920, height: 1440, facingMode: 'environment' },
+            video: videoConstraints,
             audio: false
         });
+        
         document.getElementById('cameraVideo').srcObject = stream;
+        
+        const track = stream.getVideoTracks()[0];
+        const settings = track.getSettings();
+        console.log('📷 Cámara:', settings.width + 'x' + settings.height);
+        console.log('📱 Calidad:', calidadDispositivo);
+        
+        if (settings.width < 1280 || settings.height < 720) {
+            console.warn('⚠️ Resolución baja detectada');
+        }
+        
     } catch (error) {
         alert('No se pudo acceder a la cámara');
     }
 }
 
+// ============================================================================
 // EVENTOS BOTONES
+// ============================================================================
 document.getElementById('btnCapture').addEventListener('click', function() {
     if (this.classList.contains('confirm')) {
         procesarHoja();
@@ -590,6 +666,9 @@ document.getElementById('btnSwitchCam').addEventListener('click', async () => {
 
 document.getElementById('btnVoiceToggle').addEventListener('click', toggleVoz);
 
+// ============================================================================
+// CAPTURA CON VALIDACIÓN DE CALIDAD
+// ============================================================================
 function capturarFoto() {
     if (!gpsObtenido) {
         document.getElementById('gpsAlert').classList.add('active');
@@ -602,24 +681,46 @@ function capturarFoto() {
 
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
+    
+    if (canvas.width < 640 || canvas.height < 480) {
+        alert('⚠️ Resolución muy baja. Intenta con otra cámara.');
+        return;
+    }
+    
     ctx.drawImage(video, 0, 0);
+
+    let quality = 0.92;
+    if (canvas.width < 1280) {
+        quality = 0.95;
+    }
 
     canvas.toBlob((blob) => {
         photoBlob = blob;
+        
+        const sizeMB = blob.size / 1024 / 1024;
+        console.log('📸 Foto:', canvas.width + 'x' + canvas.height, sizeMB.toFixed(2) + 'MB');
+        
+        if (sizeMB < 0.3) {
+            if (!confirm('⚠️ Calidad baja (' + sizeMB.toFixed(2) + 'MB). ¿Continuar?\n\nRecomendación: mejor iluminación')) {
+                return;
+            }
+        }
+        
         const url = URL.createObjectURL(blob);
         document.getElementById('photoImage').src = url;
         
-        // Mostrar preview
         document.getElementById('cameraView').style.display = 'none';
         document.getElementById('photoPreview').style.display = 'block';
         
-        // Cambiar botón
         const btn = document.getElementById('btnCapture');
         btn.classList.add('confirm');
         btn.textContent = '✅ Confirmar';
-    }, 'image/jpeg', 0.92);
+    }, 'image/jpeg', quality);
 }
 
+// ============================================================================
+// PROCESAMIENTO
+// ============================================================================
 async function procesarHoja() {
     try {
         document.getElementById('loadingOverlay').classList.add('active');
