@@ -13,7 +13,7 @@ from sqlalchemy import func
 from typing import Optional
 from io import BytesIO
 import zipfile
-from datetime import datetime
+from datetime import datetime, timezone
 import uuid
 import tempfile
 from dotenv import load_dotenv
@@ -71,7 +71,324 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Templates
 templates = Jinja2Templates(directory="app/templates")
 
-#app.include_router(generador_router)
+
+
+# ============================================================================
+# EXTRACCIÓN CON CLAUDE (Anthropic)
+# ============================================================================
+
+async def extraer_con_claude(imagen_path: str) -> Dict:
+    """
+    Extrae datos con Claude Vision.
+    """
+    try:
+        with open(imagen_path, "rb") as image_file:
+            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
+        
+        ext = imagen_path.split(".")[-1].lower()
+        media_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
+        
+        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
+        
+        prompt = """Analiza esta hoja de respuestas de examen de admisión.
+
+ESTRUCTURA:
+
+## CÓDIGOS (en la parte superior, 2 líneas):
+LÍNEA 1 (labels): DNI Postulante    Código Aula    DNI Profesor
+LÍNEA 2 (valores): Debajo de cada label están los códigos correspondientes, separados por espacios.
+
+Encontrarás 3 bloques de códigos separados por espacios:
+- Los primeros 8 dígitos consecutivos: DNI del Postulante
+- Los siguientes 4-5 caracteres consecutivos: Código del Aula (puede tener letras y números)
+- Los últimos 8 dígitos consecutivos: DNI del Profesor
+
+Ejemplo:
+DNI Postulante              Código Aula         DNI Profesor
+70123456                    C201                12345678
+
+Después hay una línea que dice "Código de Hoja:" seguido de un código alfanumérico de 9 caracteres (sin i, l, o, 0, 1).
+
+## RESPUESTAS (100 preguntas numeradas del 1 al 100):
+Cada pregunta tiene formato: N. (  )
+Donde N es el número de pregunta y dentro del paréntesis hay UNA letra: A, B, C, D o E.
+
+REGLAS:
+1. DEBES retornar EXACTAMENTE 100 elementos en "respuestas"
+2. Si el paréntesis está VACÍO → usa null
+3. Si hay una letra válida (A, B, C, D, E) → úsala en MAYÚSCULA
+4. Si hay minúscula (a,b,c,d,e) → convierte a MAYÚSCULA
+5. Cualquier otro valor → usa null
+
+RESPONDE SOLO CON ESTE JSON:
+{
+  "dni_postulante": "70123456",
+  "codigo_aula": "C201",
+  "dni_profesor": "12345678",
+  "codigo_hoja": "ABC23456D",
+  "proceso_admision": "2025-1",
+  "respuestas": ["A", "B", null, "C", "D", ...]
+}
+
+VALIDACIÓN: Verifica que "respuestas" tenga EXACTAMENTE 100 elementos."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=4000,
+            temperature=0,
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_data}},
+                    {"type": "text", "text": prompt}
+                ]
+            }]
+        )
+        
+        respuesta_texto = message.content[0].text.strip()
+        if respuesta_texto.startswith("```json"):
+            respuesta_texto = respuesta_texto[7:]
+        if respuesta_texto.startswith("```"):
+            respuesta_texto = respuesta_texto[3:]
+        if respuesta_texto.endswith("```"):
+            respuesta_texto = respuesta_texto[:-3]
+        respuesta_texto = respuesta_texto.strip()
+        
+        resultado = json.loads(respuesta_texto)
+        
+        # Validar
+        if len(resultado["respuestas"]) != 100:
+            raise ValueError(f"Se esperaban 100 respuestas, se obtuvieron {len(resultado['respuestas'])}")
+        
+        # Normalizar respuestas
+        respuestas_validadas = []
+        for resp in resultado["respuestas"]:
+            if resp is None or resp == "":
+                respuestas_validadas.append(None)
+            elif isinstance(resp, str) and resp.strip().upper() in ["A", "B", "C", "D", "E"]:
+                respuestas_validadas.append(resp.strip().upper())
+            else:
+                respuestas_validadas.append(None)
+        
+        resultado["respuestas"] = respuestas_validadas
+        
+        return {
+            "success": True,
+            "api": "claude",
+            "datos": resultado,
+            "tokens": message.usage.input_tokens + message.usage.output_tokens
+        }
+        
+    except Exception as e:
+        return {"success": False, "api": "claude", "error": str(e)}
+
+
+# ============================================================================
+# EXTRACCIÓN CON GOOGLE VISION
+# ============================================================================
+
+async def extraer_con_google_vision(imagen_path: str) -> Dict:
+    """
+    Extrae datos con Google Vision API + Gemini.
+    """
+    try:
+        # Inicializar cliente
+        # Requiere: pip install google-cloud-vision google-generativeai
+        from google.cloud import vision
+        import google.generativeai as genai
+        
+        genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
+        
+        # Leer imagen
+        with open(imagen_path, "rb") as image_file:
+            content = image_file.read()
+        
+        # OCR con Vision
+        client = vision.ImageAnnotatorClient()
+        image = vision.Image(content=content)
+        response = client.text_detection(image=image)
+        
+        if response.error.message:
+            raise Exception(response.error.message)
+        
+        texto_ocr = response.text_annotations[0].description if response.text_annotations else ""
+        
+        # Procesar con Gemini
+        model = genai.GenerativeModel('gemini-1.5-flash')
+        
+        prompt = f"""Analiza este texto extraído de una hoja de examen:
+
+{texto_ocr}
+
+Extrae:
+1. DNI Postulante (8 dígitos, primeros en aparecer después de "DNI Postulante")
+2. Código Aula (4-5 caracteres, aparece después de "Código Aula")
+3. DNI Profesor (8 dígitos, aparece después de "DNI Profesor")
+4. Código Hoja (9 caracteres alfanuméricos, aparece después de "Código de Hoja:")
+5. 100 respuestas (busca números del 1 al 100 seguidos de paréntesis con letras A,B,C,D,E o vacíos)
+
+RESPONDE SOLO JSON:
+{{
+  "dni_postulante": "70123456",
+  "codigo_aula": "C201",
+  "dni_profesor": "12345678",
+  "codigo_hoja": "ABC23456D",
+  "proceso_admision": "2025-1",
+  "respuestas": ["A", "B", null, ...]
+}}
+
+CRÍTICO: "respuestas" debe tener EXACTAMENTE 100 elementos."""
+
+        response = model.generate_content(prompt)
+        resultado_texto = response.text.strip()
+        
+        # Limpiar JSON
+        if resultado_texto.startswith("```json"):
+            resultado_texto = resultado_texto[7:]
+        if resultado_texto.startswith("```"):
+            resultado_texto = resultado_texto[3:]
+        if resultado_texto.endswith("```"):
+            resultado_texto = resultado_texto[:-3]
+        resultado_texto = resultado_texto.strip()
+        
+        resultado = json.loads(resultado_texto)
+        
+        # Validar 100 respuestas
+        if len(resultado["respuestas"]) != 100:
+            raise ValueError(f"Google Vision: {len(resultado['respuestas'])} respuestas en lugar de 100")
+        
+        return {
+            "success": True,
+            "api": "google_vision",
+            "datos": resultado
+        }
+        
+    except Exception as e:
+        return {"success": False, "api": "google_vision", "error": str(e)}
+
+
+# ============================================================================
+# EXTRACCIÓN CON OPENAI GPT-4 VISION
+# ============================================================================
+
+async def extraer_con_openai(imagen_path: str) -> Dict:
+    """
+    Extrae datos con OpenAI GPT-4 Vision.
+    """
+    try:
+        from openai import OpenAI
+        
+        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+        
+        # Leer imagen
+        with open(imagen_path, "rb") as image_file:
+            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
+        
+        prompt = """Analiza esta hoja de respuestas de examen.
+
+CÓDIGOS (parte superior):
+- DNI Postulante: 8 dígitos (primera línea de números)
+- Código Aula: 4-5 caracteres alfanuméricos (entre DNI Postulante y DNI Profesor)
+- DNI Profesor: 8 dígitos (última línea de números)
+- Código Hoja: 9 caracteres alfanuméricos (después de "Código de Hoja:")
+
+RESPUESTAS:
+- 100 preguntas numeradas 1-100
+- Cada una tiene formato: N. (  )
+- Dentro del paréntesis puede haber: A, B, C, D, E o estar vacío
+
+RESPONDE SOLO JSON:
+{
+  "dni_postulante": "70123456",
+  "codigo_aula": "C201",
+  "dni_profesor": "12345678",
+  "codigo_hoja": "ABC23456D",
+  "proceso_admision": "2025-1",
+  "respuestas": ["A", null, "B", ...]
+}
+
+IMPORTANTE: Array "respuestas" debe tener EXACTAMENTE 100 elementos."""
+
+        response = client.chat.completions.create(
+            model="gpt-4-vision-preview",
+            messages=[{
+                "role": "user",
+                "content": [
+                    {"type": "text", "text": prompt},
+                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
+                ]
+            }],
+            max_tokens=4000,
+            temperature=0
+        )
+        
+        resultado_texto = response.choices[0].message.content.strip()
+        
+        # Limpiar JSON
+        if resultado_texto.startswith("```json"):
+            resultado_texto = resultado_texto[7:]
+        if resultado_texto.startswith("```"):
+            resultado_texto = resultado_texto[3:]
+        if resultado_texto.endswith("```"):
+            resultado_texto = resultado_texto[:-3]
+        resultado_texto = resultado_texto.strip()
+        
+        resultado = json.loads(resultado_texto)
+        
+        # Validar
+        if len(resultado["respuestas"]) != 100:
+            raise ValueError(f"OpenAI: {len(resultado['respuestas'])} respuestas en lugar de 100")
+        
+        return {
+            "success": True,
+            "api": "openai",
+            "datos": resultado,
+            "tokens": response.usage.total_tokens
+        }
+        
+    except Exception as e:
+        return {"success": False, "api": "openai", "error": str(e)}
+
+
+# ============================================================================
+# FUNCIÓN PRINCIPAL: PROBAR CON LAS 3 APIS
+# ============================================================================
+
+async def extraer_con_todas_las_apis(imagen_path: str):
+    """
+    Prueba extracción con las 3 APIs y retorna la mejor.
+    """
+    resultados = []
+    
+    # Claude
+    print("🔄 Probando con Claude...")
+    resultado_claude = await extraer_con_claude(imagen_path)
+    resultados.append(resultado_claude)
+    
+    # Google Vision
+    print("🔄 Probando con Google Vision...")
+    resultado_google = await extraer_con_google_vision(imagen_path)
+    resultados.append(resultado_google)
+    
+    # OpenAI
+    print("🔄 Probando con OpenAI...")
+    resultado_openai = await extraer_con_openai(imagen_path)
+    resultados.append(resultado_openai)
+    
+    # Analizar resultados
+    exitosos = [r for r in resultados if r["success"]]
+    
+    if not exitosos:
+        return {
+            "success": False,
+            "error": "Ninguna API pudo procesar la imagen",
+            "intentos": resultados
+        }
+    
+    # Retornar el primero exitoso (prioridad: Claude > OpenAI > Google)
+    return exitosos[0]
+
+
 
 # ============================================
 # FUNCIONES AUXILIARES
@@ -276,219 +593,303 @@ def generar_codigo_hoja():
     return ''.join(random.choice(chars) for _ in range(9))
 
 
+
+# ============================================================================
+# GENERADOR DE CÓDIGO ÚNICO (sin caracteres ambiguos)
+# ============================================================================
+
+def generar_codigo_hoja_unico():
+    """
+    Genera código alfanumérico de 9 caracteres.
+    Excluye: i, l, I, L, o, O, 0, 1 (caracteres confusos)
+    """
+    # Caracteres seguros
+    letras_seguras = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz'  # Sin i,l,o
+    numeros_seguros = '23456789'  # Sin 0, 1
+    
+    # Formato: 3 letras + 5 números + 1 letra
+    codigo = (
+        ''.join(random.choices(letras_seguras.upper(), k=3)) +
+        ''.join(random.choices(numeros_seguros, k=5)) +
+        ''.join(random.choices(letras_seguras.upper(), k=1))
+    )
+    
+    return codigo
+
+
 # ============================================================================
 # GENERADOR DE HOJAS DE RESPUESTAS
 # ============================================================================
 
-def generar_hoja_respuesta_pdf(
+# ============================================================================
+# GENERADOR DE PDF - HOJA DE RESPUESTAS OPTIMIZADA
+# ============================================================================
+
+def generar_hoja_respuestas_pdf(
     output_path: str,
-    codigo_postulante: str,  # DNI 8 dígitos
-    codigo_profesor: str = None,  # DNI 8 dígitos
-    codigo_aula: str = None,  # 4 dígitos
-    datos_postulante: dict = None,
-    proceso_admision: str = "2025-1",
-    incluir_firma: bool = True
+    dni_postulante: str,
+    codigo_aula: str,
+    dni_profesor: str,
+    codigo_hoja: str = None,
+    proceso: str = "2025-1"
 ):
     """
-    Genera hoja de respuestas con códigos según diseño
+    Genera PDF optimizado para lectura por LLM.
+    
+    Características:
+    - Área útil: 80% del A4 (168mm × 237mm)
+    - Códigos en línea separados por espacios
+    - Respuestas: 5 por fila, 20 filas
+    - Altura de fila: 9mm (óptima para cámara y LLM)
     """
+    
+    # Generar código si no se proporciona
+    if not codigo_hoja:
+        codigo_hoja = generar_codigo_hoja_unico()
+    
+    # Crear canvas
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
-    margin = 1.5 * cm
-    margin_top = height - 1.5 * cm
-    margin_bottom = 1.5 * cm
+    # ========================================================================
+    # ÁREA ÚTIL: 80% centrado
+    # ========================================================================
+    margen_h = width * 0.10  # 10% cada lado
+    margen_v = height * 0.10  # 10% arriba y abajo
     
-    # Generar código único de hoja
-    codigo_hoja = generar_codigo_hoja()
+    area_width = width * 0.80
+    area_height = height * 0.80
     
-    # MARCAS DE ALINEACIÓN
-    marca_size = 1 * cm
-    marca_grosor = 2.5
+    x_start = margen_h
+    y_start = height - margen_v
     
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(marca_grosor)
+    # Marco del área útil (para visualización durante desarrollo)
+    # c.setStrokeColor(colors.lightgrey)
+    # c.rect(x_start, margen_v, area_width, area_height)
     
-    # 4 esquinas
-    c.line(margin, margin_top, margin + marca_size, margin_top)
-    c.line(margin, margin_top, margin, margin_top - marca_size)
-    c.line(width - margin, margin_top, width - margin - marca_size, margin_top)
-    c.line(width - margin, margin_top, width - margin, margin_top - marca_size)
-    c.line(margin, margin_bottom, margin + marca_size, margin_bottom)
-    c.line(margin, margin_bottom, margin, margin_bottom + marca_size)
-    c.line(width - margin, margin_bottom, width - margin - marca_size, margin_bottom)
-    c.line(width - margin, margin_bottom, width - margin, margin_bottom + marca_size)
-    
+    # ========================================================================
     # ENCABEZADO
-    y = margin_top - 0.8 * cm
+    # ========================================================================
+    y = y_start
+    
+    # Título
+    c.setFont("Helvetica-Bold", 16)
+    c.drawCentredString(width/2, y, "I. S. T. Pedro A. Del Águila H.")
+    y -= 6*mm
+    
+    c.setFont("Helvetica", 12)
+    c.drawCentredString(width/2, y, f"EXAMEN DE ADMISIÓN - Proceso {proceso}")
+    y -= 10*mm
+    
+    # Línea separadora
+    c.setStrokeColor(colors.black)
+    c.setLineWidth(1)
+    c.line(x_start, y, x_start + area_width, y)
+    y -= 8*mm
+    
+    # ========================================================================
+    # SECCIÓN CÓDIGOS (OPTIMIZADA PARA LLM)
+    # ========================================================================
+    
+    # Etiquetas (labels)
+    c.setFont("Helvetica-Bold", 10)
+    
+    # Calcular posiciones para 3 columnas centradas
+    col_width = area_width / 3
+    col1_x = x_start + col_width * 0.5
+    col2_x = x_start + col_width * 1.5
+    col3_x = x_start + col_width * 2.5
+    
+    c.drawCentredString(col1_x, y, "DNI Postulante")
+    c.drawCentredString(col2_x, y, "Código Aula")
+    c.drawCentredString(col3_x, y, "DNI Profesor")
+    y -= 6*mm
+    
+    # Valores (con mayor tamaño y negrita)
+    c.setFont("Helvetica-Bold", 14)
+    c.drawCentredString(col1_x, y, dni_postulante)
+    c.drawCentredString(col2_x, y, codigo_aula)
+    c.drawCentredString(col3_x, y, dni_profesor)
+    y -= 8*mm
+    
+    # Código de hoja (centrado, muy visible)
+    c.setFont("Helvetica-Bold", 10)
+    c.drawCentredString(width/2, y, "Código de Hoja:")
+    y -= 5*mm
     
     c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width / 2, y, "I. S. T. Pedro A. Del Águila H.")
-    y -= 0.6 * cm
+    c.drawCentredString(width/2, y, codigo_hoja)
+    y -= 10*mm
     
-    c.setFont("Helvetica-Bold", 11)
-    c.drawCentredString(width / 2, y, f"EXAMEN DE ADMISIÓN - PROCESO {proceso_admision}")
-    y -= 0.4 * cm
-    
-    c.setFont("Helvetica", 9)
-    c.drawCentredString(width / 2, y, "HOJA DE RESPUESTAS")
-    y -= 0.7 * cm
-    
-    c.setStrokeColor(colors.HexColor("#1e3a8a"))
-    c.setLineWidth(2)
-    c.line(margin, y, width - margin, y)
-    y -= 0.7 * cm
-    
-    # ============================================
-    # CÓDIGOS EN CUADROS (según imagen)
-    # ============================================
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(0.5)
-    
-    # Altura de la fila de códigos
-    box_height = 1.2 * cm
-    y_boxes = y
-    
-    # Ancho total disponible
-    ancho_total = width - 2 * margin
-    
-    # 3 secciones: DNI Alumno (8 dígitos) | Código Aula (4) | DNI Profesor (8)
-    ancho_dni = ancho_total * 0.40  # 40% para DNI alumno
-    ancho_aula = ancho_total * 0.20  # 20% para código aula
-    ancho_prof = ancho_total * 0.40  # 40% para DNI profesor
-    
-    # Labels superiores
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(margin + ancho_dni/2, y_boxes + 0.3*cm, "DNI - Alumno (8 dígitos)")
-    c.drawCentredString(margin + ancho_dni + ancho_aula/2, y_boxes + 0.3*cm, "Código aula")
-    c.drawCentredString(margin + ancho_dni + ancho_aula, y_boxes + 0.3*cm, "4 dígitos")
-    c.drawCentredString(margin + ancho_dni + ancho_aula + ancho_prof/2, y_boxes + 0.3*cm, "DNI - Profesor (8 dígitos)")
-    
-    y_boxes -= 0.5 * cm
-    
-    # Dibujar cuadros para DNI Alumno (8 cuadros)
-    ancho_cuadro_dni = ancho_dni / 8
-    for i in range(8):
-        x = margin + (i * ancho_cuadro_dni)
-        c.rect(x, y_boxes - box_height, ancho_cuadro_dni, box_height)
-        if codigo_postulante and i < len(codigo_postulante):
-            c.setFont("Courier-Bold", 14)
-            c.drawCentredString(x + ancho_cuadro_dni/2, y_boxes - box_height/2 - 0.2*cm, codigo_postulante[i])
-    
-    # Dibujar cuadros para Código Aula (4 cuadros)
-    ancho_cuadro_aula = ancho_aula / 4
-    for i in range(4):
-        x = margin + ancho_dni + (i * ancho_cuadro_aula)
-        c.rect(x, y_boxes - box_height, ancho_cuadro_aula, box_height)
-        if codigo_aula and i < len(codigo_aula):
-            c.setFont("Courier-Bold", 14)
-            c.drawCentredString(x + ancho_cuadro_aula/2, y_boxes - box_height/2 - 0.2*cm, codigo_aula[i])
-    
-    # Dibujar cuadros para DNI Profesor (8 cuadros)
-    ancho_cuadro_prof = ancho_prof / 8
-    for i in range(8):
-        x = margin + ancho_dni + ancho_aula + (i * ancho_cuadro_prof)
-        c.rect(x, y_boxes - box_height, ancho_cuadro_prof, box_height)
-        if codigo_profesor and i < len(codigo_profesor):
-            c.setFont("Courier-Bold", 14)
-            c.drawCentredString(x + ancho_cuadro_prof/2, y_boxes - box_height/2 - 0.2*cm, codigo_profesor[i])
-    
-    y = y_boxes - box_height - 0.5 * cm
-    
-    # ============================================
-    # CÓDIGO DE HOJA (único, alfanumérico)
-    # ============================================
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y, "Hoja:")
-    c.setFont("Courier-Bold", 12)
-    c.drawString(margin + 1.5*cm, y, codigo_hoja)
-    y -= 0.6 * cm
-    
-    # Datos postulante
-    if datos_postulante:
-        c.setFont("Helvetica", 8)
-        nombre = f"{datos_postulante.get('apellido_paterno', '')} {datos_postulante.get('apellido_materno', '')}, {datos_postulante.get('nombres', '')}"
-        c.drawString(margin, y, nombre.upper()[:60])
-        y -= 0.4 * cm
-        c.drawString(margin, y, f"Programa: {datos_postulante.get('programa', '').upper()}")
-        y -= 0.6 * cm
-    
-    c.setStrokeColor(colors.grey)
+    # Línea separadora
     c.setLineWidth(1)
-    c.line(margin, y, width - margin, y)
-    y -= 0.5 * cm
+    c.line(x_start, y, x_start + area_width, y)
+    y -= 8*mm
     
-    # INSTRUCCIONES CORREGIDAS
-    c.setFont("Helvetica-Bold", 9)
-    c.drawString(margin, y, "INSTRUCCIONES:")
-    y -= 0.35 * cm
+    # ========================================================================
+    # INSTRUCCIONES
+    # ========================================================================
+    c.setFont("Helvetica-Bold", 10)
+    c.drawString(x_start, y, "INSTRUCCIONES: Escriba UNA letra (A, B, C, D o E) dentro de cada paréntesis")
+    y -= 8*mm
     
-    c.setFont("Helvetica", 8)
-    instrucciones = [
-        "• Marque A, B, C, D o E (en mayúsculas y solo una letra) dentro de los paréntesis",
-        "• Solo una respuesta por pregunta",
-        "• No realice borrones"
-    ]
+    # ========================================================================
+    # RESPUESTAS: 5 por fila, 20 filas = 100 preguntas
+    # ========================================================================
     
-    for inst in instrucciones:
-        c.drawString(margin + 0.3 * cm, y, inst)
-        y -= 0.32 * cm
+    c.setFont("Helvetica", 10)
     
-    y -= 0.3 * cm
+    # Dimensiones óptimas
+    fila_altura = 9*mm  # Altura generosa para cámara
+    col_ancho = area_width / 5  # 5 columnas
+    parentesis_ancho = 12*mm  # Ancho del paréntesis
     
-    # GRID DE RESPUESTAS - CON LÍNEAS MEJORADAS
-    preguntas_por_fila = 5
-    espacio_pregunta = 3.3 * cm
-    espacio_linea = 0.58 * cm  # Aumentado para más espacio
+    pregunta_num = 1
     
-    x_inicial = margin + 0.2 * cm
-    y_inicial = y
-    
-    for i in range(100):
-        num_pregunta = i + 1
-        fila = i // preguntas_por_fila
-        columna = i % preguntas_por_fila
+    for fila in range(20):  # 20 filas
+        x = x_start
         
-        x = x_inicial + (columna * espacio_pregunta)
-        y_actual = y_inicial - (fila * espacio_linea)
+        for col in range(5):  # 5 columnas
+            # Número de pregunta
+            c.setFont("Helvetica-Bold", 10)
+            num_text = f"{pregunta_num}."
+            c.drawString(x, y, num_text)
+            
+            # Paréntesis
+            c.setFont("Helvetica", 12)
+            paren_x = x + 12*mm
+            c.drawString(paren_x, y, "(     )")
+            
+            pregunta_num += 1
+            x += col_ancho
         
-        # Línea tenue ENTRE filas (no tocando paréntesis)
-        if i > 0 and i % preguntas_por_fila == 0:
-            c.setStrokeColor(colors.HexColor("#eeeeee"))  # Gris muy claro
-            c.setLineWidth(0.3)
-            # Línea JUSTO entre las dos filas
-            y_linea = y_actual + (espacio_linea / 2) - 0.05*cm
-            c.line(margin, y_linea, width - margin, y_linea)
-            c.setStrokeColor(colors.black)
+        y -= fila_altura
         
-        # Número de pregunta
-        c.setFont("Helvetica-Bold", 8)
-        c.drawRightString(x + 0.7 * cm, y_actual, f"{num_pregunta}.")
-        
-        # Paréntesis
-        c.setFont("Courier-Bold", 12)
-        c.drawString(x + 0.8 * cm, y_actual - 0.05*cm, "(      )")
+        # Si se acaba el espacio, advertir
+        if y < margen_v + 20*mm:
+            c.setFont("Helvetica-Bold", 8)
+            c.setFillColor(colors.red)
+            c.drawString(x_start, y, "⚠️ Espacio insuficiente - ajustar diseño")
+            break
     
+    # ========================================================================
     # PIE DE PÁGINA
-    y_footer = margin_bottom + 1.2 * cm
+    # ========================================================================
+    c.setFillColor(colors.black)
+    c.setFont("Helvetica", 8)
+    pie_y = margen_v - 5*mm
+    c.drawCentredString(width/2, pie_y, f"Código: {codigo_hoja} | Proceso: {proceso}")
     
-    if incluir_firma:
-        c.setFont("Helvetica", 7)
-        c.drawString(margin, y_footer + 0.4 * cm, "FIRMA DEL PROFESOR RESPONSABLE:")
-        c.setLineWidth(0.5)
-        c.line(margin + 5.5 * cm, y_footer + 0.3 * cm, 
-               margin + 10 * cm, y_footer + 0.3 * cm)
-        
-        c.drawString(width - margin - 4.5 * cm, y_footer + 0.4 * cm, "FECHA:")
-        c.line(width - margin - 3 * cm, y_footer + 0.3 * cm, 
-               width - margin, y_footer + 0.3 * cm)
-    
-    c.setFont("Helvetica", 6)
-    c.setFillColor(colors.grey)
-    c.drawString(margin, margin_bottom + 0.3 * cm, 
-                 f"Proceso: {proceso_admision} | Hoja: {codigo_hoja}")
-    
+    # Guardar PDF
     c.save()
+    
+    return {
+        "success": True,
+        "codigo_hoja": codigo_hoja,
+        "filepath": output_path
+    }
+
+
+# ============================================================================
+# ENDPOINT: GENERAR HOJAS PARA EXAMEN
+# ============================================================================
+
+@app.post("/api/generar-hojas-examen")
+async def generar_hojas_examen(
+    proceso_admision: str = "2025-1",
+    cantidad: int = None,
+    postulantes_ids: list = None
+):
+    """
+    Genera hojas de respuestas pre-impresas para el examen.
+    
+    Crea:
+    1. Registros en BD con códigos únicos
+    2. PDFs individuales por postulante
+    3. Estado: "generada"
+    """
+    db = SessionLocal()
+    
+    try:
+        # Obtener postulantes
+        if postulantes_ids:
+            postulantes = db.query(Postulante).filter(
+                Postulante.id.in_(postulantes_ids)
+            ).all()
+        elif cantidad:
+            postulantes = db.query(Postulante).limit(cantidad).all()
+        else:
+            raise HTTPException(status_code=400, detail="Debe especificar 'cantidad' o 'postulantes_ids'")
+        
+        if not postulantes:
+            raise HTTPException(status_code=404, detail="No se encontraron postulantes")
+        
+        hojas_generadas = []
+        
+        for postulante in postulantes:
+            # Generar código único
+            codigo_hoja = generar_codigo_hoja_unico()
+            
+            # Verificar que sea único
+            while db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first():
+                codigo_hoja = generar_codigo_hoja_unico()
+            
+            # Obtener aula asignada (ejemplo)
+            # TODO: Implementar lógica de asignación de aulas
+            codigo_aula = "A101"  # Por defecto
+            dni_profesor = "00000000"  # Se llenará después
+            
+            # Generar PDF
+            pdf_path = f"hojas_generadas/{codigo_hoja}.pdf"
+            os.makedirs("hojas_generadas", exist_ok=True)
+            
+            resultado_pdf = generar_hoja_respuestas_pdf(
+                output_path=pdf_path,
+                dni_postulante=postulante.dni,
+                codigo_aula=codigo_aula,
+                dni_profesor=dni_profesor,
+                codigo_hoja=codigo_hoja,
+                proceso=proceso_admision
+            )
+            
+            # Crear registro en BD
+            hoja = HojaRespuesta(
+                postulante_id=postulante.id,
+                dni_profesor=dni_profesor,
+                codigo_aula=codigo_aula,
+                codigo_hoja=codigo_hoja,
+                proceso_admision=proceso_admision,
+                imagen_url=pdf_path,
+                estado="generada",
+                api_utilizada=None,
+                fecha_generacion=datetime.now(timezone.utc)
+            )
+            
+            db.add(hoja)
+            hojas_generadas.append({
+                "postulante": f"{postulante.nombres} {postulante.apellido_paterno}",
+                "dni": postulante.dni,
+                "codigo_hoja": codigo_hoja,
+                "pdf": pdf_path
+            })
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "total_generadas": len(hojas_generadas),
+            "hojas": hojas_generadas
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
 
 # ============================================================================
 # ENDPOINT DE GENERACIÓN
@@ -1130,7 +1531,7 @@ async def procesar_hoja_completa(
             nota_final=nota_final,
             respuestas_correctas_count=correctas_count,
             tiempo_procesamiento=time.time() - inicio,
-            fecha_calificacion=datetime.utcnow() if gabarito_existe else None,
+            fecha_calificacion=datetime.now(timezone.utc) if gabarito_existe else None,
             observaciones=", ".join(mensajes),
             metadata_json=json.dumps({
                 "captura": metadata,
@@ -1294,7 +1695,7 @@ async def calificar_hojas_pendientes(proceso_admision: str = "2025-1"):
                 hoja.nota_final = calificacion["nota"]
                 hoja.respuestas_correctas_count = calificacion["correctas"]
                 hoja.estado = "completado"
-                hoja.fecha_calificacion = datetime.utcnow()
+                hoja.fecha_calificacion = datetime.now(timezone.utc)
                 
                 # Actualizar respuestas individuales
                 for i, resp in enumerate(respuestas):
