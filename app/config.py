@@ -85,7 +85,7 @@ class Settings(BaseSettings):
     # ==============================================
     # CORS
     # ==============================================
-    allowed_origins: list = ["http://localhost:3000", "http://localhost:8000", "http://localhost:1010"]
+    allowed_origins: list = ["http://localhost:3000", "http://localhost:8000", "http://localhost:1010", "http://localhost:5050"]
 
 
 @lru_cache()
