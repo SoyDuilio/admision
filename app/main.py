@@ -1,50 +1,46 @@
 """
 POSTULANDO - Sistema de Exámenes de Admisión
+main.py LIMPIO Y MODULARIZADO
 """
 
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import StreamingResponse
-from fastapi import Form, HTTPException
-from fastapi import FastAPI, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
-
-from typing import Optional
+from typing import Optional, List
 from io import BytesIO
 import zipfile
 from datetime import datetime, timezone
-import uuid
 import tempfile
-from dotenv import load_dotenv
 import os
-
-import random
-import string
-
+import json
 import time
 import shutil
 
-
-from pathlib import Path
-
-
-# Importar desde app
+# Imports locales
 from app.database import SessionLocal, engine, Base
-from app.models import Postulante, HojaRespuesta, ClaveRespuesta, Calificacion, Profesor, Aula, Respuesta
+from app.models import (
+    Postulante, HojaRespuesta, ClaveRespuesta, 
+    Calificacion, Profesor, Aula, Respuesta
+)
+from app.config import settings
 
-#from app.api.generador import router as generador_router
-
-from reportlab.lib.pagesizes import A4
-from reportlab.pdfgen import canvas
-from reportlab.lib.units import cm, mm
-from reportlab.lib import colors
-from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.platypus import Paragraph, Table, TableStyle
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-
-load_dotenv()
+# Servicios modularizados
+from app.services import (
+    generar_hoja_respuestas_pdf,
+    procesar_con_api_seleccionada,
+    validar_codigos,
+    calcular_calificacion,
+    gabarito_existe
+)
+from app.utils import (
+    generar_codigo_hoja_unico,
+    guardar_foto_temporal,
+    crear_directorio_capturas,
+    crear_directorio_generadas
+)
 
 # Crear tablas
 Base.metadata.create_all(bind=engine)
@@ -72,327 +68,9 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 
-
 # ============================================================================
-# EXTRACCIÓN CON CLAUDE (Anthropic)
-# ============================================================================
-
-async def extraer_con_claude(imagen_path: str) -> Dict:
-    """
-    Extrae datos con Claude Vision.
-    """
-    try:
-        with open(imagen_path, "rb") as image_file:
-            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
-        
-        ext = imagen_path.split(".")[-1].lower()
-        media_type = {"jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png"}.get(ext, "image/jpeg")
-        
-        client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
-        
-        prompt = """Analiza esta hoja de respuestas de examen de admisión.
-
-ESTRUCTURA:
-
-## CÓDIGOS (en la parte superior, 2 líneas):
-LÍNEA 1 (labels): DNI Postulante    Código Aula    DNI Profesor
-LÍNEA 2 (valores): Debajo de cada label están los códigos correspondientes, separados por espacios.
-
-Encontrarás 3 bloques de códigos separados por espacios:
-- Los primeros 8 dígitos consecutivos: DNI del Postulante
-- Los siguientes 4-5 caracteres consecutivos: Código del Aula (puede tener letras y números)
-- Los últimos 8 dígitos consecutivos: DNI del Profesor
-
-Ejemplo:
-DNI Postulante              Código Aula         DNI Profesor
-70123456                    C201                12345678
-
-Después hay una línea que dice "Código de Hoja:" seguido de un código alfanumérico de 9 caracteres (sin i, l, o, 0, 1).
-
-## RESPUESTAS (100 preguntas numeradas del 1 al 100):
-Cada pregunta tiene formato: N. (  )
-Donde N es el número de pregunta y dentro del paréntesis hay UNA letra: A, B, C, D o E.
-
-REGLAS:
-1. DEBES retornar EXACTAMENTE 100 elementos en "respuestas"
-2. Si el paréntesis está VACÍO → usa null
-3. Si hay una letra válida (A, B, C, D, E) → úsala en MAYÚSCULA
-4. Si hay minúscula (a,b,c,d,e) → convierte a MAYÚSCULA
-5. Cualquier otro valor → usa null
-
-RESPONDE SOLO CON ESTE JSON:
-{
-  "dni_postulante": "70123456",
-  "codigo_aula": "C201",
-  "dni_profesor": "12345678",
-  "codigo_hoja": "ABC23456D",
-  "proceso_admision": "2025-1",
-  "respuestas": ["A", "B", null, "C", "D", ...]
-}
-
-VALIDACIÓN: Verifica que "respuestas" tenga EXACTAMENTE 100 elementos."""
-
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            temperature=0,
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_data}},
-                    {"type": "text", "text": prompt}
-                ]
-            }]
-        )
-        
-        respuesta_texto = message.content[0].text.strip()
-        if respuesta_texto.startswith("```json"):
-            respuesta_texto = respuesta_texto[7:]
-        if respuesta_texto.startswith("```"):
-            respuesta_texto = respuesta_texto[3:]
-        if respuesta_texto.endswith("```"):
-            respuesta_texto = respuesta_texto[:-3]
-        respuesta_texto = respuesta_texto.strip()
-        
-        resultado = json.loads(respuesta_texto)
-        
-        # Validar
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(f"Se esperaban 100 respuestas, se obtuvieron {len(resultado['respuestas'])}")
-        
-        # Normalizar respuestas
-        respuestas_validadas = []
-        for resp in resultado["respuestas"]:
-            if resp is None or resp == "":
-                respuestas_validadas.append(None)
-            elif isinstance(resp, str) and resp.strip().upper() in ["A", "B", "C", "D", "E"]:
-                respuestas_validadas.append(resp.strip().upper())
-            else:
-                respuestas_validadas.append(None)
-        
-        resultado["respuestas"] = respuestas_validadas
-        
-        return {
-            "success": True,
-            "api": "claude",
-            "datos": resultado,
-            "tokens": message.usage.input_tokens + message.usage.output_tokens
-        }
-        
-    except Exception as e:
-        return {"success": False, "api": "claude", "error": str(e)}
-
-
-# ============================================================================
-# EXTRACCIÓN CON GOOGLE VISION
-# ============================================================================
-
-async def extraer_con_google_vision(imagen_path: str) -> Dict:
-    """
-    Extrae datos con Google Vision API + Gemini.
-    """
-    try:
-        # Inicializar cliente
-        # Requiere: pip install google-cloud-vision google-generativeai
-        from google.cloud import vision
-        import google.generativeai as genai
-        
-        genai.configure(api_key=os.environ.get("GOOGLE_API_KEY"))
-        
-        # Leer imagen
-        with open(imagen_path, "rb") as image_file:
-            content = image_file.read()
-        
-        # OCR con Vision
-        client = vision.ImageAnnotatorClient()
-        image = vision.Image(content=content)
-        response = client.text_detection(image=image)
-        
-        if response.error.message:
-            raise Exception(response.error.message)
-        
-        texto_ocr = response.text_annotations[0].description if response.text_annotations else ""
-        
-        # Procesar con Gemini
-        model = genai.GenerativeModel('gemini-1.5-flash')
-        
-        prompt = f"""Analiza este texto extraído de una hoja de examen:
-
-{texto_ocr}
-
-Extrae:
-1. DNI Postulante (8 dígitos, primeros en aparecer después de "DNI Postulante")
-2. Código Aula (4-5 caracteres, aparece después de "Código Aula")
-3. DNI Profesor (8 dígitos, aparece después de "DNI Profesor")
-4. Código Hoja (9 caracteres alfanuméricos, aparece después de "Código de Hoja:")
-5. 100 respuestas (busca números del 1 al 100 seguidos de paréntesis con letras A,B,C,D,E o vacíos)
-
-RESPONDE SOLO JSON:
-{{
-  "dni_postulante": "70123456",
-  "codigo_aula": "C201",
-  "dni_profesor": "12345678",
-  "codigo_hoja": "ABC23456D",
-  "proceso_admision": "2025-1",
-  "respuestas": ["A", "B", null, ...]
-}}
-
-CRÍTICO: "respuestas" debe tener EXACTAMENTE 100 elementos."""
-
-        response = model.generate_content(prompt)
-        resultado_texto = response.text.strip()
-        
-        # Limpiar JSON
-        if resultado_texto.startswith("```json"):
-            resultado_texto = resultado_texto[7:]
-        if resultado_texto.startswith("```"):
-            resultado_texto = resultado_texto[3:]
-        if resultado_texto.endswith("```"):
-            resultado_texto = resultado_texto[:-3]
-        resultado_texto = resultado_texto.strip()
-        
-        resultado = json.loads(resultado_texto)
-        
-        # Validar 100 respuestas
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(f"Google Vision: {len(resultado['respuestas'])} respuestas en lugar de 100")
-        
-        return {
-            "success": True,
-            "api": "google_vision",
-            "datos": resultado
-        }
-        
-    except Exception as e:
-        return {"success": False, "api": "google_vision", "error": str(e)}
-
-
-# ============================================================================
-# EXTRACCIÓN CON OPENAI GPT-4 VISION
-# ============================================================================
-
-async def extraer_con_openai(imagen_path: str) -> Dict:
-    """
-    Extrae datos con OpenAI GPT-4 Vision.
-    """
-    try:
-        from openai import OpenAI
-        
-        client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-        
-        # Leer imagen
-        with open(imagen_path, "rb") as image_file:
-            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
-        
-        prompt = """Analiza esta hoja de respuestas de examen.
-
-CÓDIGOS (parte superior):
-- DNI Postulante: 8 dígitos (primera línea de números)
-- Código Aula: 4-5 caracteres alfanuméricos (entre DNI Postulante y DNI Profesor)
-- DNI Profesor: 8 dígitos (última línea de números)
-- Código Hoja: 9 caracteres alfanuméricos (después de "Código de Hoja:")
-
-RESPUESTAS:
-- 100 preguntas numeradas 1-100
-- Cada una tiene formato: N. (  )
-- Dentro del paréntesis puede haber: A, B, C, D, E o estar vacío
-
-RESPONDE SOLO JSON:
-{
-  "dni_postulante": "70123456",
-  "codigo_aula": "C201",
-  "dni_profesor": "12345678",
-  "codigo_hoja": "ABC23456D",
-  "proceso_admision": "2025-1",
-  "respuestas": ["A", null, "B", ...]
-}
-
-IMPORTANTE: Array "respuestas" debe tener EXACTAMENTE 100 elementos."""
-
-        response = client.chat.completions.create(
-            model="gpt-4-vision-preview",
-            messages=[{
-                "role": "user",
-                "content": [
-                    {"type": "text", "text": prompt},
-                    {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{image_data}"}}
-                ]
-            }],
-            max_tokens=4000,
-            temperature=0
-        )
-        
-        resultado_texto = response.choices[0].message.content.strip()
-        
-        # Limpiar JSON
-        if resultado_texto.startswith("```json"):
-            resultado_texto = resultado_texto[7:]
-        if resultado_texto.startswith("```"):
-            resultado_texto = resultado_texto[3:]
-        if resultado_texto.endswith("```"):
-            resultado_texto = resultado_texto[:-3]
-        resultado_texto = resultado_texto.strip()
-        
-        resultado = json.loads(resultado_texto)
-        
-        # Validar
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(f"OpenAI: {len(resultado['respuestas'])} respuestas en lugar de 100")
-        
-        return {
-            "success": True,
-            "api": "openai",
-            "datos": resultado,
-            "tokens": response.usage.total_tokens
-        }
-        
-    except Exception as e:
-        return {"success": False, "api": "openai", "error": str(e)}
-
-
-# ============================================================================
-# FUNCIÓN PRINCIPAL: PROBAR CON LAS 3 APIS
-# ============================================================================
-
-async def extraer_con_todas_las_apis(imagen_path: str):
-    """
-    Prueba extracción con las 3 APIs y retorna la mejor.
-    """
-    resultados = []
-    
-    # Claude
-    print("🔄 Probando con Claude...")
-    resultado_claude = await extraer_con_claude(imagen_path)
-    resultados.append(resultado_claude)
-    
-    # Google Vision
-    print("🔄 Probando con Google Vision...")
-    resultado_google = await extraer_con_google_vision(imagen_path)
-    resultados.append(resultado_google)
-    
-    # OpenAI
-    print("🔄 Probando con OpenAI...")
-    resultado_openai = await extraer_con_openai(imagen_path)
-    resultados.append(resultado_openai)
-    
-    # Analizar resultados
-    exitosos = [r for r in resultados if r["success"]]
-    
-    if not exitosos:
-        return {
-            "success": False,
-            "error": "Ninguna API pudo procesar la imagen",
-            "intentos": resultados
-        }
-    
-    # Retornar el primero exitoso (prioridad: Claude > OpenAI > Google)
-    return exitosos[0]
-
-
-
-# ============================================
 # FUNCIONES AUXILIARES
-# ============================================
+# ============================================================================
 
 def obtener_estadisticas():
     """Obtiene estadísticas generales del sistema"""
@@ -413,9 +91,10 @@ def obtener_estadisticas():
     finally:
         db.close()
 
-# ============================================
+
+# ============================================================================
 # RUTAS DE PÁGINAS
-# ============================================
+# ============================================================================
 
 @app.get("/")
 async def index(request: Request):
@@ -425,6 +104,7 @@ async def index(request: Request):
         "request": request,
         "stats": stats
     })
+
 
 @app.get("/generar-hojas")
 async def generar_hojas_page(request: Request):
@@ -439,6 +119,7 @@ async def generar_hojas_page(request: Request):
         })
     finally:
         db.close()
+
 
 @app.get("/capturar-hojas")
 async def capturar_hojas_page(request: Request):
@@ -456,45 +137,30 @@ async def capturar_hojas_page(request: Request):
     finally:
         db.close()
 
+
 @app.get("/registrar-gabarito")
 async def registrar_gabarito_page(request: Request):
     """Página para registrar respuestas correctas"""
     db = SessionLocal()
     try:
-        gabarito_existe = db.query(func.count(ClaveRespuesta.id)).scalar() > 0
+        gabarito_existe_flag = db.query(func.count(ClaveRespuesta.id)).scalar() > 0
         
         return templates.TemplateResponse("registrar_gabarito.html", {
             "request": request,
-            "gabarito_ya_existe": gabarito_existe
+            "gabarito_ya_existe": gabarito_existe_flag
         })
     finally:
         db.close()
 
+
 @app.get("/resultados")
 async def resultados_page(request: Request):
     """Página de resultados"""
-    # TODO: Implementar página de resultados
-    return {"message": "Página de resultados en construcción"}
-
-@app.get("/prueba-formal")
-async def prueba_formal(request: Request):
-    """Página de prueba (demo antigua)"""
-    return templates.TemplateResponse("demo.html", {
-        "request": request
-    })
-
-# ============================================
-# ENDPOINTS DE API
-# ============================================
-
-@app.get("/resultados")
-async def resultados_page():
-    """Página de resultados (en construcción)"""
     return {
         "message": "Página de resultados en construcción",
-        "status": "coming_soon",
-        "nota": "Esta funcionalidad estará disponible una vez que se procesen las primeras hojas"
+        "status": "coming_soon"
     }
+
 
 @app.get("/health")
 async def health_check():
@@ -506,342 +172,86 @@ async def health_check():
         "stats": stats
     }
 
-# ============================================
-# INCLUIR ROUTERS DE API (comentado por ahora)
-# ============================================
-
-# Descomentar cuando estés listo para usar los endpoints de procesamiento
-# from app.api import demo_router
-# app.include_router(demo_router, prefix="/api", tags=["demo"])
-
-
-# Instalar dependencias primero:
-# pip install reportlab qrcode[pil] pillow --break-system-packages
-
-# Luego agregar estas funciones y endpoint AL FINAL (antes de if __name__):
 
 # ============================================================================
-# GENERADOR DE CÓDIGOS Y HOJAS
-# ============================================================================
-
-def generar_codigo_unico(tipo: str = "postulante", **kwargs):
-    """Genera código alfanumérico único"""
-    fecha = datetime.now().strftime("%Y%m%d")
-    uuid_short = str(uuid.uuid4())[:4].upper()
-    
-    if tipo == "postulante":
-        dni = kwargs.get('dni', '00000000')
-        return f"POST-{dni[-4:]}-{fecha}-{uuid_short}"
-    elif tipo == "sin_identificar":
-        return f"GEN-{fecha}-{uuid_short}"
-    else:
-        return f"GEN-{fecha}-{uuid_short}"
-
-def generar_hoja_respuesta_simple(
-    output_path: str,
-    codigo_unico: str,
-    datos_postulante: Optional[dict] = None,
-    incluir_firma: bool = True
-):
-    """
-    Genera una hoja de respuestas SIMPLE en texto plano
-    (Sin ReportLab por ahora - solo archivo de texto)
-    """
-    with open(output_path, 'w', encoding='utf-8') as f:
-        f.write("="* 60 + "\n")
-        f.write("I. S. T. Pedro A. Del Águila H. - EXAMEN DE ADMISIÓN 2025\n")
-        f.write("HOJA DE RESPUESTAS\n")
-        f.write("="* 60 + "\n\n")
-        
-        if datos_postulante:
-            f.write(f"DNI: {datos_postulante.get('dni', '')}\n")
-            f.write(f"Nombres: {datos_postulante.get('nombres', '')}\n")
-            apellidos = f"{datos_postulante.get('apellido_paterno', '')} {datos_postulante.get('apellido_materno', '')}"
-            f.write(f"Apellidos: {apellidos}\n")
-            f.write(f"Programa: {datos_postulante.get('programa', '')}\n")
-        else:
-            f.write("DNI: ____________________\n")
-            f.write("Nombres: _________________________________\n")
-            f.write("Apellidos: __________________________________________________\n")
-        
-        f.write(f"\nCÓDIGO: {codigo_unico}\n")
-        f.write("="* 60 + "\n\n")
-        
-        f.write("INSTRUCCIONES:\n")
-        f.write("• Marque con X o llene el círculo de la alternativa correcta\n")
-        f.write("• Solo una respuesta por pregunta\n")
-        f.write("• No realice borrones\n\n")
-        
-        f.write("RESPUESTAS (marque a, b, c, d o e):\n")
-        f.write("-"* 60 + "\n\n")
-        
-        # Generar grid de 100 preguntas
-        for i in range(1, 101):
-            f.write(f"{i:3d}. (    )   ")
-            if i % 5 == 0:
-                f.write("\n")
-        
-        if incluir_firma:
-            f.write("\n\n" + "="* 60 + "\n")
-            f.write("Firma del Profesor: _______________________\n")
-            f.write("Fecha: ___/___/______\n")
-
-
-def generar_codigo_hoja():
-    """Genera código alfanumérico de 9 caracteres: A2iDñ5RsW"""
-    chars = string.ascii_letters + string.digits
-    return ''.join(random.choice(chars) for _ in range(9))
-
-
-
-# ============================================================================
-# GENERADOR DE CÓDIGO ÚNICO (sin caracteres ambiguos)
-# ============================================================================
-
-def generar_codigo_hoja_unico():
-    """
-    Genera código alfanumérico de 9 caracteres.
-    Excluye: i, l, I, L, o, O, 0, 1 (caracteres confusos)
-    """
-    # Caracteres seguros
-    letras_seguras = 'ABCDEFGHJKMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz'  # Sin i,l,o
-    numeros_seguros = '23456789'  # Sin 0, 1
-    
-    # Formato: 3 letras + 5 números + 1 letra
-    codigo = (
-        ''.join(random.choices(letras_seguras.upper(), k=3)) +
-        ''.join(random.choices(numeros_seguros, k=5)) +
-        ''.join(random.choices(letras_seguras.upper(), k=1))
-    )
-    
-    return codigo
-
-
-# ============================================================================
-# GENERADOR DE HOJAS DE RESPUESTAS
-# ============================================================================
-
-# ============================================================================
-# GENERADOR DE PDF - HOJA DE RESPUESTAS OPTIMIZADA
-# ============================================================================
-
-def generar_hoja_respuestas_pdf(
-    output_path: str,
-    dni_postulante: str,
-    codigo_aula: str,
-    dni_profesor: str,
-    codigo_hoja: str = None,
-    proceso: str = "2025-1"
-):
-    """
-    Genera PDF optimizado para lectura por LLM.
-    
-    Características:
-    - Área útil: 80% del A4 (168mm × 237mm)
-    - Códigos en línea separados por espacios
-    - Respuestas: 5 por fila, 20 filas
-    - Altura de fila: 9mm (óptima para cámara y LLM)
-    """
-    
-    # Generar código si no se proporciona
-    if not codigo_hoja:
-        codigo_hoja = generar_codigo_hoja_unico()
-    
-    # Crear canvas
-    c = canvas.Canvas(output_path, pagesize=A4)
-    width, height = A4
-    
-    # ========================================================================
-    # ÁREA ÚTIL: 80% centrado
-    # ========================================================================
-    margen_h = width * 0.10  # 10% cada lado
-    margen_v = height * 0.10  # 10% arriba y abajo
-    
-    area_width = width * 0.80
-    area_height = height * 0.80
-    
-    x_start = margen_h
-    y_start = height - margen_v
-    
-    # Marco del área útil (para visualización durante desarrollo)
-    # c.setStrokeColor(colors.lightgrey)
-    # c.rect(x_start, margen_v, area_width, area_height)
-    
-    # ========================================================================
-    # ENCABEZADO
-    # ========================================================================
-    y = y_start
-    
-    # Título
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, y, "I. S. T. Pedro A. Del Águila H.")
-    y -= 6*mm
-    
-    c.setFont("Helvetica", 12)
-    c.drawCentredString(width/2, y, f"EXAMEN DE ADMISIÓN - Proceso {proceso}")
-    y -= 10*mm
-    
-    # Línea separadora
-    c.setStrokeColor(colors.black)
-    c.setLineWidth(1)
-    c.line(x_start, y, x_start + area_width, y)
-    y -= 8*mm
-    
-    # ========================================================================
-    # SECCIÓN CÓDIGOS (OPTIMIZADA PARA LLM)
-    # ========================================================================
-    
-    # Etiquetas (labels)
-    c.setFont("Helvetica-Bold", 10)
-    
-    # Calcular posiciones para 3 columnas centradas
-    col_width = area_width / 3
-    col1_x = x_start + col_width * 0.5
-    col2_x = x_start + col_width * 1.5
-    col3_x = x_start + col_width * 2.5
-    
-    c.drawCentredString(col1_x, y, "DNI Postulante")
-    c.drawCentredString(col2_x, y, "Código Aula")
-    c.drawCentredString(col3_x, y, "DNI Profesor")
-    y -= 6*mm
-    
-    # Valores (con mayor tamaño y negrita)
-    c.setFont("Helvetica-Bold", 14)
-    c.drawCentredString(col1_x, y, dni_postulante)
-    c.drawCentredString(col2_x, y, codigo_aula)
-    c.drawCentredString(col3_x, y, dni_profesor)
-    y -= 8*mm
-    
-    # Código de hoja (centrado, muy visible)
-    c.setFont("Helvetica-Bold", 10)
-    c.drawCentredString(width/2, y, "Código de Hoja:")
-    y -= 5*mm
-    
-    c.setFont("Helvetica-Bold", 16)
-    c.drawCentredString(width/2, y, codigo_hoja)
-    y -= 10*mm
-    
-    # Línea separadora
-    c.setLineWidth(1)
-    c.line(x_start, y, x_start + area_width, y)
-    y -= 8*mm
-    
-    # ========================================================================
-    # INSTRUCCIONES
-    # ========================================================================
-    c.setFont("Helvetica-Bold", 10)
-    c.drawString(x_start, y, "INSTRUCCIONES: Escriba UNA letra (A, B, C, D o E) dentro de cada paréntesis")
-    y -= 8*mm
-    
-    # ========================================================================
-    # RESPUESTAS: 5 por fila, 20 filas = 100 preguntas
-    # ========================================================================
-    
-    c.setFont("Helvetica", 10)
-    
-    # Dimensiones óptimas
-    fila_altura = 9*mm  # Altura generosa para cámara
-    col_ancho = area_width / 5  # 5 columnas
-    parentesis_ancho = 12*mm  # Ancho del paréntesis
-    
-    pregunta_num = 1
-    
-    for fila in range(20):  # 20 filas
-        x = x_start
-        
-        for col in range(5):  # 5 columnas
-            # Número de pregunta
-            c.setFont("Helvetica-Bold", 10)
-            num_text = f"{pregunta_num}."
-            c.drawString(x, y, num_text)
-            
-            # Paréntesis
-            c.setFont("Helvetica", 12)
-            paren_x = x + 12*mm
-            c.drawString(paren_x, y, "(     )")
-            
-            pregunta_num += 1
-            x += col_ancho
-        
-        y -= fila_altura
-        
-        # Si se acaba el espacio, advertir
-        if y < margen_v + 20*mm:
-            c.setFont("Helvetica-Bold", 8)
-            c.setFillColor(colors.red)
-            c.drawString(x_start, y, "⚠️ Espacio insuficiente - ajustar diseño")
-            break
-    
-    # ========================================================================
-    # PIE DE PÁGINA
-    # ========================================================================
-    c.setFillColor(colors.black)
-    c.setFont("Helvetica", 8)
-    pie_y = margen_v - 5*mm
-    c.drawCentredString(width/2, pie_y, f"Código: {codigo_hoja} | Proceso: {proceso}")
-    
-    # Guardar PDF
-    c.save()
-    
-    return {
-        "success": True,
-        "codigo_hoja": codigo_hoja,
-        "filepath": output_path
-    }
-
-
-# ============================================================================
-# ENDPOINT: GENERAR HOJAS PARA EXAMEN
+# ENDPOINT: GENERAR HOJAS CON CÓDIGOS PRE-IMPRESOS
 # ============================================================================
 
 @app.post("/api/generar-hojas-examen")
 async def generar_hojas_examen(
-    proceso_admision: str = "2025-1",
+    proceso_admision: str = "2025-2",
     cantidad: int = None,
-    postulantes_ids: list = None
+    postulantes_ids: list = None,
+    codigo_aula: str = "A101",
+    dni_profesor: str = "00000000"
 ):
     """
-    Genera hojas de respuestas pre-impresas para el examen.
-    
-    Crea:
-    1. Registros en BD con códigos únicos
-    2. PDFs individuales por postulante
-    3. Estado: "generada"
+    Genera hojas de respuestas pre-impresas con códigos únicos.
+    Guarda registros en BD antes de generar PDFs.
     """
     db = SessionLocal()
     
     try:
         # Obtener postulantes
         if postulantes_ids:
-            postulantes = db.query(Postulante).filter(
-                Postulante.id.in_(postulantes_ids)
-            ).all()
+            postulantes = db.query(Postulante).filter(Postulante.id.in_(postulantes_ids)).all()
         elif cantidad:
             postulantes = db.query(Postulante).limit(cantidad).all()
         else:
-            raise HTTPException(status_code=400, detail="Debe especificar 'cantidad' o 'postulantes_ids'")
+            raise HTTPException(status_code=400, detail="Especifica 'cantidad' o 'postulantes_ids'")
         
         if not postulantes:
-            raise HTTPException(status_code=404, detail="No se encontraron postulantes")
+            raise HTTPException(status_code=404, detail="No hay postulantes")
+        
+        # Crear carpeta
+        crear_directorio_generadas()
         
         hojas_generadas = []
         
         for postulante in postulantes:
-            # Generar código único
-            codigo_hoja = generar_codigo_hoja_unico()
+            print(f"\n📄 Procesando: {postulante.dni}")
             
-            # Verificar que sea único
-            while db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first():
+            # Verificar si ya existe
+            hoja_existente = db.query(HojaRespuesta).filter_by(
+                postulante_id=postulante.id,
+                proceso_admision=proceso_admision,
+                estado="generada"
+            ).first()
+            
+            if hoja_existente:
+                # Reimpresión: actualizar código
+                print(f"   🔄 REIMPRESIÓN")
                 codigo_hoja = generar_codigo_hoja_unico()
+                
+                while db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first():
+                    codigo_hoja = generar_codigo_hoja_unico()
+                
+                hoja_existente.codigo_hoja = codigo_hoja
+                hoja_existente.updated_at = datetime.now(timezone.utc)
+                hoja = hoja_existente
+                
+            else:
+                # Primera vez
+                print(f"   ✨ PRIMERA VEZ")
+                codigo_hoja = generar_codigo_hoja_unico()
+                
+                while db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first():
+                    codigo_hoja = generar_codigo_hoja_unico()
+                
+                hoja = HojaRespuesta(
+                    postulante_id=postulante.id,
+                    dni_profesor=dni_profesor,
+                    codigo_aula=codigo_aula,
+                    codigo_hoja=codigo_hoja,
+                    proceso_admision=proceso_admision,
+                    estado="generada"
+                )
+                db.add(hoja)
             
-            # Obtener aula asignada (ejemplo)
-            # TODO: Implementar lógica de asignación de aulas
-            codigo_aula = "A101"  # Por defecto
-            dni_profesor = "00000000"  # Se llenará después
+            print(f"   📋 Código: {codigo_hoja}")
             
             # Generar PDF
             pdf_path = f"hojas_generadas/{codigo_hoja}.pdf"
-            os.makedirs("hojas_generadas", exist_ok=True)
             
             resultado_pdf = generar_hoja_respuestas_pdf(
                 output_path=pdf_path,
@@ -852,28 +262,21 @@ async def generar_hojas_examen(
                 proceso=proceso_admision
             )
             
-            # Crear registro en BD
-            hoja = HojaRespuesta(
-                postulante_id=postulante.id,
-                dni_profesor=dni_profesor,
-                codigo_aula=codigo_aula,
-                codigo_hoja=codigo_hoja,
-                proceso_admision=proceso_admision,
-                imagen_url=pdf_path,
-                estado="generada",
-                api_utilizada=None,
-                fecha_generacion=datetime.now(timezone.utc)
-            )
+            hoja.imagen_url = pdf_path
             
-            db.add(hoja)
+            print(f"   ✅ PDF: {pdf_path}")
+            
             hojas_generadas.append({
                 "postulante": f"{postulante.nombres} {postulante.apellido_paterno}",
                 "dni": postulante.dni,
                 "codigo_hoja": codigo_hoja,
-                "pdf": pdf_path
+                "pdf": pdf_path,
+                "reimpresion": hoja_existente is not None
             })
         
+        # COMMIT
         db.commit()
+        print(f"\n✅ COMMIT - {len(hojas_generadas)} hojas guardadas")
         
         return {
             "success": True,
@@ -881,18 +284,22 @@ async def generar_hojas_examen(
             "hojas": hojas_generadas
         }
         
-    except HTTPException:
-        raise
     except Exception as e:
         db.rollback()
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         db.close()
 
 
+# ============================================================================
+# ENDPOINT: GENERAR HOJAS (LEGACY - para compatibilidad con frontend actual)
+# ============================================================================
 
 # ============================================================================
-# ENDPOINT DE GENERACIÓN
+# ENDPOINT CORREGIDO - Con profesor y aula seleccionables
 # ============================================================================
 
 @app.post("/api/generar-hojas")
@@ -904,21 +311,68 @@ async def generar_hojas(
     cantidad_hojas: Optional[int] = Form(100),
     incluir_datos: bool = Form(True),
     incluir_firma: bool = Form(True),
-    proceso_admision: str = Form("2025-1")
+    proceso_admision: str = Form("2025-2"),
+    # CAMBIO: Ahora son opcionales, se obtienen de BD si no se envían
+    codigo_aula: Optional[str] = Form(None),
+    dni_profesor: Optional[str] = Form(None)
 ):
     """
-    Genera hojas de respuestas en PDF
+    Genera hojas de respuestas y las registra en BD.
+    
+    CORREGIDO:
+    - Si no se envía código_aula, usa el primero disponible en BD
+    - Si no se envía dni_profesor, usa el primero disponible en BD
+    - Logs detallados para debugging
     """
     db = SessionLocal()
     
     try:
+        # ====================================================================
+        # 1. OBTENER AULA Y PROFESOR (si no vienen del frontend)
+        # ====================================================================
+        
+        if not codigo_aula:
+            primera_aula = db.query(Aula).first()
+            if primera_aula:
+                codigo_aula = primera_aula.codigo
+                print(f"📍 Usando aula por defecto: {codigo_aula}")
+            else:
+                raise HTTPException(status_code=400, detail="No hay aulas registradas en BD")
+        
+        if not dni_profesor:
+            primer_profesor = db.query(Profesor).first()
+            if primer_profesor:
+                dni_profesor = primer_profesor.dni
+                print(f"👨‍🏫 Usando profesor por defecto: {dni_profesor} ({primer_profesor.nombres})")
+            else:
+                raise HTTPException(status_code=400, detail="No hay profesores registrados en BD")
+        
+        # Verificar que existan en BD
+        aula = db.query(Aula).filter_by(codigo=codigo_aula).first()
+        if not aula:
+            raise HTTPException(status_code=404, detail=f"Aula {codigo_aula} no existe")
+        
+        profesor = db.query(Profesor).filter_by(dni=dni_profesor).first()
+        if not profesor:
+            raise HTTPException(status_code=404, detail=f"Profesor {dni_profesor} no existe")
+        
+        print(f"✅ Aula validada: {codigo_aula} - {aula.nombre}")
+        print(f"✅ Profesor validado: {dni_profesor} - {profesor.nombres}")
+        
+        # ====================================================================
+        # 2. OBTENER POSTULANTES
+        # ====================================================================
+        
         postulantes_data = []
         
         if tipo == "todos":
             postulantes = db.query(Postulante).all()
+            print(f"📋 Obtenidos {len(postulantes)} postulantes (todos)")
+            
             for p in postulantes:
                 postulantes_data.append({
-                    "codigo": p.dni,  # DNI es el código
+                    "codigo": p.dni,
+                    "postulante_id": p.id,
                     "datos": {
                         "dni": p.dni,
                         "nombres": p.nombres,
@@ -933,8 +387,11 @@ async def generar_hojas(
             if not postulante:
                 raise HTTPException(status_code=404, detail="Postulante no encontrado")
             
+            print(f"📋 Postulante individual: {postulante.dni}")
+            
             postulantes_data.append({
                 "codigo": postulante.dni,
+                "postulante_id": postulante.id,
                 "datos": {
                     "dni": postulante.dni,
                     "nombres": postulante.nombres,
@@ -946,9 +403,12 @@ async def generar_hojas(
             
         elif tipo == "rango":
             postulantes = db.query(Postulante).slice(rango_inicio - 1, rango_fin).all()
+            print(f"📋 Obtenidos {len(postulantes)} postulantes (rango {rango_inicio}-{rango_fin})")
+            
             for p in postulantes:
                 postulantes_data.append({
                     "codigo": p.dni,
+                    "postulante_id": p.id,
                     "datos": {
                         "dni": p.dni,
                         "nombres": p.nombres,
@@ -959,31 +419,123 @@ async def generar_hojas(
                 })
                 
         elif tipo == "sin_identificar":
+            print(f"📋 Generando {cantidad_hojas} hojas sin identificar")
             for i in range(cantidad_hojas):
                 postulantes_data.append({
                     "codigo": f"SIN-ID-{i+1:04d}",
+                    "postulante_id": None,
                     "datos": None
                 })
         
-        # Generar PDFs
+        if not postulantes_data:
+            raise HTTPException(status_code=400, detail="No hay postulantes para generar hojas")
+        
+        # ====================================================================
+        # 3. GENERAR PDFs Y REGISTRAR EN BD
+        # ====================================================================
+        
         temp_dir = tempfile.mkdtemp()
         pdf_files = []
+        hojas_registradas = []
+        hojas_sin_registrar = []
         
-        for item in postulantes_data:
-            filename = f"hoja_dni_{item['codigo']}.pdf"
+        crear_directorio_generadas()
+        
+        for idx, item in enumerate(postulantes_data, 1):
+            print(f"\n{'='*60}")
+            print(f"📄 Procesando hoja {idx}/{len(postulantes_data)}")
+            print(f"   DNI: {item['codigo']}")
+            print(f"   Postulante ID: {item['postulante_id']}")
+            
+            # Generar código único
+            codigo_hoja = generar_codigo_hoja_unico()
+            
+            # Verificar que sea único
+            intentos = 0
+            while db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first():
+                codigo_hoja = generar_codigo_hoja_unico()
+                intentos += 1
+                if intentos > 10:
+                    raise Exception("No se pudo generar código único después de 10 intentos")
+            
+            print(f"   Código generado: {codigo_hoja}")
+            
+            # REGISTRAR EN BD
+            if item['postulante_id']:
+                try:
+                    hoja = HojaRespuesta(
+                        postulante_id=item['postulante_id'],
+                        dni_profesor=dni_profesor,
+                        codigo_aula=codigo_aula,
+                        codigo_hoja=codigo_hoja,
+                        proceso_admision=proceso_admision,
+                        estado="generada"
+                    )
+                    db.add(hoja)
+                    db.flush()  # Para obtener el ID
+                    
+                    hojas_registradas.append({
+                        "codigo_hoja": codigo_hoja,
+                        "dni": item['codigo'],
+                        "hoja_id": hoja.id
+                    })
+                    print(f"   ✅ Registrado en BD (ID: {hoja.id})")
+                    
+                except Exception as e:
+                    print(f"   ⚠️ Error al registrar en BD: {str(e)}")
+                    hojas_sin_registrar.append({
+                        "codigo_hoja": codigo_hoja,
+                        "dni": item['codigo'],
+                        "error": str(e)
+                    })
+            else:
+                print(f"   ⏭️ Sin postulante_id, no se registra en BD")
+                hojas_sin_registrar.append({
+                    "codigo_hoja": codigo_hoja,
+                    "dni": item['codigo'],
+                    "razon": "sin_identificar"
+                })
+            
+            # GENERAR PDF
+            filename = f"hoja_{item['codigo']}_{codigo_hoja}.pdf"
             filepath = os.path.join(temp_dir, filename)
             
-            generar_hoja_respuesta_pdf(
-                output_path=filepath,
-                codigo_postulante=item['codigo'],
-                datos_postulante=item['datos'],
-                proceso_admision=proceso_admision,
-                incluir_firma=incluir_firma
-            )
-            
-            pdf_files.append(filepath)
+            try:
+                generar_hoja_respuestas_pdf(
+                    output_path=filepath,
+                    dni_postulante=item['codigo'],
+                    codigo_aula=codigo_aula,
+                    dni_profesor=dni_profesor,
+                    codigo_hoja=codigo_hoja,
+                    proceso=proceso_admision
+                )
+                pdf_files.append(filepath)
+                print(f"   ✅ PDF generado: {filename}")
+                
+            except Exception as e:
+                print(f"   ❌ Error al generar PDF: {str(e)}")
+                raise
         
-        # Crear ZIP
+        # ====================================================================
+        # 4. COMMIT A BD
+        # ====================================================================
+        
+        try:
+            db.commit()
+            print(f"\n{'='*60}")
+            print(f"✅ COMMIT EXITOSO")
+            print(f"   Hojas registradas en BD: {len(hojas_registradas)}")
+            print(f"   Hojas sin registrar: {len(hojas_sin_registrar)}")
+            
+        except Exception as e:
+            db.rollback()
+            print(f"\n❌ ERROR EN COMMIT: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Error al guardar en BD: {str(e)}")
+        
+        # ====================================================================
+        # 5. CREAR ZIP
+        # ====================================================================
+        
         zip_buffer = BytesIO()
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             for pdf_file in pdf_files:
@@ -991,245 +543,37 @@ async def generar_hojas(
         
         zip_buffer.seek(0)
         
-        # Limpiar archivos temporales
+        # Limpiar temporales
         for pdf_file in pdf_files:
             os.remove(pdf_file)
         os.rmdir(temp_dir)
         
-        # Retornar ZIP
+        # ====================================================================
+        # 6. RESPUESTA
+        # ====================================================================
+        
         filename = f"hojas_respuestas_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
+        
+        print(f"\n✅ Proceso completado")
+        print(f"   Archivo ZIP: {filename}")
+        print(f"   Total PDFs: {len(pdf_files)}")
         
         return StreamingResponse(
             zip_buffer,
             media_type="application/zip",
-            headers={"Content-Disposition": f"attachment; filename={filename}"}
-        )
-        
-    finally:
-        db.close()
-
-
-# ============================================================================
-# FUNCIÓN: VALIDAR CÓDIGOS
-# ============================================================================
-
-def validar_codigos(dni_postulante: str, dni_profesor: str, codigo_aula: str, db):
-    """
-    Valida que los códigos existan en la base de datos
-    Retorna: (estado, mensajes, datos_validados)
-    """
-    errores = []
-    mensajes = []
-    datos = {
-        "postulante": None,
-        "profesor": None,
-        "aula": None
-    }
-    
-    # Validar DNI postulante
-    postulante = db.query(Postulante).filter_by(dni=dni_postulante).first()
-    if not postulante:
-        errores.append("DNI_POSTULANTE")
-        mensajes.append(f"⚠️ DNI postulante {dni_postulante} no registrado")
-    else:
-        datos["postulante"] = postulante
-    
-    # Validar DNI profesor
-    profesor = db.query(Profesor).filter_by(dni=dni_profesor).first()
-    if not profesor:
-        errores.append("DNI_PROFESOR")
-        mensajes.append(f"⚠️ DNI profesor {dni_profesor} no registrado")
-    else:
-        datos["profesor"] = profesor
-    
-    # Validar código aula
-    aula = db.query(Aula).filter_by(codigo=codigo_aula).first()
-    if not aula:
-        errores.append("CODIGO_AULA")
-        mensajes.append(f"⚠️ Código aula {codigo_aula} no existe")
-    else:
-        datos["aula"] = aula
-    
-    # Determinar estado
-    if len(errores) == 0:
-        estado = "completado"
-        mensajes = ["✅ Hoja validada correctamente"]
-    elif len(errores) >= 2:
-        estado = "error"
-        mensajes.insert(0, "🚨 ALERTA: Múltiples códigos incorrectos")
-    else:
-        estado = "observado"
-    
-    return estado, mensajes, datos
-
-# ============================================================================
-# FUNCIÓN: GUARDAR FOTO TEMPORALMENTE
-# ============================================================================
-
-def guardar_foto_temporal(file: UploadFile) -> tuple:
-    """
-    Guarda la foto temporalmente en el servidor
-    Retorna: (filepath, filename)
-    """
-    # Crear directorio temporal si no existe
-    temp_dir = Path("temp_uploads")
-    temp_dir.mkdir(exist_ok=True)
-    
-    # Generar nombre único
-    ext = file.filename.split(".")[-1] if "." in file.filename else "jpg"
-    filename = f"{uuid.uuid4()}.{ext}"
-    filepath = temp_dir / filename
-    
-    # Guardar archivo
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    
-    return str(filepath), filename
-
-# ============================================================================
-# ENDPOINT: CAPTURAR HOJA
-# ============================================================================
-
-@app.post("/api/capturar-hoja")
-async def capturar_hoja(
-    file: UploadFile = File(...),
-    dni_postulante: str = Form(...),
-    dni_profesor: str = Form(...),
-    codigo_aula: str = Form(...),
-    proceso_admision: str = Form("2025-1")
-):
-    """
-    Endpoint para capturar hojas de respuestas con validación
-    """
-    db = SessionLocal()
-    inicio = time.time()
-    
-    try:
-        # 1. VALIDAR CÓDIGOS
-        estado, mensajes, datos = validar_codigos(
-            dni_postulante, dni_profesor, codigo_aula, db
-        )
-        
-        # 2. GENERAR CÓDIGO ÚNICO DE HOJA
-        codigo_hoja = ''.join(random.choices(string.ascii_letters + string.digits, k=9))
-        
-        # 3. GUARDAR FOTO TEMPORALMENTE
-        filepath, filename = guardar_foto_temporal(file)
-        
-        # 4. CREAR REGISTRO EN BD
-        hoja = HojaRespuesta(
-            postulante_id=datos["postulante"].id if datos["postulante"] else None,
-            dni_profesor=dni_profesor,
-            codigo_aula=codigo_aula,
-            codigo_hoja=codigo_hoja,
-            proceso_admision=proceso_admision,
-            imagen_url=filepath,
-            imagen_original_nombre=filename,
-            estado=estado,
-            observaciones=", ".join(mensajes) if len(mensajes) > 1 else mensajes[0]
-        )
-        
-        db.add(hoja)
-        db.commit()
-        db.refresh(hoja)
-        
-        tiempo_total = time.time() - inicio
-        
-        # 5. RESPUESTA INMEDIATA
-        return {
-            "success": True,
-            "id": hoja.id,
-            "codigo_hoja": codigo_hoja,
-            "estado": estado,
-            "mensajes": mensajes,
-            "tiempo": f"{tiempo_total:.2f}s",
-            "postulante": {
-                "id": datos["postulante"].id,
-                "nombres": f"{datos['postulante'].apellido_paterno} {datos['postulante'].apellido_materno}, {datos['postulante'].nombres}",
-                "programa": datos["postulante"].programa_educativo,
-                "dni": dni_postulante
-            } if datos["postulante"] else None,
-            "profesor": {
-                "nombres": f"{datos['profesor'].apellido_paterno} {datos['profesor'].apellido_materno}, {datos['profesor'].nombres}"
-            } if datos["profesor"] else None,
-            "aula": {
-                "codigo": codigo_aula,
-                "nombre": datos["aula"].nombre
-            } if datos["aula"] else None
-        }
-        
-    except Exception as e:
-        db.rollback()
-        import traceback
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        db.close()
-
-# ============================================================================
-# ENDPOINT: REGISTRAR GABARITO MANUAL
-# ============================================================================
-
-@app.post("/api/registrar-gabarito-manual")
-async def registrar_gabarito_manual(
-    respuestas: str = Form(...),
-    proceso_admision: str = Form("2025-1")
-):
-    """
-    Registra las respuestas correctas manualmente
-    """
-    db = SessionLocal()
-    
-    try:
-        # Convertir string a lista
-        lista_respuestas = [r.strip().upper() for r in respuestas.split(",")]
-        
-        # Validar que sean 100 respuestas
-        if len(lista_respuestas) != 100:
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Se esperan 100 respuestas, se recibieron {len(lista_respuestas)}"
-            )
-        
-        # Validar que todas sean A, B, C, D o E
-        validas = set(['A', 'B', 'C', 'D', 'E'])
-        for i, resp in enumerate(lista_respuestas, 1):
-            if resp not in validas:
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Respuesta {i} inválida: '{resp}'. Debe ser A, B, C, D o E"
-                )
-        
-        # Borrar gabarito anterior del mismo proceso
-        from app.models.clave_respuesta import ClaveRespuesta
-        db.query(ClaveRespuesta).filter_by(proceso_admision=proceso_admision).delete()
-        
-        # Insertar nuevas respuestas correctas
-        for i, respuesta in enumerate(lista_respuestas, 1):
-            cr = ClaveRespuesta(
-                numero_pregunta=i,
-                respuesta_correcta=respuesta,
-                proceso_admision=proceso_admision
-            )
-            db.add(cr)
-        
-        db.commit()
-        
-        return {
-            "success": True,
-            "mensaje": "Gabarito registrado exitosamente",
-            "proceso": proceso_admision,
-            "total_respuestas": len(lista_respuestas),
-            "vista_previa": {
-                "primeras_10": lista_respuestas[:10],
-                "ultimas_10": lista_respuestas[-10:]
+            headers={
+                "Content-Disposition": f"attachment; filename={filename}",
+                "X-Total-Hojas": str(len(pdf_files)),
+                "X-Hojas-Registradas": str(len(hojas_registradas)),
+                "X-Hojas-Sin-Registrar": str(len(hojas_sin_registrar))
             }
-        }
+        )
         
     except HTTPException:
         raise
     except Exception as e:
         db.rollback()
+        print(f"\n❌ ERROR FATAL: {str(e)}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
@@ -1237,203 +581,9 @@ async def registrar_gabarito_manual(
         db.close()
 
 
-# ============================================================================
-# AGREGAR ESTE CÓDIGO A app/main.py (AL FINAL, ANTES DE if __name__)
-# ============================================================================
-
-import anthropic
-import os
-import base64
-import json
-from typing import List, Dict
 
 # ============================================================================
-# FUNCIÓN: PROCESAR IMAGEN CON CLAUDE
-# ============================================================================
-
-async def procesar_imagen_con_claude(imagen_path: str) -> Dict:
-    """
-    Procesa una imagen de hoja de respuestas usando Claude API
-    
-    Args:
-        imagen_path: Ruta local de la imagen
-        
-    Returns:
-        Dict con respuestas extraídas y metadata
-    """
-    try:
-        # Leer imagen y convertir a base64
-        with open(imagen_path, "rb") as image_file:
-            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
-        
-        # Detectar tipo de imagen
-        ext = imagen_path.split(".")[-1].lower()
-        media_types = {
-            "jpg": "image/jpeg",
-            "jpeg": "image/jpeg",
-            "png": "image/png",
-            "webp": "image/webp"
-        }
-        media_type = media_types.get(ext, "image/jpeg")
-        
-        # Inicializar cliente de Anthropic
-        client = anthropic.Anthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY")
-        )
-        
-        # Prompt para Claude
-        prompt = """Analiza esta hoja de respuestas de examen de admisión.
-
-La hoja contiene 100 preguntas numeradas del 1 al 100.
-Cada pregunta tiene un paréntesis donde el estudiante escribió UNA letra: A, B, C, D o E.
-
-INSTRUCCIONES:
-1. Identifica TODAS las 100 respuestas marcadas
-2. Si una respuesta está vacía, usa null
-3. Si no puedes leer una respuesta con seguridad, usa null
-4. Retorna SOLO un JSON válido, sin texto adicional
-
-FORMATO DE RESPUESTA (JSON):
-{
-  "respuestas": ["A", "B", "C", "D", "E", "A", null, "C", ...],
-  "confianza_promedio": 0.95,
-  "respuestas_detectadas": 98,
-  "respuestas_vacias": 2,
-  "notas": "Observaciones si hay alguna dificultad en la lectura"
-}
-
-IMPORTANTE: 
-- El array "respuestas" debe tener EXACTAMENTE 100 elementos
-- Usa null para respuestas vacías o ilegibles
-- Solo letras mayúsculas: A, B, C, D, E
-- NO agregues texto fuera del JSON"""
-
-        # Llamada a Claude API
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=2000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ],
-                }
-            ],
-        )
-        
-        # Extraer respuesta
-        respuesta_texto = message.content[0].text
-        
-        # Limpiar respuesta (por si Claude agregó markdown)
-        respuesta_texto = respuesta_texto.strip()
-        if respuesta_texto.startswith("```json"):
-            respuesta_texto = respuesta_texto[7:]
-        if respuesta_texto.startswith("```"):
-            respuesta_texto = respuesta_texto[3:]
-        if respuesta_texto.endswith("```"):
-            respuesta_texto = respuesta_texto[:-3]
-        respuesta_texto = respuesta_texto.strip()
-        
-        # Parsear JSON
-        resultado = json.loads(respuesta_texto)
-        
-        # Validar estructura
-        if "respuestas" not in resultado:
-            raise ValueError("Respuesta de Claude no contiene el campo 'respuestas'")
-        
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(f"Se esperaban 100 respuestas, se obtuvieron {len(resultado['respuestas'])}")
-        
-        return {
-            "success": True,
-            "respuestas": resultado["respuestas"],
-            "confianza_promedio": resultado.get("confianza_promedio", 0.95),
-            "respuestas_detectadas": resultado.get("respuestas_detectadas", 100),
-            "respuestas_vacias": resultado.get("respuestas_vacias", 0),
-            "notas": resultado.get("notas", ""),
-            "tokens_usados": message.usage.input_tokens + message.usage.output_tokens
-        }
-        
-    except json.JSONDecodeError as e:
-        return {
-            "success": False,
-            "error": f"Error al parsear JSON de Claude: {str(e)}",
-            "respuesta_cruda": respuesta_texto if 'respuesta_texto' in locals() else None
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-# ============================================================================
-# FUNCIÓN: CALCULAR CALIFICACIÓN
-# ============================================================================
-
-def calcular_calificacion(respuestas_alumno: List, respuestas_correctas_db, db) -> Dict:
-    """
-    Calcula la nota comparando respuestas del alumno con el gabarito
-    
-    Args:
-        respuestas_alumno: Lista de 100 respuestas del alumno
-        respuestas_correctas_db: Query de ClaveRespuesta
-        db: Sesión de base de datos
-        
-    Returns:
-        Dict con correctas, incorrectas, vacias y nota
-    """
-    # Obtener gabarito ordenado
-    gabarito = respuestas_correctas_db.order_by(ClaveRespuesta.numero_pregunta).all()
-    
-    if len(gabarito) != 100:
-        raise ValueError(f"El gabarito debe tener 100 respuestas, tiene {len(gabarito)}")
-    
-    correctas = 0
-    incorrectas = 0
-    vacias = 0
-    
-    for i, resp_alumno in enumerate(respuestas_alumno):
-        resp_correcta = gabarito[i].respuesta_correcta.upper()
-        
-        if resp_alumno is None or resp_alumno == "":
-            vacias += 1
-        elif resp_alumno.upper() == resp_correcta:
-            correctas += 1
-        else:
-            incorrectas += 1
-    
-    # Nota sobre 20
-    nota = (correctas / 100) * 20
-    
-    return {
-        "correctas": correctas,
-        "incorrectas": incorrectas,
-        "vacias": vacias,
-        "nota": round(nota, 2)
-    }
-
-# ============================================================================
-# ENDPOINT: PROCESAR HOJA CON CLAUDE
-# ============================================================================
-
-# ============================================================================
-# AGREGAR ESTE ENDPOINT A app/main.py (REEMPLAZA /api/procesar-hoja)
-# ============================================================================
-
-# ============================================================================
-# ENDPOINT CORREGIDO - NO REQUIERE GABARITO
+# ENDPOINT: PROCESAR HOJA COMPLETA
 # ============================================================================
 
 @app.post("/api/procesar-hoja-completa")
@@ -1444,20 +594,24 @@ async def procesar_hoja_completa(
     request: Request = None
 ):
     """
-    Endpoint que:
-    1. Extrae códigos + respuestas con Claude
-    2. Valida códigos en BD
-    3. Guarda hoja con estado "pendiente_calificacion"
-    4. NO requiere gabarito (se califica después)
+    Procesa hoja capturada:
+    1. Extrae códigos + respuestas con Vision AI
+    2. Busca hoja en BD por código
+    3. Valida códigos
+    4. Guarda imagen con nombre correcto
+    5. Califica si existe gabarito
     """
     db = SessionLocal()
     inicio = time.time()
     
     try:
-        # 1. GUARDAR FOTO
-        filepath, filename = guardar_foto_temporal(file)
+        # Crear carpeta
+        crear_directorio_capturas()
         
-        # 2. PARSEAR METADATA
+        # 1. Guardar foto temporal
+        temp_filepath, temp_filename = guardar_foto_temporal(file)
+        
+        # 2. Parsear metadata
         metadata = {}
         if metadata_captura:
             try:
@@ -1467,162 +621,111 @@ async def procesar_hoja_completa(
         
         if request:
             metadata['ip_address'] = request.client.host
-        
         metadata['image_hash'] = image_hash
-        metadata['filename_original'] = file.filename
         
-        # 3. PROCESAR CON CLAUDE
-        print("📸 Procesando imagen con Claude...")
-        resultado_claude = await extraer_todo_con_claude(filepath)
+        # 3. Procesar con Vision AI
+        print("📸 Procesando con Vision AI...")
+        resultado_vision = await procesar_con_api_seleccionada(temp_filepath)
         
-        if not resultado_claude["success"]:
-            raise HTTPException(status_code=500, detail=resultado_claude["error"])
+        if not resultado_vision["success"]:
+            raise HTTPException(status_code=500, detail=resultado_vision["error"])
         
-        # 4. EXTRAER DATOS
-        datos_extraidos = resultado_claude["datos"]
-        dni_postulante = datos_extraidos.get("dni_postulante")
-        dni_profesor = datos_extraidos.get("dni_profesor")
-        codigo_aula = datos_extraidos.get("codigo_aula")
-        codigo_hoja = datos_extraidos.get("codigo_hoja")
-        proceso_admision = datos_extraidos.get("proceso_admision", "2025-1")
-        respuestas_alumno = datos_extraidos.get("respuestas", [])
+        # 4. Extraer datos
+        datos = resultado_vision["datos"]
+        codigo_hoja = datos.get("codigo_hoja")
+        dni_postulante = datos.get("dni_postulante")
+        dni_profesor = datos.get("dni_profesor")
+        codigo_aula = datos.get("codigo_aula")
+        respuestas_alumno = datos.get("respuestas", [])
         
-        print(f"✅ Extraído - DNI: {dni_postulante}, Profesor: {dni_profesor}, Aula: {codigo_aula}")
+        # 5. Buscar hoja en BD
+        hoja = db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first()
         
-        # 5. VALIDAR CÓDIGOS
+        if not hoja:
+            raise HTTPException(
+                status_code=404,
+                detail=f"No existe hoja con código {codigo_hoja}"
+            )
+        
+        # 6. Validar códigos
         estado, mensajes, datos_validados = validar_codigos(
             dni_postulante, dni_profesor, codigo_aula, db
         )
         
-        # 6. VERIFICAR SI EXISTE GABARITO (pero NO es obligatorio)
-        gabarito_existe = db.query(ClaveRespuesta).filter_by(
-            proceso_admision=proceso_admision
-        ).count() > 0
+        # 7. Guardar imagen con nombre correcto
+        filename_final = f"{codigo_hoja}-{dni_postulante}-{codigo_aula}-{dni_profesor}.jpeg"
+        filepath_final = f"app/hojas_capturadas/{filename_final}"
+        shutil.copy(temp_filepath, filepath_final)
         
-        if gabarito_existe:
-            # Calificar inmediatamente
-            gabarito_query = db.query(ClaveRespuesta).filter_by(
-                proceso_admision=proceso_admision
+        # 8. Verificar gabarito y calificar si existe
+        tiene_gabarito = gabarito_existe(hoja.proceso_admision, db)
+        
+        if tiene_gabarito:
+            calificacion = calcular_calificacion(
+                respuestas_alumno,
+                hoja.proceso_admision,
+                db
             )
-            calificacion = calcular_calificacion(respuestas_alumno, gabarito_query, db)
             nota_final = calificacion["nota"]
             correctas_count = calificacion["correctas"]
             estado_hoja = "completado"
-            mensajes.append("✅ Hoja calificada automáticamente")
+            mensajes.append("✅ Calificada automáticamente")
         else:
-            # Guardar sin calificar
             nota_final = None
             correctas_count = None
             estado_hoja = "pendiente_calificacion"
-            mensajes.append("⏳ Hoja guardada, pendiente de calificación")
+            mensajes.append("⏳ Pendiente de calificación")
         
-        # 7. GUARDAR HOJA EN BD
-        hoja = HojaRespuesta(
-            postulante_id=datos_validados["postulante"].id if datos_validados["postulante"] else None,
-            dni_profesor=dni_profesor,
-            codigo_aula=codigo_aula,
-            codigo_hoja=codigo_hoja,
-            proceso_admision=proceso_admision,
-            imagen_url=filepath,
-            imagen_original_nombre=filename,
-            estado=estado_hoja,
-            api_utilizada="anthropic",
-            respuestas_detectadas=len([r for r in respuestas_alumno if r]),
-            nota_final=nota_final,
-            respuestas_correctas_count=correctas_count,
-            tiempo_procesamiento=time.time() - inicio,
-            fecha_calificacion=datetime.now(timezone.utc) if gabarito_existe else None,
-            observaciones=", ".join(mensajes),
-            metadata_json=json.dumps({
-                "captura": metadata,
-                "claude": {
-                    "confianza": resultado_claude.get("confianza_promedio", 0.95),
-                    "tokens": resultado_claude.get("tokens_usados", 0)
-                },
-                "validacion": {
-                    "estado": estado,
-                    "mensajes": mensajes
-                }
-            })
-        )
+        # 9. Actualizar BD
+        hoja.imagen_url = filepath_final
+        hoja.estado = estado_hoja
+        hoja.api_utilizada = resultado_vision["api"]
+        hoja.respuestas_detectadas = len([r for r in respuestas_alumno if r])
+        hoja.nota_final = nota_final
+        hoja.respuestas_correctas_count = correctas_count
+        hoja.tiempo_procesamiento = time.time() - inicio
+        hoja.fecha_calificacion = datetime.now(timezone.utc) if tiene_gabarito else None
+        hoja.observaciones = ", ".join(mensajes)
+        hoja.metadata_json = json.dumps({
+            "captura": metadata,
+            "api": resultado_vision["api"],
+            "validacion": mensajes
+        })
         
-        db.add(hoja)
-        db.commit()
-        db.refresh(hoja)
-        
-        # 8. GUARDAR RESPUESTAS INDIVIDUALES
-        for i, resp_alumno in enumerate(respuestas_alumno, 1):
+        # 10. Guardar respuestas
+        for i, resp in enumerate(respuestas_alumno, 1):
             respuesta = Respuesta(
                 hoja_respuesta_id=hoja.id,
                 numero_pregunta=i,
-                respuesta_marcada=resp_alumno if resp_alumno else None,
-                es_correcta=None,  # Se calculará después cuando exista gabarito
-                confianza=resultado_claude.get("confianza_promedio", 0.95)
+                respuesta_marcada=resp if resp else None
             )
             db.add(respuesta)
         
         db.commit()
+        db.refresh(hoja)
         
-        tiempo_total = time.time() - inicio
-        postulante = datos_validados["postulante"]
-        
-        # 9. RESPUESTA
+        # 11. Respuesta
         response_data = {
             "success": True,
             "hoja_id": hoja.id,
             "codigo_hoja": codigo_hoja,
-            "estado": estado_hoja,
+            "archivo_guardado": filename_final,
             "postulante": {
-                "id": postulante.id,
-                "dni": postulante.dni,
-                "nombres": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
-                "programa": postulante.programa_educativo
-            } if postulante else {
                 "dni": dni_postulante,
-                "error": "DNI no encontrado"
-            },
-            "profesor": {
-                "dni": dni_profesor,
-                "nombres": f"{datos_validados['profesor'].apellido_paterno} {datos_validados['profesor'].apellido_materno}, {datos_validados['profesor'].nombres}"
-            } if datos_validados["profesor"] else {
-                "dni": dni_profesor,
-                "error": "DNI no encontrado"
-            },
-            "aula": {
-                "codigo": codigo_aula,
-                "nombre": datos_validados["aula"].nombre
-            } if datos_validados["aula"] else {
-                "codigo": codigo_aula,
-                "error": "Aula no encontrada"
-            },
-            "procesamiento": {
-                "api": "Claude Sonnet 4",
-                "tiempo": f"{tiempo_total:.2f}s",
-                "confianza": resultado_claude.get("confianza_promedio", 0.95),
-                "tokens": resultado_claude.get("tokens_usados", 0)
+                "nombres": f"{hoja.postulante.nombres} {hoja.postulante.apellido_paterno}" if hoja.postulante else "No identificado"
             },
             "validacion": {
-                "estado": estado,
-                "mensajes": mensajes
+                "mensajes": mensajes,
+                "estado": "con_observaciones" if len(mensajes) > 1 else "ok"
             },
-            "metadata": {
-                "gps": metadata.get("gps"),
-                "timestamp": metadata.get("timestamp"),
-                "device": metadata.get("device_fingerprint")
+            "procesamiento": {
+                "api": resultado_vision["api"],
+                "tiempo": f"{time.time() - inicio:.2f}s"
             }
         }
         
-        # Agregar calificación SOLO si existe gabarito
-        if gabarito_existe:
-            response_data["calificacion"] = {
-                "nota": calificacion["nota"],
-                "correctas": calificacion["correctas"],
-                "incorrectas": calificacion["incorrectas"],
-                "vacias": calificacion["vacias"]
-            }
-        else:
-            response_data["calificacion"] = None
-            response_data["mensaje"] = "Hoja guardada exitosamente. Se calificará cuando se registre el gabarito."
+        if tiene_gabarito:
+            response_data["calificacion"] = calificacion
         
         return response_data
         
@@ -1638,32 +741,84 @@ async def procesar_hoja_completa(
 
 
 # ============================================================================
-# NUEVO ENDPOINT: CALIFICAR MASIVAMENTE
+# ENDPOINT: REGISTRAR GABARITO
 # ============================================================================
 
-@app.post("/api/calificar-hojas-pendientes")
-async def calificar_hojas_pendientes(proceso_admision: str = "2025-1"):
-    """
-    Califica todas las hojas con estado "pendiente_calificacion"
-    después de que se haya registrado el gabarito.
-    """
+@app.post("/api/registrar-gabarito-manual")
+async def registrar_gabarito_manual(
+    respuestas: str = Form(...),
+    proceso_admision: str = Form("2025-2")
+):
+    """Registra las respuestas correctas manualmente"""
     db = SessionLocal()
     
     try:
-        # Verificar que existe gabarito
-        gabarito_query = db.query(ClaveRespuesta).filter_by(
-            proceso_admision=proceso_admision
-        )
+        # Convertir a lista
+        lista_respuestas = [r.strip().upper() for r in respuestas.split(",")]
         
-        if gabarito_query.count() == 0:
+        if len(lista_respuestas) != 100:
             raise HTTPException(
-                status_code=400, 
-                detail=f"No existe gabarito para el proceso {proceso_admision}"
+                status_code=400,
+                detail=f"Se esperan 100 respuestas, se recibieron {len(lista_respuestas)}"
             )
         
-        gabarito = gabarito_query.order_by(ClaveRespuesta.numero_pregunta).all()
+        # Validar
+        validas = set(['A', 'B', 'C', 'D', 'E'])
+        for i, resp in enumerate(lista_respuestas, 1):
+            if resp not in validas:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Respuesta {i} inválida: '{resp}'"
+                )
         
-        # Obtener hojas pendientes
+        # Borrar anterior
+        db.query(ClaveRespuesta).filter_by(proceso_admision=proceso_admision).delete()
+        
+        # Insertar
+        for i, respuesta in enumerate(lista_respuestas, 1):
+            cr = ClaveRespuesta(
+                numero_pregunta=i,
+                respuesta_correcta=respuesta,
+                proceso_admision=proceso_admision
+            )
+            db.add(cr)
+        
+        db.commit()
+        
+        return {
+            "success": True,
+            "mensaje": "Gabarito registrado exitosamente",
+            "proceso": proceso_admision,
+            "total_respuestas": len(lista_respuestas)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
+
+
+# ============================================================================
+# ENDPOINT: CALIFICAR HOJAS PENDIENTES
+# ============================================================================
+
+@app.post("/api/calificar-hojas-pendientes")
+async def calificar_hojas_pendientes(proceso_admision: str = "2025-2"):
+    """Califica todas las hojas pendientes después de registrar gabarito"""
+    db = SessionLocal()
+    
+    try:
+        # Verificar gabarito
+        if not gabarito_existe(proceso_admision, db):
+            raise HTTPException(
+                status_code=400,
+                detail=f"No existe gabarito para {proceso_admision}"
+            )
+        
+        # Obtener pendientes
         hojas_pendientes = db.query(HojaRespuesta).filter_by(
             estado="pendiente_calificacion",
             proceso_admision=proceso_admision
@@ -1672,7 +827,7 @@ async def calificar_hojas_pendientes(proceso_admision: str = "2025-1"):
         if not hojas_pendientes:
             return {
                 "success": True,
-                "mensaje": "No hay hojas pendientes de calificación",
+                "mensaje": "No hay hojas pendientes",
                 "calificadas": 0
             }
         
@@ -1688,37 +843,29 @@ async def calificar_hojas_pendientes(proceso_admision: str = "2025-1"):
                 
                 respuestas_array = [r.respuesta_marcada for r in respuestas]
                 
-                # Calcular calificación
-                calificacion = calcular_calificacion(respuestas_array, gabarito_query, db)
+                # Calificar
+                calificacion = calcular_calificacion(
+                    respuestas_array,
+                    proceso_admision,
+                    db
+                )
                 
-                # Actualizar hoja
+                # Actualizar
                 hoja.nota_final = calificacion["nota"]
                 hoja.respuestas_correctas_count = calificacion["correctas"]
                 hoja.estado = "completado"
                 hoja.fecha_calificacion = datetime.now(timezone.utc)
                 
-                # Actualizar respuestas individuales
-                for i, resp in enumerate(respuestas):
-                    resp.es_correcta = (
-                        resp.respuesta_marcada and 
-                        resp.respuesta_marcada.upper() == gabarito[i].respuesta_correcta.upper()
-                    )
-                
                 calificadas += 1
                 
             except Exception as e:
-                errores.append({
-                    "hoja_id": hoja.id,
-                    "error": str(e)
-                })
+                errores.append({"hoja_id": hoja.id, "error": str(e)})
         
         db.commit()
         
         return {
             "success": True,
-            "mensaje": f"Proceso completado",
             "calificadas": calificadas,
-            "total_pendientes": len(hojas_pendientes),
             "errores": errores
         }
         
@@ -1731,221 +878,43 @@ async def calificar_hojas_pendientes(proceso_admision: str = "2025-1"):
         db.close()
 
 
-
 # ============================================================================
-# FUNCIÓN: EXTRAER TODO CON CLAUDE (CÓDIGOS + RESPUESTAS)
+# ENDPOINT: VERIFICAR CÓDIGOS
 # ============================================================================
 
-async def extraer_todo_con_claude(imagen_path: str) -> Dict:
-    """
-    Usa Claude para extraer códigos + respuestas con VALIDACIÓN ESTRICTA.
-    """
+@app.get("/api/verificar-codigos")
+async def verificar_codigos():
+    """Verifica códigos guardados en BD"""
+    db = SessionLocal()
     try:
-        # Leer imagen
-        with open(imagen_path, "rb") as image_file:
-            image_data = base64.standard_b64encode(image_file.read()).decode("utf-8")
+        hojas = db.query(HojaRespuesta).filter_by(estado="generada").all()
         
-        ext = imagen_path.split(".")[-1].lower()
-        media_types = {
-            "jpg": "image/jpeg",
-            "jpeg": "image/jpeg",
-            "png": "image/png",
-            "webp": "image/webp"
-        }
-        media_type = media_types.get(ext, "image/jpeg")
-        
-        client = anthropic.Anthropic(
-            api_key=os.environ.get("ANTHROPIC_API_KEY")
-        )
-        
-        # ====================================================================
-        # PROMPT MEJORADO - MUY ESTRICTO
-        # ====================================================================
-        prompt = """Analiza esta hoja de respuestas de examen de admisión del I. S. T. Pedro A. Del Águila H.
-
-ESTRUCTURA DE LA HOJA:
-
-## PARTE 1: CÓDIGOS (en la parte SUPERIOR de la hoja)
-- DNI Alumno: 8 dígitos en cuadros individuales
-- Código Aula: texto/números en cuadros (ej: "A101", "B205")  
-- DNI Profesor: 8 dígitos en cuadros individuales
-- Código Hoja: 9 caracteres alfanuméricos que dice "Hoja: XXXXXXXXX"
-
-## PARTE 2: RESPUESTAS (100 preguntas NUMERADAS del 1 al 100)
-Cada pregunta tiene un paréntesis ( ) donde puede haber UNA letra.
-
-REGLAS CRÍTICAS PARA LAS 100 RESPUESTAS:
-1. DEBES retornar EXACTAMENTE 100 elementos en el array "respuestas"
-2. Recorre pregunta por pregunta del 1 al 100 en ORDEN
-3. Para cada pregunta, mira SOLO dentro del paréntesis:
-   - Si hay una letra A, B, C, D o E → úsala (en MAYÚSCULA)
-   - Si hay letra minúscula a, b, c, d, e → conviértela a MAYÚSCULA
-   - Si está VACÍO el paréntesis → usa null
-   - Si hay círculo, X, guión, F o cualquier cosa inválida → usa null
-4. NO agregues respuestas extras
-5. NO omitas preguntas
-6. El array debe tener EXACTAMENTE 100 elementos
-
-FORMATO JSON (CRÍTICO - debe ser JSON válido):
-{
-  "dni_postulante": "12345678",
-  "dni_profesor": "87654321",
-  "codigo_aula": "A101",
-  "codigo_hoja": "A2iDñ5RsW",
-  "proceso_admision": "2025-1",
-  "respuestas": [
-    "A", "B", "C", null, "E", "A", null, "D", ...
-  ],
-  "confianza_promedio": 0.95,
-  "respuestas_detectadas": 98,
-  "notas": "Observaciones si las hay"
-}
-
-VALIDACIÓN ANTES DE RESPONDER:
-- ¿El array "respuestas" tiene EXACTAMENTE 100 elementos? 
-- ¿Cada elemento es "A", "B", "C", "D", "E" o null?
-- ¿Los DNI tienen 8 dígitos?
-
-RESPONDE SOLO CON EL JSON. NO agregues texto adicional."""
-
-        # Llamada a Claude
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4000,
-            temperature=0,  # IMPORTANTE: temperatura 0 para máxima consistencia
-            messages=[
+        return {
+            "total": len(hojas),
+            "codigos": [
                 {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": media_type,
-                                "data": image_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": prompt
-                        }
-                    ],
+                    "id": h.id,
+                    "codigo_hoja": h.codigo_hoja,
+                    "postulante_id": h.postulante_id,
+                    "created_at": h.created_at.isoformat() if h.created_at else None
                 }
-            ],
-        )
-        
-        # Extraer respuesta
-        respuesta_texto = message.content[0].text
-        
-        # Limpiar respuesta
-        respuesta_texto = respuesta_texto.strip()
-        if respuesta_texto.startswith("```json"):
-            respuesta_texto = respuesta_texto[7:]
-        if respuesta_texto.startswith("```"):
-            respuesta_texto = respuesta_texto[3:]
-        if respuesta_texto.endswith("```"):
-            respuesta_texto = respuesta_texto[:-3]
-        respuesta_texto = respuesta_texto.strip()
-        
-        # Parsear JSON
-        resultado = json.loads(respuesta_texto)
-        
-        # ====================================================================
-        # VALIDACIÓN ESTRICTA
-        # ====================================================================
-        
-        # 1. Verificar campos requeridos
-        required_fields = ["dni_postulante", "dni_profesor", "codigo_aula", "respuestas"]
-        for field in required_fields:
-            if field not in resultado:
-                raise ValueError(f"❌ Respuesta de Claude no contiene el campo '{field}'")
-        
-        # 2. VALIDAR QUE SEAN EXACTAMENTE 100 RESPUESTAS
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(
-                f"❌ Se esperaban 100 respuestas, se obtuvieron {len(resultado['respuestas'])}. "
-                f"Claude no siguió las instrucciones correctamente."
-            )
-        
-        # 3. Validar que cada respuesta sea válida
-        respuestas_validadas = []
-        for i, resp in enumerate(resultado["respuestas"], 1):
-            if resp is None or resp == "" or resp == "null":
-                respuestas_validadas.append(None)
-            elif isinstance(resp, str):
-                resp_upper = resp.strip().upper()
-                if resp_upper in ["A", "B", "C", "D", "E"]:
-                    respuestas_validadas.append(resp_upper)
-                else:
-                    # Valor inválido → convertir a null
-                    respuestas_validadas.append(None)
-                    print(f"⚠️ Pregunta {i}: Valor inválido '{resp}' convertido a null")
-            else:
-                respuestas_validadas.append(None)
-        
-        # Reemplazar con respuestas validadas
-        resultado["respuestas"] = respuestas_validadas
-        
-        # 4. Validar DNIs
-        if not (isinstance(resultado["dni_postulante"], str) and len(resultado["dni_postulante"]) == 8):
-            print(f"⚠️ DNI postulante inválido: {resultado['dni_postulante']}")
-        
-        if not (isinstance(resultado["dni_profesor"], str) and len(resultado["dni_profesor"]) == 8):
-            print(f"⚠️ DNI profesor inválido: {resultado['dni_profesor']}")
-        
-        # Estadísticas
-        respuestas_validas = sum(1 for r in respuestas_validadas if r is not None)
-        respuestas_vacias = 100 - respuestas_validas
-        
-        print(f"✅ Extracción exitosa:")
-        print(f"   - Total respuestas: 100")
-        print(f"   - Respuestas válidas: {respuestas_validas}")
-        print(f"   - Respuestas vacías: {respuestas_vacias}")
-        
-        return {
-            "success": True,
-            "datos": resultado,
-            "confianza_promedio": resultado.get("confianza_promedio", 0.95),
-            "tokens_usados": message.usage.input_tokens + message.usage.output_tokens,
-            "estadisticas": {
-                "respuestas_validas": respuestas_validas,
-                "respuestas_vacias": respuestas_vacias
-            }
+                for h in hojas
+            ]
         }
-        
-    except json.JSONDecodeError as e:
-        return {
-            "success": False,
-            "error": f"Error al parsear JSON de Claude: {str(e)}",
-            "respuesta_cruda": respuesta_texto if 'respuesta_texto' in locals() else None
-        }
-    except ValueError as e:
-        # Error de validación
-        return {
-            "success": False,
-            "error": str(e),
-            "respuesta_cruda": respuesta_texto if 'respuesta_texto' in locals() else None
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": f"Error inesperado: {str(e)}"
-        }
+    finally:
+        db.close()
 
 
 # ============================================================================
-# ENDPOINT: OBTENER RESULTADOS (RANKING)
+# ENDPOINT: RESULTADOS
 # ============================================================================
 
 @app.get("/api/resultados/{proceso_admision}")
 async def obtener_resultados(proceso_admision: str):
-    """
-    Obtiene el ranking de postulantes de un proceso específico
-    """
+    """Obtiene ranking de postulantes"""
     db = SessionLocal()
     
     try:
-        # Obtener hojas procesadas del proceso
         hojas = db.query(HojaRespuesta).filter(
             HojaRespuesta.proceso_admision == proceso_admision,
             HojaRespuesta.estado == "completado",
@@ -1954,7 +923,7 @@ async def obtener_resultados(proceso_admision: str):
         
         resultados = []
         for i, hoja in enumerate(hojas, 1):
-            postulante = db.query(Postulante).filter_by(id=hoja.postulante_id).first()
+            postulante = hoja.postulante
             if postulante:
                 resultados.append({
                     "puesto": i,
@@ -1962,20 +931,121 @@ async def obtener_resultados(proceso_admision: str):
                     "nombres": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
                     "programa": postulante.programa_educativo,
                     "nota": hoja.nota_final,
-                    "correctas": hoja.respuestas_correctas_count,
-                    "codigo_hoja": hoja.codigo_hoja,
-                    "fecha_examen": hoja.fecha_captura.isoformat() if hoja.fecha_captura else None
+                    "correctas": hoja.respuestas_correctas_count
                 })
         
         return {
             "success": True,
             "proceso": proceso_admision,
-            "total_postulantes": len(resultados),
+            "total": len(resultados),
             "resultados": resultados
         }
         
     finally:
         db.close()
+
+
+# ============================================================================
+# AGREGAR ESTOS ENDPOINTS AL MAIN.PY
+# Para que el frontend pueda obtener listas de profesores y aulas
+# ============================================================================
+
+@app.get("/api/profesores")
+async def obtener_profesores():
+    """Obtiene lista de profesores para selección"""
+    db = SessionLocal()
+    try:
+        profesores = db.query(Profesor).all()
+        
+        return {
+            "success": True,
+            "total": len(profesores),
+            "profesores": [
+                {
+                    "id": p.id,
+                    "dni": p.dni,
+                    "nombres": p.nombres,
+                    "apellido_paterno": p.apellido_paterno,
+                    "apellido_materno": p.apellido_materno,
+                    "nombre_completo": f"{p.apellido_paterno} {p.apellido_materno}, {p.nombres}"
+                }
+                for p in profesores
+            ]
+        }
+    finally:
+        db.close()
+
+
+@app.get("/api/aulas")
+async def obtener_aulas():
+    """Obtiene lista de aulas para selección"""
+    db = SessionLocal()
+    try:
+        aulas = db.query(Aula).all()
+        
+        return {
+            "success": True,
+            "total": len(aulas),
+            "aulas": [
+                {
+                    "id": a.id,
+                    "codigo": a.codigo,
+                    "nombre": a.nombre,
+                    "capacidad": a.capacidad
+                }
+                for a in aulas
+            ]
+        }
+    finally:
+        db.close()
+
+
+@app.post("/api/verificar-datos-generacion")
+async def verificar_datos_generacion():
+    """
+    Verifica que existan datos necesarios para generar hojas.
+    Útil para mostrar warnings en frontend.
+    """
+    db = SessionLocal()
+    try:
+        total_postulantes = db.query(Postulante).count()
+        total_profesores = db.query(Profesor).count()
+        total_aulas = db.query(Aula).count()
+        
+        errores = []
+        warnings = []
+        
+        if total_postulantes == 0:
+            errores.append("No hay postulantes registrados")
+        
+        if total_profesores == 0:
+            errores.append("No hay profesores registrados")
+        
+        if total_aulas == 0:
+            errores.append("No hay aulas registradas")
+        
+        if total_postulantes < 10:
+            warnings.append(f"Solo hay {total_postulantes} postulante(s) registrado(s)")
+        
+        puede_generar = len(errores) == 0
+        
+        return {
+            "success": True,
+            "puede_generar": puede_generar,
+            "errores": errores,
+            "warnings": warnings,
+            "estadisticas": {
+                "postulantes": total_postulantes,
+                "profesores": total_profesores,
+                "aulas": total_aulas
+            }
+        }
+    finally:
+        db.close()
+
+# ============================================================================
+# PUNTO DE ENTRADA
+# ============================================================================
 
 if __name__ == "__main__":
     import uvicorn

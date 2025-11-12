@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     secret_key: str = "change-me-in-production"
     port: int = 1010
 
-    instituto_nombre: str = "Instituto Pedro A. Del Águila"
+    instituto_nombre: str = "I. S. T. Pedro A. Del Águila H."
     instituto_logo: Optional[str] = None
     
     # ==============================================
@@ -33,6 +33,13 @@ class Settings(BaseSettings):
     # ==============================================
     database_url: str
     
+
+    # ==============================================
+    # CONFIGURACIÓN DE APIs DE VISIÓN
+    # ==============================================
+    API_VISION_DEFAULT: str = "anthropic"  # o "google" o "openai", "anthropic"
+    api_vision_fallback: bool = True  # ← Activar fallback automático
+
     # ==============================================
     # GOOGLE CLOUD VISION
     # ==============================================
