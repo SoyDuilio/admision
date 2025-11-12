@@ -351,7 +351,7 @@ function inicializarCamara() {
             texts: {
                 capture: 'Capturar Hoja',
                 retake: 'Tomar Otra',
-                confirm: 'Confirmar y Procesar',
+                confirm: 'Confirmar y Procesar',  // ← Este texto aparece en el botón
                 switchCamera: 'Cambiar Cámara',
                 loading: 'Procesando...'
             },
@@ -381,35 +381,92 @@ function inicializarCamara() {
 
 async function procesarHoja() {
     try {
+        // 1. CONFIRMAR FOTO Y OBTENER FormData
         const result = await camera.confirmPhoto();
         
-        const response = await fetch('/api/procesar-hoja', {
+        if (!result || !result.formData) {
+            throw new Error('No se pudo obtener la imagen');
+        }
+        
+        // Mostrar estado de carga
+        document.getElementById('cameraContainer').innerHTML = `
+            <div class="loading-state" style="display: flex; min-height: 300px;">
+                <div class="spinner"></div>
+                <p>Subiendo y procesando hoja...</p>
+            </div>
+        `;
+        
+        // 2. CAPTURAR HOJA (subir imagen + validar)
+        const capturaResponse = await fetch('/api/capturar-hoja', {
             method: 'POST',
             body: result.formData
         });
         
-        if (!response.ok) {
-            throw new Error('Error al procesar hoja');
+        if (!capturaResponse.ok) {
+            throw new Error('Error al capturar hoja');
         }
         
-        const data = await response.json();
-        mostrarResultado(data);
-        actualizarEstadisticas(data);
+        const datosCaptura = await capturaResponse.json();
+        console.log('Hoja capturada:', datosCaptura);
+        
+        // Verificar si la validación fue exitosa
+        if (datosCaptura.estado !== "completado") {
+            alert(`⚠️ Advertencia:\n${datosCaptura.mensajes.join('\n')}`);
+            // Aún así, intentar procesar
+        }
+        
+        // 3. PROCESAR CON CLAUDE API
+        document.getElementById('cameraContainer').innerHTML = `
+            <div class="loading-state" style="display: flex; min-height: 300px;">
+                <div class="spinner"></div>
+                <p>Procesando con Claude AI...<br>Esto puede tomar 5-10 segundos</p>
+            </div>
+        `;
+        
+        const procesamientoResponse = await fetch(`/api/procesar-hoja/${datosCaptura.id}`, {
+            method: 'POST'
+        });
+        
+        if (!procesamientoResponse.ok) {
+            const error = await procesamientoResponse.json();
+            throw new Error(error.detail || 'Error al procesar con Claude');
+        }
+        
+        const resultado = await procesamientoResponse.json();
+        console.log('Resultado procesamiento:', resultado);
+        
+        // 4. MOSTRAR RESULTADOS
+        mostrarResultado(resultado);
+        actualizarEstadisticas(resultado);
         
     } catch (error) {
         console.error('Error:', error);
         alert('Error: ' + error.message);
-        camera.retakePhoto();
+        
+        // Resetear cámara en caso de error
+        document.getElementById('cameraContainer').style.display = 'block';
+        if (camera) {
+            camera.retakePhoto();
+        }
     }
 }
 
 function mostrarResultado(data) {
-    document.getElementById('resultadoNombre').textContent = data.postulante;
-    document.getElementById('resultadoDni').textContent = data.dni;
-    document.getElementById('resultadoPrograma').textContent = data.programa || '-';
-    document.getElementById('resultadoNota').textContent = data.nota.toFixed(2);
-    document.getElementById('resultadoCorrectas').textContent = data.respuestas_correctas + ' / 100';
+    // Llenar datos del postulante
+    if (data.postulante) {
+        document.getElementById('resultadoNombre').textContent = data.postulante.nombres;
+        document.getElementById('resultadoDni').textContent = data.postulante.dni;
+        document.getElementById('resultadoPrograma').textContent = data.postulante.programa || '-';
+    }
     
+    // Llenar datos de calificación
+    if (data.calificacion) {
+        document.getElementById('resultadoNota').textContent = data.calificacion.nota.toFixed(2);
+        document.getElementById('resultadoCorrectas').textContent = 
+            `${data.calificacion.correctas} / 100`;
+    }
+    
+    // Ocultar cámara y mostrar resultados
     document.getElementById('cameraContainer').style.display = 'none';
     document.getElementById('resultadoSection').style.display = 'block';
 }
@@ -423,9 +480,13 @@ function actualizarEstadisticas(data) {
     const porcentaje = (contadorProcesados / totalPostulantes) * 100;
     document.getElementById('progressFill').style.width = porcentaje + '%';
     
-    tiemposTotales.push(data.tiempo_procesamiento);
-    const promedio = tiemposTotales.reduce((a, b) => a + b, 0) / tiemposTotales.length;
-    document.getElementById('statTiempoPromedio').textContent = promedio.toFixed(1) + 's';
+    // Actualizar tiempo promedio si está disponible
+    if (data.procesamiento && data.procesamiento.tiempo) {
+        const tiempo = parseFloat(data.procesamiento.tiempo);
+        tiemposTotales.push(tiempo);
+        const promedio = tiemposTotales.reduce((a, b) => a + b, 0) / tiemposTotales.length;
+        document.getElementById('statTiempoPromedio').textContent = promedio.toFixed(1) + 's';
+    }
 }
 
 function siguienteHoja() {
