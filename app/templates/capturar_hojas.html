@@ -3,7 +3,6 @@
 {% block title %}Capturar Hojas{% endblock %}
 
 {% block extra_css %}
-<link rel="stylesheet" href="{{ url_for('static', path='/css/camera-styles.css') }}">
 <style>
     * {
         margin: 0;
@@ -12,128 +11,95 @@
     }
 
     body {
-        background: #0f172a;
+        background: #000;
         color: #f8fafc;
         overflow: hidden;
         height: 100vh;
     }
 
-    /* HEADER COMPACTO */
+    /* HEADER MÍNIMO */
     .header-bar {
         display: flex;
         justify-content: space-between;
         align-items: center;
-        padding: 8px 16px;
-        background: rgba(30, 41, 59, 0.95);
+        padding: 6px 12px;
+        background: rgba(15, 23, 42, 0.95);
         border-bottom: 1px solid #334155;
+        height: 44px;
     }
 
     .header-left {
         display: flex;
         align-items: center;
-        gap: 12px;
+        gap: 10px;
     }
 
     .btn-volver {
         display: inline-flex;
         align-items: center;
-        gap: 6px;
-        padding: 6px 12px;
+        gap: 4px;
+        padding: 4px 10px;
         background: transparent;
         color: #f8fafc;
         border: 1px solid #334155;
         border-radius: 6px;
         text-decoration: none;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
         font-weight: 600;
     }
 
     .header-title {
-        font-size: 1.125rem;
+        font-size: 0.9375rem;
         font-weight: 700;
-        color: #f8fafc;
     }
 
     .header-right {
         display: flex;
         gap: 8px;
-        align-items: center;
     }
 
     .header-link {
-        padding: 6px 12px;
+        padding: 4px 10px;
         color: #60a5fa;
         text-decoration: none;
-        font-size: 0.875rem;
+        font-size: 0.8125rem;
         font-weight: 600;
         border-radius: 6px;
-        transition: background 0.2s;
     }
 
-    .header-link:hover {
-        background: rgba(96, 165, 250, 0.1);
-    }
-
-    /* STATUS BAR COMPACTO */
-    .status-bar {
-        display: flex;
-        justify-content: center;
-        gap: 12px;
-        padding: 8px 16px;
-        background: rgba(15, 23, 42, 0.95);
-        border-bottom: 1px solid #334155;
-        font-size: 0.75rem;
-    }
-
-    .status-item {
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        padding: 4px 10px;
-        background: rgba(0, 0, 0, 0.3);
-        border-radius: 12px;
-        font-size: 0.75rem;
-    }
-
-    .status-item.ok {
-        color: #22c55e;
-    }
-
-    .status-item.loading {
-        color: #94a3b8;
-    }
-
-    /* CÁMARA FULL SCREEN */
+    /* CÁMARA FULLSCREEN */
     .camera-fullscreen {
         position: relative;
-        height: calc(100vh - 90px);
+        height: calc(100vh - 104px);
         background: #000;
         overflow: hidden;
     }
 
-    #cameraContainer {
-        width: 100% !important;
-        height: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
+    #cameraView {
+        width: 100%;
+        height: 100%;
     }
 
-    #cameraContainer .camera-view,
-    #cameraContainer .photo-preview {
-        height: 100% !important;
-        max-height: 100% !important;
-        min-height: 100% !important;
+    #cameraVideo {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
     }
 
-    #cameraContainer video,
-    #cameraContainer img {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: contain !important;
+    #photoPreview {
+        width: 100%;
+        height: 100%;
+        display: none;
     }
 
-    /* MARCO COMPLETO */
-    #cameraContainer .camera-overlay {
+    #photoImage {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+
+    /* MARCO AZUL */
+    .camera-overlay {
         position: absolute;
         top: 0;
         left: 0;
@@ -143,110 +109,102 @@
         z-index: 5;
     }
 
-    #cameraContainer .camera-frame {
+    .camera-frame {
         position: absolute;
         top: 50%;
         left: 50%;
         transform: translate(-50%, -50%);
-        width: 85% !important;
-        height: 90% !important;
-        border: 3px solid #3b82f6 !important;
-        border-radius: 12px;
-        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        width: 90%;
+        height: 95%;
+        border: 2px solid #3b82f6;
+        border-radius: 8px;
+        box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
     }
 
-    /* INSTRUCCIÓN VOZ OVERLAY */
-    .voice-instruction-overlay {
+    /* STATUS MINI */
+    .status-mini {
         position: absolute;
-        top: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        background: rgba(37, 99, 235, 0.9);
-        color: white;
-        padding: 8px 20px;
-        border-radius: 20px;
-        font-size: 0.875rem;
-        font-weight: 600;
+        top: 10px;
+        right: 10px;
+        display: flex;
+        gap: 8px;
         z-index: 10;
+    }
+
+    .status-badge {
+        padding: 4px 10px;
+        background: rgba(0, 0, 0, 0.8);
+        border-radius: 12px;
+        font-size: 0.6875rem;
+        backdrop-filter: blur(10px);
+        color: #94a3b8;
+    }
+
+    .status-badge.ok {
+        color: #22c55e;
+    }
+
+    .status-badge.error {
+        color: #ef4444;
+    }
+
+    /* BARRA DE BOTONES FIJA */
+    .bottom-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(15, 23, 42, 0.98);
+        border-top: 1px solid #334155;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        gap: 8px;
+        padding: 0 12px;
+        z-index: 100;
         backdrop-filter: blur(10px);
     }
 
-    /* CONTROLES OVERLAY */
-    .controls-overlay {
-        position: absolute;
-        bottom: 20px;
-        left: 50%;
-        transform: translateX(-50%);
-        display: flex;
-        gap: 12px;
-        z-index: 10;
-    }
-
-    .btn-control {
-        padding: 12px 24px;
+    .btn-bottom {
+        flex: 1;
+        max-width: 150px;
+        padding: 10px 12px;
         border: none;
-        border-radius: 50px;
+        border-radius: 8px;
         font-weight: 700;
         cursor: pointer;
-        display: inline-flex;
+        display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
+        gap: 6px;
         transition: all 0.2s;
-        font-size: 0.9375rem;
-        backdrop-filter: blur(10px);
+        font-size: 0.8125rem;
     }
 
-    .btn-capture {
+    .btn-switch-cam {
+        background: rgba(71, 85, 105, 0.9);
+        color: white;
+    }
+
+    .btn-capture-main {
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
         color: white;
-        box-shadow: 0 4px 12px rgba(37, 99, 235, 0.5);
+        box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
     }
 
-    .btn-capture:hover {
-        transform: scale(1.05);
-        box-shadow: 0 6px 16px rgba(37, 99, 235, 0.6);
+    .btn-capture-main.confirm {
+        background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
     }
 
-    .btn-switch {
-        background: rgba(71, 85, 105, 0.8);
+    .btn-voice-toggle {
+        background: rgba(71, 85, 105, 0.9);
         color: white;
     }
 
-    .btn-switch:hover {
-        background: rgba(51, 65, 85, 0.9);
-    }
-
-    /* INDICADOR VOZ */
-    .voice-indicator {
-        position: fixed;
-        bottom: 30px;
-        right: 30px;
+    .btn-voice-toggle.active {
         background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-        color: white;
-        padding: 12px 20px;
-        border-radius: 50px;
-        font-weight: 700;
-        display: none;
-        align-items: center;
-        gap: 8px;
-        box-shadow: 0 4px 12px rgba(239, 68, 68, 0.5);
-        animation: pulse-voice 1.5s infinite;
-        z-index: 1000;
-        font-size: 0.875rem;
-    }
-
-    .voice-indicator.active {
-        display: flex;
-    }
-
-    .voice-indicator::before {
-        content: '🎤';
-        font-size: 1.2rem;
-    }
-
-    @keyframes pulse-voice {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.05); }
+        box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
     }
 
     /* LOADING */
@@ -256,12 +214,12 @@
         left: 0;
         right: 0;
         bottom: 0;
-        background: rgba(0, 0, 0, 0.9);
+        background: rgba(0, 0, 0, 0.95);
         display: none;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        z-index: 100;
+        z-index: 200;
     }
 
     .loading-overlay.active {
@@ -275,14 +233,34 @@
         border-top-color: #2563eb;
         border-radius: 50%;
         animation: spin 0.8s linear infinite;
-        margin-bottom: 16px;
     }
 
     @keyframes spin {
         to { transform: rotate(360deg); }
     }
 
-    /* RESULTADOS */
+    /* ALERTA GPS */
+    .gps-alert {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(239, 68, 68, 0.95);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        text-align: center;
+        z-index: 150;
+        display: none;
+        max-width: 400px;
+        backdrop-filter: blur(10px);
+    }
+
+    .gps-alert.active {
+        display: block;
+    }
+
+    /* RESULTADOS MODAL */
     .resultado-modal {
         position: fixed;
         top: 0;
@@ -293,7 +271,7 @@
         display: none;
         align-items: center;
         justify-content: center;
-        z-index: 200;
+        z-index: 300;
         padding: 20px;
         overflow-y: auto;
     }
@@ -305,48 +283,48 @@
     .resultado-content {
         background: #1e293b;
         border-radius: 16px;
-        padding: 30px;
-        max-width: 600px;
+        padding: 24px;
+        max-width: 500px;
         width: 100%;
-        max-height: 90vh;
+        max-height: 85vh;
         overflow-y: auto;
     }
 
     .nota-destacada {
         background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
         color: white;
-        padding: 24px;
+        padding: 20px;
         border-radius: 12px;
         text-align: center;
-        margin-bottom: 24px;
+        margin-bottom: 20px;
     }
 
     .nota-destacada .value {
-        font-size: 3rem;
+        font-size: 2.5rem;
         font-weight: 700;
     }
 
     .resultado-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-        gap: 16px;
-        margin-bottom: 24px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+        margin-bottom: 20px;
     }
 
     .resultado-item {
         background: rgba(0, 0, 0, 0.3);
-        padding: 12px;
+        padding: 10px;
         border-radius: 8px;
     }
 
     .resultado-item dt {
-        font-size: 0.75rem;
+        font-size: 0.6875rem;
         color: #94a3b8;
         margin-bottom: 4px;
     }
 
     .resultado-item dd {
-        font-size: 1rem;
+        font-size: 0.9375rem;
         color: #f8fafc;
         font-weight: 600;
         margin: 0;
@@ -354,30 +332,14 @@
 
     .btn-siguiente {
         width: 100%;
-        padding: 14px;
+        padding: 12px;
         background: #2563eb;
         color: white;
         border: none;
         border-radius: 8px;
-        font-size: 1rem;
+        font-size: 0.9375rem;
         font-weight: 600;
         cursor: pointer;
-    }
-
-    @media (max-width: 768px) {
-        .header-title {
-            font-size: 0.875rem;
-        }
-
-        .controls-overlay {
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .btn-control {
-            width: auto;
-            min-width: 200px;
-        }
     }
 </style>
 {% endblock %}
@@ -387,7 +349,7 @@
 <div class="header-bar">
     <div class="header-left">
         <a href="/" class="btn-volver">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
             Volver
@@ -400,89 +362,75 @@
     </div>
 </div>
 
-<!-- STATUS BAR -->
-<div class="status-bar">
-    <div class="status-item loading" id="statusGPS">
-        📍 GPS...
-    </div>
-    <div class="status-item loading" id="statusDevice">
-        📱 Device...
-    </div>
-    <div class="status-item ok" id="statusVoz">
-        🎤 Voz ✓
-    </div>
-</div>
-
 <!-- CÁMARA FULLSCREEN -->
 <div class="camera-fullscreen">
-    <!-- Instrucción de voz overlay -->
-    <div class="voice-instruction-overlay">
-        🎤 Di <strong>"CAPTURAR"</strong> para tomar foto
+    <!-- Status mini -->
+    <div class="status-mini">
+        <div class="status-badge" id="statusGPS">📍 Obteniendo...</div>
     </div>
 
-    <!-- Container de cámara -->
-    <div id="cameraContainer"></div>
-
-    <!-- Controles overlay -->
-    <div class="controls-overlay" id="controlsOverlay">
-        <button type="button" class="btn-control btn-switch" id="btnSwitchOverlay">
-            🔄 Cambiar Cámara
-        </button>
-        <button type="button" class="btn-control btn-capture" id="btnCaptureOverlay">
-            📸 Capturar Hoja
-        </button>
+    <!-- Video -->
+    <div id="cameraView">
+        <video id="cameraVideo" autoplay playsinline></video>
+        <div class="camera-overlay">
+            <div class="camera-frame"></div>
+        </div>
     </div>
 
-    <!-- Loading overlay -->
+    <!-- Preview -->
+    <div id="photoPreview">
+        <img id="photoImage" alt="Foto capturada">
+    </div>
+
+    <!-- Canvas oculto -->
+    <canvas id="photoCanvas" style="display: none;"></canvas>
+
+    <!-- Loading -->
     <div class="loading-overlay" id="loadingOverlay">
         <div class="spinner"></div>
-        <p style="color: white; font-size: 1.125rem; margin-top: 16px;">Procesando con Claude AI...</p>
-        <p style="color: #94a3b8; font-size: 0.875rem; margin-top: 8px;">Extrayendo códigos y respuestas</p>
+        <p style="color: white; font-size: 1rem; margin-top: 16px;">Procesando con Claude AI...</p>
+        <p style="color: #94a3b8; font-size: 0.8125rem; margin-top: 8px;">Extrayendo códigos y respuestas</p>
+    </div>
+
+    <!-- Alerta GPS -->
+    <div class="gps-alert" id="gpsAlert">
+        <h3 style="margin-bottom: 12px;">⚠️ GPS Requerido</h3>
+        <p style="margin-bottom: 16px;">Debes compartir tu ubicación para capturar hojas. Es un requisito de seguridad del proceso de admisión.</p>
+        <button onclick="solicitarGPS()" style="padding: 10px 20px; background: white; color: #ef4444; border: none; border-radius: 8px; font-weight: 700; cursor: pointer;">
+            Permitir Ubicación
+        </button>
     </div>
 </div>
 
-<!-- Indicador de voz -->
-<div class="voice-indicator" id="voiceIndicator">
-    Escuchando...
+<!-- BARRA DE BOTONES FIJA -->
+<div class="bottom-bar">
+    <button type="button" class="btn-bottom btn-switch-cam" id="btnSwitchCam">
+        🔄 Cambiar
+    </button>
+    <button type="button" class="btn-bottom btn-capture-main" id="btnCapture">
+        📸 Capturar
+    </button>
+    <button type="button" class="btn-bottom btn-voice-toggle" id="btnVoiceToggle">
+        🎤 Usar Voz
+    </button>
 </div>
 
 <!-- MODAL DE RESULTADOS -->
 <div class="resultado-modal" id="resultadoModal">
     <div class="resultado-content">
-        <h3 style="margin-bottom: 20px;">✅ Hoja Procesada</h3>
-
+        <h3 style="margin-bottom: 16px;">✅ Hoja Procesada</h3>
         <div class="nota-destacada">
-            <div class="label" style="font-size: 0.875rem; margin-bottom: 8px;">Nota Final</div>
+            <div style="font-size: 0.8125rem; margin-bottom: 6px;">Nota Final</div>
             <div class="value" id="resultadoNota">-</div>
         </div>
-
         <div class="resultado-grid">
-            <div class="resultado-item">
-                <dt>Postulante</dt>
-                <dd id="resultadoNombre">-</dd>
-            </div>
-            <div class="resultado-item">
-                <dt>DNI</dt>
-                <dd id="resultadoDni">-</dd>
-            </div>
-            <div class="resultado-item">
-                <dt>Programa</dt>
-                <dd id="resultadoPrograma">-</dd>
-            </div>
-            <div class="resultado-item">
-                <dt>Correctas</dt>
-                <dd id="resultadoCorrectas">-</dd>
-            </div>
-            <div class="resultado-item">
-                <dt>Código Hoja</dt>
-                <dd id="resultadoCodigoHoja">-</dd>
-            </div>
-            <div class="resultado-item">
-                <dt>Tiempo</dt>
-                <dd id="resultadoTiempo">-</dd>
-            </div>
+            <div class="resultado-item"><dt>Postulante</dt><dd id="resultadoNombre">-</dd></div>
+            <div class="resultado-item"><dt>DNI</dt><dd id="resultadoDni">-</dd></div>
+            <div class="resultado-item"><dt>Programa</dt><dd id="resultadoPrograma">-</dd></div>
+            <div class="resultado-item"><dt>Correctas</dt><dd id="resultadoCorrectas">-</dd></div>
+            <div class="resultado-item"><dt>Código Hoja</dt><dd id="resultadoCodigoHoja">-</dd></div>
+            <div class="resultado-item"><dt>Tiempo</dt><dd id="resultadoTiempo">-</dd></div>
         </div>
-
         <button type="button" class="btn-siguiente" onclick="siguienteHoja()">
             Procesar Siguiente Hoja →
         </button>
@@ -491,31 +439,35 @@
 {% endblock %}
 
 {% block extra_js %}
-<script src="{{ url_for('static', path='/js/camera-capture.js') }}"></script>
 <script>
-let camera;
+let stream;
 let recognition;
 let metadataCaptura = {};
+let vozActiva = false;
+let photoBlob = null;
+let gpsObtenido = false;
 
-// CAPTURA DE METADATA
+// CAPTURA DE METADATA CON GPS OBLIGATORIO
 async function capturarMetadata() {
     metadataCaptura = {
         timestamp: new Date().toISOString(),
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         user_agent: navigator.userAgent,
         device_fingerprint: await generarDeviceFingerprint(),
-        screen: {
-            width: screen.width,
-            height: screen.height
-        }
+        screen: { width: screen.width, height: screen.height }
     };
 
-    // GPS
+    // GPS OBLIGATORIO
+    await solicitarGPS();
+}
+
+async function solicitarGPS() {
     try {
         const position = await new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true,
-                timeout: 10000
+                timeout: 10000,
+                maximumAge: 0
             });
         });
 
@@ -525,21 +477,21 @@ async function capturarMetadata() {
             accuracy: position.coords.accuracy
         };
 
-        document.getElementById('statusGPS').className = 'status-item ok';
+        document.getElementById('statusGPS').className = 'status-badge ok';
         document.getElementById('statusGPS').textContent = '📍 GPS ✓';
+        document.getElementById('gpsAlert').classList.remove('active');
+        gpsObtenido = true;
     } catch (error) {
-        metadataCaptura.gps = null;
+        document.getElementById('statusGPS').className = 'status-badge error';
         document.getElementById('statusGPS').textContent = '📍 GPS ✗';
+        document.getElementById('gpsAlert').classList.add('active');
+        gpsObtenido = false;
+        throw new Error('GPS requerido');
     }
-
-    document.getElementById('statusDevice').className = 'status-item ok';
-    document.getElementById('statusDevice').textContent = '📱 Device ✓';
-
-    return metadataCaptura;
 }
 
 async function generarDeviceFingerprint() {
-    const data = navigator.userAgent + screen.width + screen.height + navigator.language;
+    const data = navigator.userAgent + screen.width + screen.height;
     const msgBuffer = new TextEncoder().encode(data);
     const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
@@ -549,150 +501,137 @@ async function generarDeviceFingerprint() {
 // RECONOCIMIENTO DE VOZ
 function iniciarReconocimientoVoz() {
     if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-        console.log('Voz no disponible');
+        document.getElementById('btnVoiceToggle').disabled = true;
         return;
     }
 
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     recognition = new SpeechRecognition();
-    
     recognition.lang = 'es-ES';
     recognition.continuous = true;
-    recognition.interimResults = false;
-
-    recognition.onstart = () => {
-        console.log('🎤 Escuchando');
-        document.getElementById('voiceIndicator').classList.add('active');
-    };
 
     recognition.onresult = (event) => {
         const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-        console.log('Voz:', transcript);
-
         if (transcript.includes('captur') || transcript.includes('foto')) {
-            console.log('✅ CAPTURAR detectado');
-            document.getElementById('voiceIndicator').textContent = '✓ Capturando...';
-            setTimeout(() => {
-                document.getElementById('voiceIndicator').textContent = 'Escuchando...';
-            }, 2000);
-            
             capturarFoto();
         }
     };
 
-    recognition.onerror = (event) => {
-        if (event.error === 'no-speech') {
+    recognition.onerror = (e) => {
+        if (e.error === 'no-speech' && vozActiva) {
             recognition.stop();
-            setTimeout(() => recognition.start(), 1000);
+            setTimeout(() => { if (vozActiva) recognition.start(); }, 1000);
         }
     };
 
     recognition.onend = () => {
-        if (!document.getElementById('resultadoModal').classList.contains('active')) {
-            recognition.start();
-        }
+        if (vozActiva) recognition.start();
     };
+}
 
-    recognition.start();
+function toggleVoz() {
+    vozActiva = !vozActiva;
+    const btn = document.getElementById('btnVoiceToggle');
+    
+    if (vozActiva) {
+        btn.classList.add('active');
+        btn.textContent = '🎤 Activo';
+        recognition.start();
+    } else {
+        btn.classList.remove('active');
+        btn.textContent = '🎤 Usar Voz';
+        recognition.stop();
+    }
 }
 
 // INICIALIZACIÓN
 window.addEventListener('load', async () => {
-    await capturarMetadata();
-    
-    if (typeof CameraCapture === 'undefined') {
-        alert('Error: CameraCapture no disponible');
-        return;
-    }
-    
-    setTimeout(() => {
-        inicializarCamara();
+    try {
+        await capturarMetadata();
+        await iniciarCamara();
         iniciarReconocimientoVoz();
-    }, 500);
+    } catch (error) {
+        console.error('Error inicial:', error);
+    }
 });
 
-function inicializarCamara() {
-    camera = new CameraCapture('cameraContainer', {
-        width: 1920,
-        height: 1440,
-        imageQuality: 0.92,
-        facingMode: 'environment',
-        
-        onCameraReady: () => {
-            console.log('Cámara lista');
-        },
-        
-        onError: (error, message) => {
-            alert(message);
-        }
-    });
-    
-    camera.startCamera();
-
-    // EVENTOS DE BOTONES OVERLAY
-    document.getElementById('btnCaptureOverlay').addEventListener('click', () => {
-        capturarFoto();
-    });
-
-    document.getElementById('btnSwitchOverlay').addEventListener('click', () => {
-        if (camera) {
-            camera.switchCamera();
-        }
-    });
+async function iniciarCamara() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { width: 1920, height: 1440, facingMode: 'environment' },
+            audio: false
+        });
+        document.getElementById('cameraVideo').srcObject = stream;
+    } catch (error) {
+        alert('No se pudo acceder a la cámara');
+    }
 }
 
-function capturarFoto() {
-    if (camera && camera.elements && camera.elements.video) {
-        camera.capturePhoto();
-        
-        // Ocultar controles después de capturar
-        setTimeout(() => {
-            document.getElementById('controlsOverlay').style.display = 'none';
-            
-            // Agregar botón de confirmar después de capturar
-            setTimeout(() => {
-                const confirmBtn = document.createElement('button');
-                confirmBtn.className = 'btn-control btn-capture';
-                confirmBtn.innerHTML = '✅ Confirmar y Procesar';
-                confirmBtn.style.position = 'absolute';
-                confirmBtn.style.bottom = '20px';
-                confirmBtn.style.left = '50%';
-                confirmBtn.style.transform = 'translateX(-50%)';
-                confirmBtn.style.zIndex = '15';
-                confirmBtn.onclick = procesarHoja;
-                
-                document.querySelector('.camera-fullscreen').appendChild(confirmBtn);
-            }, 500);
-        }, 500);
+// EVENTOS BOTONES
+document.getElementById('btnCapture').addEventListener('click', function() {
+    if (this.classList.contains('confirm')) {
+        procesarHoja();
+    } else {
+        capturarFoto();
     }
+});
+
+document.getElementById('btnSwitchCam').addEventListener('click', async () => {
+    if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        const currentFacing = stream.getVideoTracks()[0].getSettings().facingMode;
+        const newFacing = currentFacing === 'environment' ? 'user' : 'environment';
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: newFacing }
+        });
+        document.getElementById('cameraVideo').srcObject = stream;
+    }
+});
+
+document.getElementById('btnVoiceToggle').addEventListener('click', toggleVoz);
+
+function capturarFoto() {
+    if (!gpsObtenido) {
+        document.getElementById('gpsAlert').classList.add('active');
+        return;
+    }
+
+    const video = document.getElementById('cameraVideo');
+    const canvas = document.getElementById('photoCanvas');
+    const ctx = canvas.getContext('2d');
+
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0, 0);
+
+    canvas.toBlob((blob) => {
+        photoBlob = blob;
+        const url = URL.createObjectURL(blob);
+        document.getElementById('photoImage').src = url;
+        
+        // Mostrar preview
+        document.getElementById('cameraView').style.display = 'none';
+        document.getElementById('photoPreview').style.display = 'block';
+        
+        // Cambiar botón
+        const btn = document.getElementById('btnCapture');
+        btn.classList.add('confirm');
+        btn.textContent = '✅ Confirmar';
+    }, 'image/jpeg', 0.92);
 }
 
 async function procesarHoja() {
     try {
-        const result = await camera.confirmPhoto();
-        
-        if (!result || !result.formData) {
-            throw new Error('No se pudo obtener la imagen');
-        }
-
-        // Agregar metadata
-        result.formData.append('metadata_captura', JSON.stringify(metadataCaptura));
-        
-        const imageHash = await generarDeviceFingerprint();
-        result.formData.append('image_hash', imageHash);
-        
-        // Mostrar loading
         document.getElementById('loadingOverlay').classList.add('active');
         
-        if (recognition) {
-            recognition.stop();
-        }
-        document.getElementById('voiceIndicator').classList.remove('active');
+        const formData = new FormData();
+        formData.append('file', photoBlob, 'hoja.jpg');
+        formData.append('metadata_captura', JSON.stringify(metadataCaptura));
+        formData.append('image_hash', await generarDeviceFingerprint());
         
-        // Enviar
         const response = await fetch('/api/procesar-hoja-completa', {
             method: 'POST',
-            body: result.formData
+            body: formData
         });
         
         if (!response.ok) {
@@ -701,19 +640,10 @@ async function procesarHoja() {
         }
         
         const resultado = await response.json();
-        console.log('Resultado:', resultado);
-        
         mostrarResultado(resultado);
-        
     } catch (error) {
-        console.error('Error:', error);
         alert('Error: ' + error.message);
-        
         document.getElementById('loadingOverlay').classList.remove('active');
-        
-        if (recognition) {
-            recognition.start();
-        }
     }
 }
 
@@ -744,21 +674,14 @@ function mostrarResultado(data) {
 
 function siguienteHoja() {
     document.getElementById('resultadoModal').classList.remove('active');
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('cameraView').style.display = 'block';
     
-    // Limpiar y reiniciar
-    const existingBtn = document.querySelector('.camera-fullscreen > button');
-    if (existingBtn) {
-        existingBtn.remove();
-    }
+    const btn = document.getElementById('btnCapture');
+    btn.classList.remove('confirm');
+    btn.textContent = '📸 Capturar';
     
-    document.getElementById('controlsOverlay').style.display = 'flex';
-    
-    camera.reset();
-    camera.startCamera();
-    
-    if (recognition) {
-        recognition.start();
-    }
+    photoBlob = null;
 }
 </script>
 {% endblock %}
