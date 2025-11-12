@@ -453,6 +453,7 @@ let metadataCaptura = {};
 let vozActiva = false;
 let photoBlob = null;
 let gpsObtenido = false;
+let linternaActiva = false;
 
 // ============================================================================
 // DETECCIÓN DE CALIDAD DEL DISPOSITIVO
@@ -580,7 +581,7 @@ function toggleVoz() {
 window.addEventListener('load', async () => {
     try {
         await capturarMetadata();
-        await iniciarCamara();
+        await iniciarCamaraConLinterna(); // ← CAMBIAR DE iniciarCamara() a iniciarCamaraConLinterna()
         iniciarReconocimientoVoz();
     } catch (error) {
         console.error('Error inicial:', error);
@@ -590,35 +591,15 @@ window.addEventListener('load', async () => {
 // ============================================================================
 // CÁMARA CON ADAPTACIÓN SEGÚN DISPOSITIVO
 // ============================================================================
-async function iniciarCamara() {
+async function iniciarCamaraConLinterna() {
     try {
         const calidadDispositivo = detectarCalidadDispositivo();
         
-        let videoConstraints;
-        
-        switch(calidadDispositivo) {
-            case 'high':
-                videoConstraints = {
-                    width: { ideal: 1920, min: 1280 },
-                    height: { ideal: 1440, min: 720 },
-                    facingMode: 'environment'
-                };
-                break;
-            case 'medium':
-                videoConstraints = {
-                    width: { ideal: 1280, min: 640 },
-                    height: { ideal: 960, min: 480 },
-                    facingMode: 'environment'
-                };
-                break;
-            case 'low':
-                videoConstraints = {
-                    width: { ideal: 1280, min: 640 },
-                    height: { ideal: 960, min: 480 },
-                    facingMode: 'environment'
-                };
-                break;
-        }
+        let videoConstraints = {
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1440, min: 720 },
+            facingMode: 'environment'
+        };
         
         stream = await navigator.mediaDevices.getUserMedia({
             video: videoConstraints,
@@ -627,17 +608,121 @@ async function iniciarCamara() {
         
         document.getElementById('cameraVideo').srcObject = stream;
         
+        // ====== ACTIVAR LINTERNA AUTOMÁTICAMENTE ======
         const track = stream.getVideoTracks()[0];
-        const settings = track.getSettings();
-        console.log('📷 Cámara:', settings.width + 'x' + settings.height);
-        console.log('📱 Calidad:', calidadDispositivo);
+        const capabilities = track.getCapabilities();
         
-        if (settings.width < 1280 || settings.height < 720) {
-            console.warn('⚠️ Resolución baja detectada');
+        if (capabilities.torch) {
+            console.log('📱 Dispositivo tiene linterna');
+            
+            try {
+                await track.applyConstraints({
+                    advanced: [{ torch: true }]
+                });
+                console.log('✅ Linterna activada automáticamente');
+                linternaActiva = true;
+                mostrarIndicadorLinterna(true);
+            } catch (error) {
+                console.warn('⚠️ No se pudo activar linterna:', error);
+            }
+        } else {
+            console.log('📱 Dispositivo NO tiene linterna');
         }
+        
+        verificarIluminacion(track);
         
     } catch (error) {
         alert('No se pudo acceder a la cámara');
+    }
+}
+
+// ============ AGREGAR ESTAS FUNCIONES NUEVAS ============
+
+function verificarIluminacion(track) {
+    const settings = track.getSettings();
+    
+    if (settings.exposureCompensation !== undefined) {
+        const exposure = settings.exposureCompensation;
+        
+        if (exposure > 2) {
+            console.log('⚠️ Ambiente con poca luz detectado');
+            mostrarAlertaIluminacion();
+        }
+    }
+}
+
+function mostrarAlertaIluminacion() {
+    const alert = document.createElement('div');
+    alert.style.cssText = `
+        position: fixed;
+        top: 60px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: rgba(234, 179, 8, 0.95);
+        color: white;
+        padding: 12px 20px;
+        border-radius: 8px;
+        font-size: 0.875rem;
+        z-index: 1000;
+    `;
+    alert.textContent = '💡 Poca luz detectada - Linterna activada';
+    document.body.appendChild(alert);
+    
+    setTimeout(() => alert.remove(), 3000);
+}
+
+function mostrarIndicadorLinterna(activa) {
+    let indicador = document.getElementById('indicadorLinterna');
+    
+    if (!indicador) {
+        indicador = document.createElement('div');
+        indicador.id = 'indicadorLinterna';
+        indicador.style.cssText = `
+            position: absolute;
+            top: 50px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 6px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            z-index: 20;
+        `;
+        document.querySelector('.camera-fullscreen').appendChild(indicador);
+    }
+    
+    if (activa) {
+        indicador.innerHTML = '💡 Linterna ON';
+        indicador.style.background = 'rgba(234, 179, 8, 0.8)';
+    } else {
+        indicador.innerHTML = '💡 Linterna OFF';
+        indicador.style.background = 'rgba(0, 0, 0, 0.7)';
+    }
+}
+
+async function toggleLinterna() {
+    if (!stream) return;
+    
+    const track = stream.getVideoTracks()[0];
+    const capabilities = track.getCapabilities();
+    
+    if (!capabilities.torch) {
+        alert('Tu dispositivo no tiene linterna');
+        return;
+    }
+    
+    try {
+        linternaActiva = !linternaActiva;
+        
+        await track.applyConstraints({
+            advanced: [{ torch: linternaActiva }]
+        });
+        
+        mostrarIndicadorLinterna(linternaActiva);
+        console.log(`💡 Linterna ${linternaActiva ? 'ON' : 'OFF'}`);
+        
+    } catch (error) {
+        console.error('Error al cambiar linterna:', error);
     }
 }
 
