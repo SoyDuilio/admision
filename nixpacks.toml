@@ -1,0 +1,5 @@
+[phases.setup]
+nixPkgs = ["libGL", "glib", "libglvnd"]
+
+[phases.install]
+cmds = ["pip install --upgrade pip", "pip install -r requirements.txt"]
