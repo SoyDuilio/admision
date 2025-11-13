@@ -694,12 +694,12 @@ async def procesar_hoja_completa(
         
         # 10. Guardar respuestas
         for i, resp in enumerate(respuestas_alumno, 1):
-            respuesta = Respuesta(
+            la_respuesta = Respuesta(
                 hoja_respuesta_id=hoja.id,
                 numero_pregunta=i,
-                respuesta_marcada=resp if resp else None
+                respuesta=resp if resp else None
             )
-            db.add(respuesta)
+            db.add(la_respuesta)
         
         db.commit()
         db.refresh(hoja)
