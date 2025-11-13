@@ -201,7 +201,7 @@ def test_anthropic_vision():
     print("🧪 TEST: Anthropic Claude Vision Service")
     print("="*50)
     
-    service = AnthropicVisionService()
+    service = ClaudeVisionService()
     
     print(f"\n📊 Estado:")
     print(f"  - Módulo instalado: {ANTHROPIC_AVAILABLE}")
