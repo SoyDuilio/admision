@@ -413,6 +413,104 @@
         opacity: 0;
     }
 }
+
+.estado-visual {
+    text-align: center;
+    padding: 24px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-radius: 16px;
+    margin-bottom: 24px;
+}
+
+.icono-estado {
+    font-size: 64px;
+    margin-bottom: 12px;
+}
+
+#mensajeEstado {
+    color: white;
+    font-size: 1.25rem;
+    margin: 0;
+}
+
+.datos-postulante {
+    display: grid;
+    gap: 12px;
+    margin-bottom: 24px;
+}
+
+.dato-item {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px;
+    background: #f8fafc;
+    border-radius: 8px;
+}
+
+.dato-item .label {
+    color: #64748b;
+    font-size: 0.875rem;
+}
+
+.dato-item .value {
+    font-weight: 600;
+    color: #1e293b;
+}
+
+.detalles-tecnicos {
+    margin: 16px 0;
+    padding: 12px;
+    background: #f1f5f9;
+    border-radius: 8px;
+}
+
+.detalles-tecnicos summary {
+    cursor: pointer;
+    font-weight: 600;
+    color: #475569;
+    padding: 8px;
+}
+
+.detalle-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding-top: 12px;
+}
+
+.label-mini {
+    display: block;
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 4px;
+}
+
+.resultado-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.btn-primary, .btn-secondary {
+    flex: 1;
+    padding: 14px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn-secondary {
+    background: white;
+    color: #667eea;
+    border: 2px solid #667eea;
+}
 </style>
 {% endblock %}
 
@@ -492,25 +590,81 @@
     </button>
 </div>
 
-<!-- MODAL DE RESULTADOS -->
+<!-- ============================================================================
+MODAL DE RESULTADO MEJORADO
+Reemplazar en capturar_hojas.html
+============================================================================ -->
+
 <div class="resultado-modal" id="resultadoModal">
     <div class="resultado-content">
-        <h3 style="margin-bottom: 16px;">✅ Hoja Procesada</h3>
-        <div class="nota-destacada">
-            <div style="font-size: 0.8125rem; margin-bottom: 6px;">Nota Final</div>
-            <div class="value" id="resultadoNota">-</div>
+        <div class="resultado-header">
+            <h2 id="resultadoTitulo">✅ Hoja Procesada</h2>
+            <button onclick="cerrarResultado()" class="btn-close">✕</button>
         </div>
-        <div class="resultado-grid">
-            <div class="resultado-item"><dt>Postulante</dt><dd id="resultadoNombre">-</dd></div>
-            <div class="resultado-item"><dt>DNI</dt><dd id="resultadoDni">-</dd></div>
-            <div class="resultado-item"><dt>Programa</dt><dd id="resultadoPrograma">-</dd></div>
-            <div class="resultado-item"><dt>Correctas</dt><dd id="resultadoCorrectas">-</dd></div>
-            <div class="resultado-item"><dt>Código Hoja</dt><dd id="resultadoCodigoHoja">-</dd></div>
-            <div class="resultado-item"><dt>Tiempo</dt><dd id="resultadoTiempo">-</dd></div>
+
+        <!-- Estado visual -->
+        <div class="estado-visual" id="estadoVisual">
+            <div class="icono-estado" id="iconoEstado">📸</div>
+            <h3 id="mensajeEstado">Procesamiento exitoso</h3>
         </div>
-        <button type="button" class="btn-siguiente" onclick="siguienteHoja()">
-            Procesar Siguiente Hoja →
-        </button>
+
+        <!-- Datos del postulante -->
+        <div class="datos-postulante">
+            <div class="dato-item">
+                <span class="label">Postulante</span>
+                <span class="value" id="resultadoNombre">-</span>
+            </div>
+            <div class="dato-item">
+                <span class="label">DNI</span>
+                <span class="value" id="resultadoDni">-</span>
+            </div>
+            <div class="dato-item">
+                <span class="label">Programa</span>
+                <span class="value" id="resultadoPrograma">-</span>
+            </div>
+        </div>
+
+        <!-- Nota (si existe) -->
+        <div class="nota-destacada" id="seccionNota">
+            <div class="nota-numero" id="resultadoNota">-</div>
+            <div class="nota-detalle">
+                <span class="label">Nota Final</span>
+                <span class="correctas" id="resultadoCorrectas">- / 100</span>
+            </div>
+        </div>
+
+        <!-- Detalles técnicos (colapsable) -->
+        <details class="detalles-tecnicos">
+            <summary>📋 Detalles técnicos</summary>
+            <div class="detalle-grid">
+                <div>
+                    <span class="label-mini">Código Hoja</span>
+                    <span id="resultadoCodigoHoja">-</span>
+                </div>
+                <div>
+                    <span class="label-mini">API Usada</span>
+                    <span id="resultadoApi">-</span>
+                </div>
+                <div>
+                    <span class="label-mini">Tiempo</span>
+                    <span id="resultadoTiempo">-</span>
+                </div>
+                <div>
+                    <span class="label-mini">Respuestas</span>
+                    <span id="resultadoRespDetectadas">-</span>
+                </div>
+            </div>
+        </details>
+
+        <!-- Botones -->
+        <div class="resultado-actions">
+            <button onclick="siguienteHoja()" class="btn-primary">
+                ➡️ Siguiente Hoja
+            </button>
+            <button onclick="verDetalles()" class="btn-secondary">
+                📊 Ver Detalles
+            </button>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -920,16 +1074,126 @@ async function procesarHoja() {
             body: formData
         });
         
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Error al procesar');
+        const resultado = await response.json();
+        
+        // SI HAY ERROR
+        if (!resultado.success || resultado.error) {
+            mostrarError(resultado.error || {
+                titulo: "Error",
+                mensaje: resultado.detail || "Ocurrió un error desconocido",
+                icono: "⚠️"
+            });
+            return;
         }
         
-        const resultado = await response.json();
+        // SI ES EXITOSO
         mostrarResultado(resultado);
+        
     } catch (error) {
-        alert('Error: ' + error.message);
         document.getElementById('loadingOverlay').classList.remove('active');
+        console.error('Error en procesarHoja:', error);
+        
+        mostrarError({
+            titulo: "Error de Conexión",
+            mensaje: "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
+            icono: "📡"
+        });
+    }
+}
+
+// ============================================================================
+// AGREGAR ESTAS FUNCIONES NUEVAS AL MISMO <script>
+// ============================================================================
+
+function mostrarError(error) {
+    document.getElementById('loadingOverlay').classList.remove('active');
+    
+    // Verificar si ya existe modal de error
+    const existingModal = document.querySelector('.error-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    // Crear HTML del modal
+    const errorHTML = `
+        <div class="error-modal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        ">
+            <div class="error-content" style="
+                background: white;
+                border-radius: 16px;
+                padding: 32px;
+                max-width: 400px;
+                width: 100%;
+                text-align: center;
+                box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            ">
+                <div class="error-icon" style="
+                    font-size: 64px;
+                    margin-bottom: 16px;
+                ">${error.icono || '⚠️'}</div>
+                
+                <h2 style="
+                    color: #1e293b;
+                    margin-bottom: 12px;
+                    font-size: 1.5rem;
+                ">${error.titulo || 'Error'}</h2>
+                
+                <p style="
+                    color: #64748b;
+                    margin-bottom: 24px;
+                    line-height: 1.5;
+                ">${error.mensaje || 'Ocurrió un error inesperado'}</p>
+                
+                ${error.detalles_tecnicos ? `
+                    <details style="
+                        text-align: left;
+                        margin-bottom: 24px;
+                        background: #f1f5f9;
+                        padding: 12px;
+                        border-radius: 8px;
+                    ">
+                        <summary style="cursor: pointer; font-weight: 600;">Detalles técnicos</summary>
+                        <pre style="
+                            font-size: 0.75rem;
+                            margin-top: 8px;
+                            overflow-x: auto;
+                        ">${error.detalles_tecnicos}</pre>
+                    </details>
+                ` : ''}
+                
+                <button onclick="cerrarError()" style="
+                    width: 100%;
+                    padding: 14px;
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    font-weight: 600;
+                    cursor: pointer;
+                    font-size: 1rem;
+                ">Entendido</button>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', errorHTML);
+}
+
+function cerrarError() {
+    const modal = document.querySelector('.error-modal');
+    if (modal) {
+        modal.remove();
     }
 }
 
@@ -939,53 +1203,65 @@ async function procesarHoja() {
 function mostrarResultado(data) {
     document.getElementById('loadingOverlay').classList.remove('active');
     
-    // Postulante
+    const modal = document.getElementById('resultadoModal');
+    const estadoVisual = document.getElementById('estadoVisual');
+    const iconoEstado = document.getElementById('iconoEstado');
+    const mensajeEstado = document.getElementById('mensajeEstado');
+    
+    // DETERMINAR ESTADO
+    if (data.calificacion) {
+        // CON NOTA
+        iconoEstado.textContent = '✅';
+        mensajeEstado.textContent = '¡Hoja calificada exitosamente!';
+        estadoVisual.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        
+        document.getElementById('resultadoNota').textContent = data.calificacion.nota.toFixed(2);
+        document.getElementById('resultadoCorrectas').textContent = `${data.calificacion.correctas} / 100`;
+        document.getElementById('seccionNota').style.display = 'flex';
+        
+    } else {
+        // SIN NOTA (pendiente gabarito)
+        iconoEstado.textContent = '⏳';
+        mensajeEstado.textContent = 'Hoja procesada - Pendiente de calificación';
+        estadoVisual.style.background = 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)';
+        
+        document.getElementById('resultadoNota').textContent = 'Pendiente';
+        document.getElementById('resultadoCorrectas').textContent = '100 respuestas detectadas';
+        document.getElementById('seccionNota').style.display = 'flex';
+    }
+    
+    // POSTULANTE
     if (data.postulante) {
         document.getElementById('resultadoNombre').textContent = data.postulante.nombres;
         document.getElementById('resultadoDni').textContent = data.postulante.dni;
-        document.getElementById('resultadoPrograma').textContent = data.postulante.programa || '-';
+        document.getElementById('resultadoPrograma').textContent = data.postulante.programa || 'No especificado';
     }
     
-    // Calificación (si existe gabarito)
-    if (data.calificacion) {
-        document.getElementById('resultadoNota').textContent = data.calificacion.nota.toFixed(2);
-        document.getElementById('resultadoCorrectas').textContent = `${data.calificacion.correctas} / 100`;
-    } else {
-        // Sin gabarito aún
-        document.getElementById('resultadoNota').textContent = '⏳';
-        document.getElementById('resultadoNota').style.fontSize = '2rem';
-        document.getElementById('resultadoCorrectas').textContent = 'Pendiente';
-        
-        // Cambiar título
-        const labelElement = document.querySelector('.nota-destacada .label');
-        if (labelElement) {
-            labelElement.textContent = 'Estado';
-        }
-        
-        // Mostrar mensaje
-        if (data.mensaje) {
-            const messageDiv = document.createElement('div');
-            messageDiv.style.cssText = 'background: rgba(234, 179, 8, 0.2); color: #fbbf24; padding: 12px; border-radius: 8px; margin-bottom: 16px; font-size: 0.875rem;';
-            messageDiv.innerHTML = '⏳ ' + data.mensaje;
-            
-            const resultadoContent = document.querySelector('.resultado-content');
-            const notaDestacada = document.querySelector('.nota-destacada');
-            if (resultadoContent && notaDestacada) {
-                resultadoContent.insertBefore(messageDiv, notaDestacada);
-            }
-        }
-    }
-    
-    // Otros datos
+    // DETALLES TÉCNICOS
     if (data.codigo_hoja) {
         document.getElementById('resultadoCodigoHoja').textContent = data.codigo_hoja;
     }
     
     if (data.procesamiento) {
-        document.getElementById('resultadoTiempo').textContent = data.procesamiento.tiempo;
+        document.getElementById('resultadoApi').textContent = data.procesamiento.api || 'OpenAI';
+        document.getElementById('resultadoTiempo').textContent = data.procesamiento.tiempo || '-';
     }
     
-    document.getElementById('resultadoModal').classList.add('active');
+    if (data.respuestas_detectadas !== undefined) {
+        document.getElementById('resultadoRespDetectadas').textContent = data.respuestas_detectadas + ' / 100';
+    }
+    
+    // MOSTRAR MODAL
+    modal.classList.add('active');
+}
+
+function cerrarResultado() {
+    document.getElementById('resultadoModal').classList.remove('active');
+}
+
+function verDetalles() {
+    // TODO: Implementar vista detallada de respuestas
+    alert('📊 Vista de detalles en desarrollo');
 }
 
 function siguienteHoja() {
