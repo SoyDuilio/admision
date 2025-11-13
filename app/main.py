@@ -588,6 +588,11 @@ async def generar_hojas(
 # ENDPOINT: PROCESAR HOJA COMPLETA
 # ============================================================================
 
+"""
+ENDPOINT COMPLETO Y SANEADO - /api/procesar-hoja-completa
+Reemplazar en main.py desde la línea del @app.post hasta el final del endpoint
+"""
+
 @app.post("/api/procesar-hoja-completa")
 async def procesar_hoja_completa(
     file: UploadFile = File(...),
@@ -596,51 +601,80 @@ async def procesar_hoja_completa(
     request: Request = None
 ):
     """
-    Procesa hoja capturada:
-    1. Extrae códigos + respuestas con Vision AI
-    2. Busca hoja en BD por código
-    3. Valida códigos
-    4. Guarda imagen con nombre correcto
+    Procesa hoja capturada con Vision AI V2:
+    1. Pre-procesa con OpenCV
+    2. Extrae códigos + respuestas (fallback 4 APIs)
+    3. Valida códigos en BD
+    4. Guarda imagen + respuestas
     5. Califica si existe gabarito
     """
     db = SessionLocal()
     inicio = time.time()
     
     try:
-        # Crear carpeta
+        # ====================================================================
+        # 1. PREPARAR IMAGEN
+        # ====================================================================
         crear_directorio_capturas()
-        
-        # 1. Guardar foto temporal
         temp_filepath, temp_filename = guardar_foto_temporal(file)
         
-        # 2. Parsear metadata
-        metadata = {}
+        # Parsear metadata de captura
+        metadata_dict = {}
         if metadata_captura:
             try:
-                metadata = json.loads(metadata_captura)
+                metadata_dict = json.loads(metadata_captura)
             except:
                 pass
         
         if request:
-            metadata['ip_address'] = request.client.host
-        metadata['image_hash'] = image_hash
+            metadata_dict['ip_address'] = request.client.host
+        metadata_dict['image_hash'] = image_hash
         
-        # 3. Procesar con Vision AI
-        print("📸 Procesando con Vision AI...")
+        # ====================================================================
+        # 2. PROCESAR CON VISION AI V2 (OpenCV + APIs)
+        # ====================================================================
+        print("📸 Procesando con Vision AI V2...")
         resultado_vision = await procesar_con_api_seleccionada(temp_filepath)
         
         if not resultado_vision["success"]:
-            raise HTTPException(status_code=500, detail=resultado_vision["error"])
+            raise HTTPException(
+                status_code=500,
+                detail=resultado_vision.get("error", "Error en Vision AI")
+            )
         
-        # 4. Extraer datos
+        # ====================================================================
+        # 3. EXTRAER DATOS
+        # ====================================================================
         datos = resultado_vision["datos"]
         codigo_hoja = datos.get("codigo_hoja")
         dni_postulante = datos.get("dni_postulante")
         dni_profesor = datos.get("dni_profesor")
         codigo_aula = datos.get("codigo_aula")
+        proceso = datos.get("proceso_admision", "2025-2")
         respuestas_alumno = datos.get("respuestas", [])
         
-        # 5. Buscar hoja en BD
+        # Metadata de procesamiento
+        api_utilizada = resultado_vision.get("api", "unknown")
+        modelo_usado = resultado_vision.get("modelo", "unknown")
+        tiempo_procesamiento = resultado_vision.get("tiempo_procesamiento", 0.0)
+        preprocessing_usado = resultado_vision.get("preprocessing", {}).get("used", False)
+        
+        # Estadísticas
+        stats = datos.get("stats", {})
+        respuestas_validas = stats.get("validas", len([r for r in respuestas_alumno if r]))
+        respuestas_vacias = stats.get("vacias", len([r for r in respuestas_alumno if not r]))
+        requieren_revision = stats.get("requieren_revision", 0)
+        
+        # Log
+        print(f"✅ API: {api_utilizada.upper()} | Modelo: {modelo_usado}")
+        print(f"⏱️  Tiempo: {tiempo_procesamiento:.2f}s")
+        print(f"📊 Válidas: {respuestas_validas}/100 | Vacías: {respuestas_vacias}")
+        if preprocessing_usado:
+            print(f"🔧 OpenCV: activado")
+        
+        # ====================================================================
+        # 4. BUSCAR HOJA EN BD
+        # ====================================================================
         hoja = db.query(HojaRespuesta).filter_by(codigo_hoja=codigo_hoja).first()
         
         if not hoja:
@@ -649,130 +683,154 @@ async def procesar_hoja_completa(
                 detail=f"No existe hoja con código {codigo_hoja}"
             )
         
-        # 6. Validar códigos
-        estado, mensajes, datos_validados = validar_codigos(
+        # ====================================================================
+        # 5. VALIDAR CÓDIGOS
+        # ====================================================================
+        estado_val, mensajes, datos_validados = validar_codigos(
             dni_postulante, dni_profesor, codigo_aula, db
         )
         
-        # 7. Guardar imagen con nombre correcto
+        postulante = datos_validados.get("postulante")
+        
+        if not postulante:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Postulante con DNI {dni_postulante} no encontrado"
+            )
+        
+        # ====================================================================
+        # 6. GUARDAR IMAGEN CON NOMBRE FINAL
+        # ====================================================================
         filename_final = f"{codigo_hoja}-{dni_postulante}-{codigo_aula}-{dni_profesor}.jpeg"
         filepath_final = f"app/hojas_capturadas/{filename_final}"
         shutil.copy(temp_filepath, filepath_final)
         
-        # 8. Verificar gabarito y calificar si existe
-        tiene_gabarito = gabarito_existe(hoja.proceso_admision, db)
+        # ====================================================================
+        # 7. VERIFICAR GABARITO Y CALIFICAR
+        # ====================================================================
+        tiene_gabarito = gabarito_existe(db, proceso)
+        calificacion_data = None
         
         if tiene_gabarito:
             calificacion = calcular_calificacion(
                 respuestas_alumno,
-                hoja.proceso_admision,
+                gabarito_existe(db, proceso),  # Obtener gabarito
                 db
             )
+            
             nota_final = calificacion["nota"]
             correctas_count = calificacion["correctas"]
             estado_hoja = "completado"
             mensajes.append("✅ Calificada automáticamente")
+            
+            calificacion_data = {
+                "nota": nota_final,
+                "correctas": correctas_count,
+                "incorrectas": calificacion["incorrectas"],
+                "en_blanco": calificacion["en_blanco"]
+            }
         else:
             nota_final = None
             correctas_count = None
             estado_hoja = "pendiente_calificar"
             mensajes.append("⏳ Pendiente de calificación")
         
-        # 9. Actualizar BD
+        # ====================================================================
+        # 8. ACTUALIZAR HOJA EN BD
+        # ====================================================================
         hoja.imagen_url = filepath_final
+        hoja.api_utilizada = api_utilizada
         hoja.estado = estado_hoja
-        hoja.api_utilizada = resultado_vision["api"]
-        hoja.respuestas_detectadas = len([r for r in respuestas_alumno if r])
+        hoja.respuestas_detectadas = len(respuestas_alumno)
+        hoja.tiempo_procesamiento = tiempo_procesamiento
         hoja.nota_final = nota_final
         hoja.respuestas_correctas_count = correctas_count
-        hoja.tiempo_procesamiento = time.time() - inicio
         hoja.fecha_calificacion = datetime.now(timezone.utc) if tiene_gabarito else None
         hoja.observaciones = ", ".join(mensajes)
-        hoja.metadata_json = json.dumps({
-            "captura": metadata,
-            "api": resultado_vision["api"],
-            "validacion": mensajes
-        })
         
-        # 10. Guardar respuestas
-        for i, resp in enumerate(respuestas_alumno, 1):
-            la_respuesta = Respuesta(
+        # Metadata completa
+        hoja.metadata_json = json.dumps({
+            "captura": metadata_dict,
+            "api": api_utilizada,
+            "modelo": modelo_usado,
+            "preprocessing": preprocessing_usado,
+            "stats": {
+                "validas": respuestas_validas,
+                "vacias": respuestas_vacias,
+                "requieren_revision": requieren_revision
+            },
+            "validacion": mensajes
+        }, ensure_ascii=False)
+        
+        # ====================================================================
+        # 9. GUARDAR RESPUESTAS INDIVIDUALES
+        # ====================================================================
+        for i, resp_raw in enumerate(respuestas_alumno, 1):
+            respuesta = Respuesta(
                 hoja_respuesta_id=hoja.id,
                 numero_pregunta=i,
-                respuesta=resp if resp else None
+                respuesta_marcada=resp_raw,
+                confianza=1.0 if resp_raw else 0.8,
+                marcada_revision=False
             )
-            db.add(la_respuesta)
+            db.add(respuesta)
         
         db.commit()
         db.refresh(hoja)
         
-        # 11. Respuesta
-        response_data = {
+        # ====================================================================
+        # 10. RETORNAR RESPUESTA
+        # ====================================================================
+        return {
             "success": True,
-            "hoja_id": hoja.id,
             "codigo_hoja": codigo_hoja,
-            "archivo_guardado": filename_final,
             "postulante": {
-                "dni": dni_postulante,
-                "nombres": f"{hoja.postulante.nombres} {hoja.postulante.apellido_paterno}" if hoja.postulante else "No identificado"
+                "dni": postulante.dni,
+                "nombres": f"{postulante.nombres} {postulante.apellido_paterno}",
+                "programa": postulante.programa_educativo
+            },
+            "procesamiento": {
+                "api": api_utilizada,
+                "modelo": modelo_usado,
+                "tiempo": f"{tiempo_procesamiento:.2f}s",
+                "opencv_usado": preprocessing_usado
+            },
+            "respuestas_detectadas": len(respuestas_alumno),
+            "stats": {
+                "validas": respuestas_validas,
+                "vacias": respuestas_vacias,
+                "requieren_revision": requieren_revision
             },
             "validacion": {
                 "mensajes": mensajes,
-                "estado": "con_observaciones" if len(mensajes) > 1 else "ok"
+                "estado": "ok" if estado_val else "con_observaciones"
             },
-            "procesamiento": {
-                "api": resultado_vision["api"],
-                "tiempo": f"{time.time() - inicio:.2f}s"
-            }
+            "calificacion": calificacion_data
         }
         
-        if tiene_gabarito:
-            response_data["calificacion"] = calificacion
-        
-        return response_data
-        
     except HTTPException as he:
-        # Error HTTP controlado
-        return JSONResponse(
-            status_code=he.status_code,
-            content={
-                "success": False,
-                "error": {
-                    "titulo": ERRORES_AMIGABLES.get(str(he.status_code), {}).get("titulo", "Error"),
-                    "mensaje": he.detail,
-                    "icono": ERRORES_AMIGABLES.get(str(he.status_code), {}).get("icono", "⚠️"),
-                    "tipo": "http_error"
-                }
-            }
-        )
-    except Exception as e:
+        db.rollback()
+        raise he
+        
+    except DataError as de:
         db.rollback()
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-    
-    except DataError as de:
-        # Error de base de datos
-        db.rollback()
-        error_info = ERRORES_AMIGABLES.get("StringDataRightTruncation", {})
         
         return JSONResponse(
             status_code=500,
             content={
                 "success": False,
                 "error": {
-                    "titulo": error_info.get("titulo", "Error de Datos"),
-                    "mensaje": "Algunos datos exceden el límite permitido. Contacta al administrador del sistema.",
-                    "icono": error_info.get("icono", "⚠️"),
-                    "tipo": "database_error",
-                    "detalles_tecnicos": str(de) if os.getenv("DEBUG") else None
+                    "titulo": "Error de Datos",
+                    "mensaje": "Algunos datos exceden el límite permitido.",
+                    "icono": "⚠️",
+                    "tipo": "database_error"
                 }
             }
         )
-    
-
+        
     except Exception as e:
-        # Error genérico
         db.rollback()
         import traceback
         traceback.print_exc()
@@ -783,15 +841,13 @@ async def procesar_hoja_completa(
                 "success": False,
                 "error": {
                     "titulo": "Error Inesperado",
-                    "mensaje": "Ocurrió un error al procesar la hoja. Por favor intenta nuevamente.",
+                    "mensaje": str(e),
                     "icono": "❌",
-                    "tipo": "unknown_error",
-                    "detalles_tecnicos": str(e) if os.getenv("DEBUG") else None
+                    "tipo": "unknown_error"
                 }
             }
         )
-
-
+        
     finally:
         db.close()
 
