@@ -18,7 +18,7 @@ class EstadoProcesamiento(enum.Enum):
     completado = "completado"
     error = "error"
     observado = "observado"
-    pendiente_calificacion = "pendiente_calificacion"  # ← NUEVO
+    pendiente_calificar = "pendiente_calificar"  # ← CONSISTENTE
 
 class APIVision(enum.Enum):
     """APIs de Vision disponibles"""
