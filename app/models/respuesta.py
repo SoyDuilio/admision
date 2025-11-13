@@ -25,7 +25,7 @@ class Respuesta(Base):
     
     # Pregunta y respuesta
     numero_pregunta = Column(Integer, nullable=False)  # 1-100
-    respuesta = Column(String(1), nullable=True)  # A, B, C, D, E, o null si está en blanco
+    respuesta_marcada = Column(String(1), nullable=True)  # A, B, C, D, E, o null si está en blanco
     
     # Confianza del reconocimiento (0-1)
     confianza = Column(Float, nullable=True, default=1.0)
@@ -68,7 +68,7 @@ class Respuesta(Base):
         return {
             "id": self.id,
             "numero_pregunta": self.numero_pregunta,
-            "respuesta": self.respuesta,
+            "respuesta": self.respuesta_marcada,
             "respuesta_display": self.respuesta_display,
             "confianza": self.confianza,
             "es_correcta": self.es_correcta,
