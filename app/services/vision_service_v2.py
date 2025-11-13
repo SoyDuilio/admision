@@ -21,6 +21,10 @@ import google.generativeai as genai
 
 from app.services.image_preprocessor import ImagePreprocessor
 
+from sqlalchemy.orm import Session
+from app.models import HojaRespuesta, Respuesta
+from app.services.prompt_vision_v3 import PROMPT_DETECCION_RESPUESTAS_V3
+
 
 # ============================================================================
 # CONFIGURACIÓN DE APIs
@@ -35,37 +39,8 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 # PROMPT OPTIMIZADO
 # ============================================================================
 
-PROMPT_BASE = """Analiza esta hoja de respuestas del I.S.T. Pedro A. Del Águila H.
-
-CÓDIGOS A EXTRAER:
-- DNI Postulante: 8 dígitos numéricos
-- Código Aula: 4-5 caracteres alfanuméricos
-- DNI Profesor: 8 dígitos numéricos
-- Código Hoja: 9 caracteres alfanuméricos
-
-RESPUESTAS:
-- 100 preguntas numeradas del 1 al 100
-- Formato: "1. (   )" - letra escrita DENTRO de los paréntesis
-- Respuestas válidas: A, B, C, D, E (MAYÚSCULAS)
-- Si el paréntesis está vacío → null
-- Si hay letra minúscula (a-e) → convertir a mayúscula
-- Si hay símbolo/número/tachado/borroso → null
-
-RESPONDE SOLO CON JSON VÁLIDO (sin markdown, sin backticks):
-{
-  "dni_postulante": "70123456",
-  "codigo_aula": "C201",
-  "dni_profesor": "12345678",
-  "codigo_hoja": "9CFPrxSzP",
-  "proceso_admision": "2025-2",
-  "respuestas": ["A", null, "B", "C", null, ...]
-}
-
-CRÍTICO:
-- El array "respuestas" DEBE tener EXACTAMENTE 100 elementos
-- Cada elemento debe ser: "A", "B", "C", "D", "E" o null
-- NO agregues texto adicional, SOLO el JSON
-"""
+# Usar el nuevo prompt
+PROMPT_BASE = PROMPT_DETECCION_RESPUESTAS_V3
 
 
 # ============================================================================
@@ -439,3 +414,312 @@ async def procesar_con_api_seleccionada(imagen_path: str, api_preferida: str = N
     Usa la versión V2 con OpenCV.
     """
     return await procesar_hoja_completa_v2(imagen_path)
+
+
+
+# ============================================================================
+# FUNCIONES CORREGIDAS PARA vision_service_v2.py
+# Copia SOLO estas funciones al final de tu archivo
+# ============================================================================
+
+import json
+from typing import Dict
+from sqlalchemy.orm import Session
+
+
+async def procesar_y_guardar_respuestas(
+    hoja_respuesta_id: int,
+    resultado_api: Dict,
+    db: Session
+) -> Dict:
+    """
+    Procesa el resultado de la Vision API y guarda cada respuesta en la BD.
+    
+    Args:
+        hoja_respuesta_id: ID de la hoja de respuesta procesada
+        resultado_api: Resultado JSON de la Vision API
+        db: Sesión de base de datos
+        
+    Returns:
+        Dict con estadísticas del procesamiento
+    """
+    
+    from app.models import HojaRespuesta, Respuesta
+    
+    # Extraer respuestas del JSON
+    respuestas_raw = resultado_api.get("respuestas", [])
+    
+    if not respuestas_raw:
+        raise ValueError("No se encontraron respuestas en el resultado de la API")
+    
+    # Estadísticas
+    stats = {
+        "total": 0,
+        "validas": 0,
+        "vacias": 0,
+        "letra_invalida": 0,
+        "garabatos": 0,
+        "multiple": 0,
+        "ilegible": 0,
+        "requieren_revision": 0
+    }
+    
+    respuestas_guardadas = []
+    
+    for resp_data in respuestas_raw:
+        numero = resp_data.get("numero")
+        respuesta_detectada = resp_data.get("respuesta", "").upper()
+        confianza = resp_data.get("confianza")
+        observacion = resp_data.get("observacion")
+        
+        # Normalizar minúsculas a mayúsculas
+        if respuesta_detectada.lower() in ['a', 'b', 'c', 'd', 'e']:
+            respuesta_detectada = respuesta_detectada.upper()
+        
+        # Determinar si es válida
+        es_valida = respuesta_detectada in ['A', 'B', 'C', 'D', 'E']
+        
+        # Determinar si requiere revisión
+        requiere_rev = requiere_revision(respuesta_detectada, confianza)
+        
+        # Crear objeto Respuesta
+        respuesta = Respuesta(
+            hoja_respuesta_id=hoja_respuesta_id,
+            numero_pregunta=numero,
+            respuesta_marcada=respuesta_detectada,
+            es_correcta=False,  # Se actualizará al calificar con gabarito
+            confianza=confianza if es_valida else None,
+            respuesta_raw=str(resp_data),  # Convertir a string directamente
+            observacion=observacion,
+            requiere_revision=requiere_rev
+        )
+        
+        db.add(respuesta)
+        respuestas_guardadas.append(respuesta)
+        
+        # Actualizar estadísticas
+        stats["total"] += 1
+        if es_valida:
+            stats["validas"] += 1
+        elif respuesta_detectada == "VACIO":
+            stats["vacias"] += 1
+        elif respuesta_detectada == "LETRA_INVALIDA":
+            stats["letra_invalida"] += 1
+        elif respuesta_detectada == "GARABATO":
+            stats["garabatos"] += 1
+        elif respuesta_detectada == "MULTIPLE":
+            stats["multiple"] += 1
+        elif respuesta_detectada == "ILEGIBLE":
+            stats["ilegible"] += 1
+        
+        if respuesta.requiere_revision:
+            stats["requieren_revision"] += 1
+    
+    # Commit a la base de datos
+    db.commit()
+    
+    # Actualizar metadata de la hoja
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_respuesta_id).first()
+    if hoja:
+        hoja.respuestas_detectadas = stats["total"]
+        
+        # Obtener metadata actual
+        metadata_actual = {}
+        if hoja.metadata_json:
+            try:
+                metadata_actual = json.loads(hoja.metadata_json) if isinstance(hoja.metadata_json, str) else hoja.metadata_json
+            except:
+                metadata_actual = {}
+        
+        # Agregar estadísticas
+        metadata_actual["estadisticas_deteccion"] = stats
+        
+        # Guardar como string JSON
+        hoja.metadata_json = json.dumps(metadata_actual)
+        db.commit()
+    
+    return {
+        "success": True,
+        "hoja_respuesta_id": hoja_respuesta_id,
+        "respuestas_guardadas": len(respuestas_guardadas),
+        "estadisticas": stats
+    }
+
+
+def requiere_revision(respuesta: str, confianza: float = None) -> bool:
+    """
+    Determina si una respuesta requiere revisión manual.
+    
+    Criterios:
+    - Confianza < 0.7 en respuestas válidas
+    - Todas las LETRA_INVALIDA
+    - Todos los GARABATO
+    - Todos los MULTIPLE
+    - Todos los ILEGIBLE
+    """
+    
+    # Respuestas problemáticas siempre requieren revisión
+    if respuesta in ["LETRA_INVALIDA", "GARABATO", "MULTIPLE", "ILEGIBLE"]:
+        return True
+    
+    # Respuestas válidas con confianza baja
+    if respuesta in ["A", "B", "C", "D", "E"] and confianza and confianza < 0.70:
+        return True
+    
+    return False
+
+
+async def calificar_hoja_con_gabarito(
+    hoja_respuesta_id: int,
+    gabarito_id: int,
+    db: Session
+) -> Dict:
+    """
+    Califica una hoja de respuestas comparando con el gabarito.
+    
+    Args:
+        hoja_respuesta_id: ID de la hoja a calificar
+        gabarito_id: ID del gabarito (clave de respuestas)
+        db: Sesión de base de datos
+        
+    Returns:
+        Dict con resultados de la calificación
+    """
+    
+    from app.models import ClaveRespuesta, HojaRespuesta, Respuesta
+    
+    # Obtener gabarito
+    gabarito = db.query(ClaveRespuesta).filter(
+        ClaveRespuesta.id == gabarito_id
+    ).first()
+    
+    if not gabarito:
+        raise ValueError(f"Gabarito {gabarito_id} no encontrado")
+    
+    # Obtener respuestas de la hoja
+    respuestas = db.query(Respuesta).filter(
+        Respuesta.hoja_respuesta_id == hoja_respuesta_id
+    ).order_by(Respuesta.numero_pregunta).all()
+    
+    if not respuestas:
+        raise ValueError(f"No hay respuestas para la hoja {hoja_respuesta_id}")
+    
+    # Gabarito como dict (numero_pregunta: respuesta_correcta)
+    clave_dict = {}
+    if gabarito.respuestas_json:
+        if isinstance(gabarito.respuestas_json, str):
+            clave_dict = json.loads(gabarito.respuestas_json)
+        else:
+            clave_dict = gabarito.respuestas_json
+    
+    correctas = 0
+    incorrectas = 0
+    no_calificables = 0
+    
+    for respuesta in respuestas:
+        num_pregunta = str(respuesta.numero_pregunta)
+        respuesta_correcta = clave_dict.get(num_pregunta)
+        
+        # Solo calificar respuestas válidas (A-E)
+        if respuesta.respuesta_marcada in ['A', 'B', 'C', 'D', 'E']:
+            if respuesta.respuesta_marcada == respuesta_correcta:
+                respuesta.es_correcta = True
+                correctas += 1
+            else:
+                respuesta.es_correcta = False
+                incorrectas += 1
+        else:
+            # No calificable (VACIO, LETRA_INVALIDA, etc.)
+            respuesta.es_correcta = False
+            no_calificables += 1
+    
+    db.commit()
+    
+    # Calcular nota (sobre 20)
+    total_preguntas = len(respuestas)
+    nota_final = (correctas / total_preguntas) * 20 if total_preguntas > 0 else 0
+    
+    # Actualizar hoja de respuestas
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_respuesta_id).first()
+    if hoja:
+        hoja.nota_final = nota_final
+        hoja.respuestas_correctas_count = correctas
+        hoja.estado = "calificado"
+        db.commit()
+    
+    return {
+        "success": True,
+        "hoja_respuesta_id": hoja_respuesta_id,
+        "correctas": correctas,
+        "incorrectas": incorrectas,
+        "no_calificables": no_calificables,
+        "total": total_preguntas,
+        "nota_final": round(nota_final, 2),
+        "porcentaje": round((correctas / total_preguntas) * 100, 2) if total_preguntas > 0 else 0
+    }
+
+
+def generar_reporte_detallado(hoja_respuesta_id: int, db: Session) -> Dict:
+    """
+    Genera reporte detallado de una hoja con todas las estadísticas.
+    
+    Returns:
+        Dict con información completa para mostrar al operador
+    """
+    
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_respuesta_id).first()
+    
+    if not hoja:
+        raise ValueError(f"Hoja {hoja_respuesta_id} no encontrada")
+    
+    respuestas = db.query(Respuesta).filter(
+        Respuesta.hoja_respuesta_id == hoja_respuesta_id
+    ).order_by(Respuesta.numero_pregunta).all()
+    
+    # Agrupar por tipo
+    por_tipo = {
+        "validas": [],
+        "vacias": [],
+        "letra_invalida": [],
+        "garabatos": [],
+        "multiple": [],
+        "ilegible": []
+    }
+    
+    for resp in respuestas:
+        if resp.es_valida:
+            por_tipo["validas"].append(resp.to_dict())
+        elif resp.respuesta_marcada == "VACIO":
+            por_tipo["vacias"].append(resp.to_dict())
+        elif resp.respuesta_marcada == "LETRA_INVALIDA":
+            por_tipo["letra_invalida"].append(resp.to_dict())
+        elif resp.respuesta_marcada == "GARABATO":
+            por_tipo["garabatos"].append(resp.to_dict())
+        elif resp.respuesta_marcada == "MULTIPLE":
+            por_tipo["multiple"].append(resp.to_dict())
+        elif resp.respuesta_marcada == "ILEGIBLE":
+            por_tipo["ilegible"].append(resp.to_dict())
+    
+    return {
+        "hoja": {
+            "id": hoja.id,
+            "codigo_hoja": hoja.codigo_hoja,
+            "estado": hoja.estado,
+            "nota_final": float(hoja.nota_final) if hoja.nota_final else None,
+            "fecha_captura": hoja.fecha_captura.isoformat() if hoja.fecha_captura else None
+        },
+        "resumen": {
+            "total": len(respuestas),
+            "validas": len(por_tipo["validas"]),
+            "vacias": len(por_tipo["vacias"]),
+            "letra_invalida": len(por_tipo["letra_invalida"]),
+            "garabatos": len(por_tipo["garabatos"]),
+            "multiple": len(por_tipo["multiple"]),
+            "ilegible": len(por_tipo["ilegible"]),
+            "correctas": sum(1 for r in respuestas if r.es_correcta)
+        },
+        "detalle_por_tipo": por_tipo,
+        "requieren_revision": [
+            r.to_dict() for r in respuestas if r.requiere_revision
+        ]
+    }
