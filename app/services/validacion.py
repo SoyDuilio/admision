@@ -1,72 +1,98 @@
 """
-Servicio de validación de códigos en base de datos
+Servicios de validación
+Ubicación: app/services/validacion.py
 """
 
-from typing import Dict, Tuple, List
-from app.models import Postulante, Profesor, Aula
+from typing import Dict, Tuple
+from sqlalchemy.orm import Session
 
 
 def validar_codigos(
+    db: Session,
     dni_postulante: str,
-    dni_profesor: str,
     codigo_aula: str,
-    db
-) -> Tuple[str, List[str], Dict]:
+    dni_profesor: str,
+    codigo_hoja: str
+) -> Tuple[bool, Dict]:
     """
-    Valida que los códigos existan en la base de datos.
+    Valida que los códigos extraídos existan en la base de datos.
     
-    Args:
-        dni_postulante: DNI del postulante
-        dni_profesor: DNI del profesor
-        codigo_aula: Código del aula
-        db: Sesión de base de datos
-        
     Returns:
-        Tuple con:
-        - estado: "completado", "observado" o "error"
-        - mensajes: Lista de mensajes de validación
-        - datos: Dict con postulante, profesor y aula encontrados
+        tuple: (es_valido, datos)
     """
-    errores = []
-    mensajes = []
-    datos = {
+    from app.models import Postulante, Aula, Profesor, HojaRespuesta
+    
+    resultado = {
         "postulante": None,
+        "aula": None,
         "profesor": None,
-        "aula": None
+        "errores": []
     }
     
-    # Validar DNI postulante
-    postulante = db.query(Postulante).filter_by(dni=dni_postulante).first()
+    # Validar postulante
+    postulante = db.query(Postulante).filter(Postulante.dni == dni_postulante).first()
     if not postulante:
-        errores.append("DNI_POSTULANTE")
-        mensajes.append(f"⚠️ DNI postulante {dni_postulante} no registrado")
+        resultado["errores"].append(f"Postulante con DNI {dni_postulante} no encontrado")
     else:
-        datos["postulante"] = postulante
+        resultado["postulante"] = postulante
     
-    # Validar DNI profesor
-    profesor = db.query(Profesor).filter_by(dni=dni_profesor).first()
-    if not profesor:
-        errores.append("DNI_PROFESOR")
-        mensajes.append(f"⚠️ DNI profesor {dni_profesor} no registrado")
-    else:
-        datos["profesor"] = profesor
-    
-    # Validar código aula
-    aula = db.query(Aula).filter_by(codigo=codigo_aula).first()
+    # Validar aula
+    aula = db.query(Aula).filter(Aula.codigo == codigo_aula).first()
     if not aula:
-        errores.append("CODIGO_AULA")
-        mensajes.append(f"⚠️ Código aula {codigo_aula} no existe")
+        resultado["errores"].append(f"Aula {codigo_aula} no encontrada")
     else:
-        datos["aula"] = aula
+        resultado["aula"] = aula
     
-    # Determinar estado
-    if len(errores) == 0:
-        estado = "completado"
-        mensajes = ["✅ Hoja validada correctamente"]
-    elif len(errores) >= 2:
-        estado = "error"
-        mensajes.insert(0, "🚨 ALERTA: Múltiples códigos incorrectos")
+    # Validar profesor
+    profesor = db.query(Profesor).filter(Profesor.dni == dni_profesor).first()
+    if not profesor:
+        resultado["errores"].append(f"Profesor con DNI {dni_profesor} no encontrado")
     else:
-        estado = "observado"
+        resultado["profesor"] = profesor
     
-    return estado, mensajes, datos
+    # Validar que el código de hoja no esté duplicado
+    hoja_existente = db.query(HojaRespuesta).filter(
+        HojaRespuesta.codigo_hoja == codigo_hoja
+    ).first()
+    
+    if hoja_existente:
+        resultado["errores"].append(f"Código de hoja {codigo_hoja} ya existe")
+    
+    es_valido = len(resultado["errores"]) == 0
+    
+    return es_valido, resultado
+
+
+def validar_respuestas(respuestas: list) -> Tuple[bool, Dict]:
+    """
+    Valida que las respuestas sean correctas.
+    
+    Returns:
+        tuple: (son_validas, estadisticas)
+    """
+    if len(respuestas) != 100:
+        return False, {
+            "error": f"Se esperaban 100 respuestas, se recibieron {len(respuestas)}"
+        }
+    
+    stats = {
+        "total": 100,
+        "respondidas": 0,
+        "en_blanco": 0,
+        "validas": 0,
+        "invalidas": 0
+    }
+    
+    validas = ["A", "B", "C", "D", "E", None]
+    
+    for resp in respuestas:
+        if resp is None:
+            stats["en_blanco"] += 1
+        else:
+            stats["respondidas"] += 1
+            if resp.upper() in ["A", "B", "C", "D", "E"]:
+                stats["validas"] += 1
+            else:
+                stats["invalidas"] += 1
+    
+    return True, stats

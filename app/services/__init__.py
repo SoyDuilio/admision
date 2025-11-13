@@ -1,31 +1,30 @@
 """
-Servicios del sistema POSTULANDO
+Servicios de la aplicación POSTULANDO
+Ubicación: app/services/__init__.py
 """
 
-from .pdf_generator import generar_hoja_respuestas_pdf
-from .vision_service import (
-    extraer_con_claude,
-    extraer_con_google_vision,
+# GENERACIÓN DE PDFs
+from app.services.pdf_generator_v2 import generar_hoja_respuestas_v2 as generar_hoja_respuestas_pdf
+
+# PROCESAMIENTO DE IMÁGENES
+from app.services.vision_service_v2 import (
+    procesar_con_api_seleccionada,
     extraer_con_openai,
-    procesar_con_api_seleccionada
+    extraer_con_claude,
+    extraer_con_google_vision
 )
-from .validacion import validar_codigos
-from .calificacion import calcular_calificacion, gabarito_existe
+
+from app.services.image_preprocessor import ImagePreprocessor
+
+# VALIDACIÓN Y CALIFICACIÓN
+from app.services.validacion import validar_codigos
+from app.services.calificacion import calcular_calificacion, gabarito_existe
 
 __all__ = [
-    # PDF
     'generar_hoja_respuestas_pdf',
-    
-    # Visión
-    'extraer_con_claude',
-    'extraer_con_google_vision',
-    'extraer_con_openai',
     'procesar_con_api_seleccionada',
-    
-    # Validación
     'validar_codigos',
-    
-    # Calificación
     'calcular_calificacion',
-    'gabarito_existe'
+    'gabarito_existe',
+    'ImagePreprocessor'
 ]
