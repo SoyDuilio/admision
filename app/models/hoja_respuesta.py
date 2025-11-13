@@ -13,11 +13,12 @@ import enum
 
 
 class EstadoProcesamiento(enum.Enum):
-    """Estados posibles del procesamiento"""
+    generada = "generada"  # ← NUEVO
     procesando = "procesando"
     completado = "completado"
     error = "error"
     observado = "observado"
+    pendiente_calificacion = "pendiente_calificacion"  # ← NUEVO
 
 class APIVision(enum.Enum):
     """APIs de Vision disponibles"""
