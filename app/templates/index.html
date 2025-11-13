@@ -5,104 +5,194 @@
 {% block extra_css %}
 <style>
     :root {
-        --primary-blue: #1e3a8a;
-        --secondary-blue: #2563eb;
-        --accent-gold: #f59e0b;
+        --primary-blue: #3b82f6;
+        --secondary-purple: #8b5cf6;
+        --accent-green: #10b981;
+        --accent-orange: #f59e0b;
         --bg-dark: #0f172a;
         --bg-darker: #020617;
         --text-light: #f8fafc;
         --text-muted: #94a3b8;
-        --border-subtle: #334155;
     }
 
     body {
-        background: linear-gradient(135deg, var(--bg-darker) 0%, var(--bg-dark) 100%);
+        background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
         min-height: 100vh;
         color: var(--text-light);
     }
 
     .dashboard-container {
-        max-width: 1400px;
+        max-width: 1200px;
         margin: 0 auto;
-        padding: 60px 20px;
+        padding: 40px 20px;
     }
 
-    /* Header principal */
+    /* Header simplificado */
     .page-header {
         text-align: center;
-        margin-bottom: 40px;
-        padding: 40px 20px;
-        border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .page-header h1 {
-        font-size: 2.5rem;
-        font-weight: 700;
-        color: var(--text-light);
-        margin-bottom: 12px;
-        letter-spacing: -0.02em;
-    }
-
-    .page-header .subtitle {
-        font-size: 1.125rem;
-        color: var(--text-muted);
-        font-weight: 400;
+        margin-bottom: 30px;
+        padding: 24px 20px;
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+        border-radius: 20px;
+        border: 1px solid rgba(59, 130, 246, 0.2);
     }
 
     .page-header .institution {
-        font-size: 0.875rem;
-        color: var(--accent-gold);
+        font-size: 0.75rem;
+        color: var(--accent-orange);
         text-transform: uppercase;
-        letter-spacing: 0.1em;
-        margin-top: 8px;
-        font-weight: 600;
+        letter-spacing: 0.15em;
+        font-weight: 700;
+        margin-bottom: 8px;
     }
 
-    /* Estadísticas compactas */
-    .stats-compact {
+    .page-header .subtitle {
+        font-size: 0.9375rem;
+        color: var(--text-muted);
+    }
+
+    /* Navegación visible */
+    .top-nav {
         display: flex;
         justify-content: center;
-        gap: 24px;
-        margin-bottom: 60px;
+        gap: 16px;
+        margin-bottom: 30px;
         flex-wrap: wrap;
     }
 
-    .stat-mini {
-        background: rgba(37, 99, 235, 0.05);
-        border: 1px solid rgba(37, 99, 235, 0.2);
-        border-radius: 8px;
-        padding: 16px 24px;
-        min-width: 140px;
+    .nav-button {
+        padding: 12px 24px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px solid var(--primary-blue);
+        border-radius: 12px;
+        color: var(--primary-blue);
+        font-weight: 700;
+        font-size: 0.875rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        text-decoration: none;
+        display: inline-block;
+    }
+
+    .nav-button:hover {
+        background: var(--primary-blue);
+        color: white;
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+    }
+
+    .nav-button.secondary {
+        border-color: var(--secondary-purple);
+        color: var(--secondary-purple);
+        background: rgba(139, 92, 246, 0.1);
+    }
+
+    .nav-button.secondary:hover {
+        background: var(--secondary-purple);
+        color: white;
+        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+    }
+
+    /* Stats Grid 2x2 SIEMPRE */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+        margin-bottom: 40px;
+    }
+
+    .stat-card {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 16px;
+        padding: 24px 20px;
+        position: relative;
+        overflow: hidden;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+        min-height: 120px;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: var(--gradient);
+        opacity: 0.1;
+        z-index: 0;
+    }
+
+    .stat-card::after {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: var(--gradient);
+        border-radius: 16px;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover::after {
+        opacity: 1;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .stat-card-1 { --gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
+    .stat-card-2 { --gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
+    .stat-card-3 { --gradient: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+    .stat-card-4 { --gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+
+    .stat-content {
+        position: relative;
+        z-index: 1;
         text-align: center;
     }
 
-    .stat-mini .value {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--secondary-blue);
-        display: block;
+    .stat-icon {
+        font-size: 2rem;
+        margin-bottom: 8px;
     }
 
-    .stat-mini .label {
+    .stat-info .value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-light);
+        line-height: 1;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .stat-info .label {
         font-size: 0.75rem;
         color: var(--text-muted);
+        font-weight: 600;
         text-transform: uppercase;
         letter-spacing: 0.05em;
-        margin-top: 4px;
     }
 
-    /* Sección principal de pasos */
+    /* Proceso principal */
     .process-section {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--border-subtle);
-        border-radius: 12px;
-        padding: 40px;
-        margin-bottom: 60px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 40px 24px;
+        margin-bottom: 40px;
     }
 
     .section-title {
         font-size: 1.5rem;
-        font-weight: 600;
+        font-weight: 700;
         color: var(--text-light);
         margin-bottom: 30px;
         text-align: center;
@@ -116,28 +206,30 @@
         bottom: 0;
         left: 50%;
         transform: translateX(-50%);
-        width: 60px;
-        height: 3px;
-        background: var(--accent-gold);
+        width: 80px;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary-blue), var(--secondary-purple));
+        border-radius: 2px;
     }
 
-    /* Grid de opciones */
     .process-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-        gap: 24px;
-        margin-top: 40px;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
     }
 
     .process-card {
-        background: rgba(255, 255, 255, 0.02);
-        border: 2px solid var(--border-subtle);
-        border-radius: 12px;
-        padding: 32px 24px;
+        background: rgba(255, 255, 255, 0.03);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 20px 16px;
         transition: all 0.3s ease;
         cursor: pointer;
         position: relative;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        min-height: 180px;
     }
 
     .process-card::before {
@@ -147,135 +239,218 @@
         left: 0;
         right: 0;
         height: 4px;
-        background: var(--secondary-blue);
+        background: var(--card-gradient);
         transform: scaleX(0);
         transform-origin: left;
         transition: transform 0.3s ease;
     }
 
     .process-card:hover {
-        border-color: var(--secondary-blue);
-        background: rgba(37, 99, 235, 0.05);
+        border-color: var(--card-color);
+        background: rgba(255, 255, 255, 0.05);
         transform: translateY(-4px);
-        box-shadow: 0 12px 24px rgba(0, 0, 0, 0.4);
     }
 
     .process-card:hover::before {
         transform: scaleX(1);
     }
 
+    .card-1 { --card-gradient: linear-gradient(90deg, #3b82f6, #2563eb); --card-color: #3b82f6; }
+    .card-2 { --card-gradient: linear-gradient(90deg, #8b5cf6, #7c3aed); --card-color: #8b5cf6; }
+    .card-3 { --card-gradient: linear-gradient(90deg, #10b981, #059669); --card-color: #10b981; }
+    .card-4 { --card-gradient: linear-gradient(90deg, #f59e0b, #d97706); --card-color: #f59e0b; }
+
     .process-number {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        width: 48px;
-        height: 48px;
-        background: rgba(37, 99, 235, 0.1);
-        border: 2px solid var(--secondary-blue);
+        width: 40px;
+        height: 40px;
+        background: var(--card-gradient);
         border-radius: 50%;
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--secondary-blue);
-        margin-bottom: 20px;
-    }
-
-    .process-card h3 {
-        font-size: 1.25rem;
-        font-weight: 600;
-        color: var(--text-light);
+        font-size: 1.125rem;
+        font-weight: 800;
+        color: white;
         margin-bottom: 12px;
     }
 
-    .process-card p {
-        color: var(--text-muted);
-        line-height: 1.6;
-        font-size: 0.9375rem;
-        margin-bottom: 20px;
-    }
-
-    .process-status {
-        display: inline-block;
-        padding: 6px 14px;
-        border-radius: 6px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-    }
-
-    .status-pending {
-        background: rgba(245, 158, 11, 0.1);
-        color: var(--accent-gold);
-        border: 1px solid rgba(245, 158, 11, 0.3);
-    }
-
-    .status-ready {
-        background: rgba(34, 197, 94, 0.1);
-        color: #22c55e;
-        border: 1px solid rgba(34, 197, 94, 0.3);
-    }
-
-    /* Sección de medios */
-    .media-section {
-        margin-top: 60px;
-    }
-
-    .media-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-        gap: 24px;
-    }
-
-    .media-card {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid var(--border-subtle);
-        border-radius: 12px;
-        overflow: hidden;
-        transition: all 0.3s ease;
-    }
-
-    .media-card:hover {
-        border-color: var(--secondary-blue);
-        transform: translateY(-4px);
-    }
-
-    .media-placeholder {
-        aspect-ratio: 16/9;
-        background: linear-gradient(135deg, rgba(30, 58, 138, 0.3) 0%, rgba(37, 99, 235, 0.3) 100%);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        color: var(--text-muted);
-        font-size: 3rem;
-    }
-
-    .media-content {
-        padding: 20px;
-    }
-
-    .media-content h4 {
+    .process-card h3 {
         font-size: 1rem;
+        font-weight: 700;
         color: var(--text-light);
         margin-bottom: 8px;
     }
 
-    .media-content p {
-        font-size: 0.875rem;
+    .process-card p {
         color: var(--text-muted);
+        line-height: 1.4;
+        font-size: 0.8125rem;
+        margin-bottom: 12px;
+        flex-grow: 1;
     }
 
-    /* Responsive */
+    .process-status {
+        display: inline-block;
+        padding: 5px 10px;
+        border-radius: 6px;
+        font-size: 0.625rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        align-self: flex-start;
+    }
+
+    .status-ready {
+        background: rgba(16, 185, 129, 0.15);
+        color: #10b981;
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .status-pending {
+        background: rgba(245, 158, 11, 0.15);
+        color: #f59e0b;
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Videos Grid - 4 videos en 2x2 en desktop, 1 columna en móvil */
+    .videos-section {
+        margin-top: 40px;
+    }
+
+    .videos-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .video-card {
+        background: rgba(255, 255, 255, 0.03);
+        border-radius: 16px;
+        overflow: hidden;
+        position: relative;
+        border: 2px solid transparent;
+        transition: all 0.3s ease;
+    }
+
+    .video-card::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: var(--video-gradient);
+        border-radius: 16px;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .video-card:hover::before {
+        opacity: 1;
+    }
+
+    .video-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .video-1 { --video-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6); }
+    .video-2 { --video-gradient: linear-gradient(135deg, #10b981, #06b6d4); }
+    .video-3 { --video-gradient: linear-gradient(135deg, #f59e0b, #ef4444); }
+    .video-4 { --video-gradient: linear-gradient(135deg, #ec4899, #8b5cf6); }
+
+    .video-player {
+        width: 100%;
+        aspect-ratio: 16/9;
+        background: #000;
+        border-radius: 12px 12px 0 0;
+    }
+
+    .video-info {
+        padding: 16px;
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    .video-info h4 {
+        font-size: 0.9375rem;
+        font-weight: 700;
+        color: var(--text-light);
+        margin-bottom: 6px;
+    }
+
+    .video-info p {
+        font-size: 0.8125rem;
+        color: var(--text-muted);
+        line-height: 1.4;
+    }
+
+    .video-duration {
+        display: inline-block;
+        margin-top: 8px;
+        padding: 4px 8px;
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 6px;
+        font-size: 0.6875rem;
+        font-weight: 600;
+        color: var(--text-light);
+    }
+
+    /* Modal en desarrollo */
+    .modal-overlay {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 9999;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal-overlay.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
+        border: 2px solid var(--primary-blue);
+        border-radius: 20px;
+        padding: 40px;
+        text-align: center;
+        max-width: 400px;
+    }
+
+    .modal-content h3 {
+        font-size: 1.5rem;
+        margin-bottom: 16px;
+        color: var(--text-light);
+    }
+
+    .modal-content p {
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+
+    .modal-close {
+        padding: 12px 32px;
+        background: var(--primary-blue);
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+    }
+
+    .modal-close:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+
     @media (max-width: 768px) {
-        .page-header h1 {
-            font-size: 2rem;
-        }
-
-        .stats-compact {
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .process-grid {
+        .videos-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -284,122 +459,179 @@
 
 {% block content %}
 <div class="dashboard-container">
+    <!-- Navegación visible -->
+    <div class="top-nav">
+        <a href="/" class="nav-button">🎬 Demo Interactiva</a>
+        <a href="#" onclick="mostrarEnDesarrollo(); return false;" class="nav-button secondary">📊 Ver Resultados</a>
+    </div>
+
     <!-- Header -->
     <div class="page-header">
         <div class="institution">I. S. T. Pedro A. Del Águila H.</div>
-        <h1>Sistema POSTULANDO</h1>
-        <p class="subtitle">Proceso de Admisión con Tecnología de Visión Artificial</p>
+        <p class="subtitle">Sistema de Admisión con IA de Visión Artificial</p>
     </div>
 
-    <!-- Estadísticas compactas -->
-    <div class="stats-compact">
-        <div class="stat-mini">
-            <span class="value">{{ stats.total_postulantes }}</span>
-            <span class="label">Postulantes</span>
+    <!-- Stats Grid 2x2 -->
+    <div class="stats-grid">
+        <div class="stat-card stat-card-1">
+            <div class="stat-content">
+                <div class="stat-icon">👥</div>
+                <div class="stat-info">
+                    <span class="value">{{ stats.total_postulantes }}</span>
+                    <span class="label">Postulantes</span>
+                </div>
+            </div>
         </div>
-        <div class="stat-mini">
-            <span class="value">{{ stats.hojas_procesadas }}</span>
-            <span class="label">Procesadas</span>
+
+        <div class="stat-card stat-card-2">
+            <div class="stat-content">
+                <div class="stat-icon">📄</div>
+                <div class="stat-info">
+                    <span class="value">{{ stats.hojas_procesadas }}</span>
+                    <span class="label">Procesadas</span>
+                </div>
+            </div>
         </div>
-        <div class="stat-mini">
-            <span class="value">{{ stats.respuestas_correctas }}</span>
-            <span class="label">Gabarito</span>
+
+        <div class="stat-card stat-card-3">
+            <div class="stat-content">
+                <div class="stat-icon">✅</div>
+                <div class="stat-info">
+                    <span class="value">{{ stats.respuestas_correctas }}</span>
+                    <span class="label">Gabarito</span>
+                </div>
+            </div>
         </div>
-        <div class="stat-mini">
-            <span class="value">{{ stats.calificados }}</span>
-            <span class="label">Calificados</span>
+
+        <div class="stat-card stat-card-4">
+            <div class="stat-content">
+                <div class="stat-icon">🎯</div>
+                <div class="stat-info">
+                    <span class="value">{{ stats.calificados }}</span>
+                    <span class="label">Calificados</span>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Proceso principal -->
+    <!-- Proceso Grid 2x2 -->
     <div class="process-section">
         <h2 class="section-title">Proceso de Evaluación</h2>
         
         <div class="process-grid">
-            <!-- Paso 1 -->
-            <a href="/generar-hojas" class="process-card">
+            <a href="/generar-hojas" class="process-card card-1">
                 <div class="process-number">1</div>
-                <h3>Generar Hojas de Respuestas</h3>
-                <p>Genera hojas personalizadas con códigos alfanuméricos únicos para cada postulante o por aula/profesor.</p>
-                <span class="process-status status-ready">Disponible</span>
+                <h3>Generar Hojas</h3>
+                <p>Crea hojas con códigos únicos</p>
+                <span class="process-status status-ready">✓ Listo</span>
             </a>
 
-            <!-- Paso 2 -->
-            <a href="/capturar-hojas" class="process-card">
+            <a href="/capturar-hojas" class="process-card card-2">
                 <div class="process-number">2</div>
                 <h3>Capturar Exámenes</h3>
-                <p>Usa la cámara para capturar y procesar automáticamente las hojas de respuestas con IA de visión.</p>
-                <span class="process-status status-pending">En desarrollo</span>
+                <p>Procesa con IA de visión</p>
+                <span class="process-status status-pending">⚡ Activo</span>
             </a>
 
-            <!-- Paso 3 -->
-            <a href="/registrar-gabarito" class="process-card">
+            <a href="/registrar-gabarito" class="process-card card-3">
                 <div class="process-number">3</div>
                 <h3>Registrar Gabarito</h3>
-                <p>Ingresa o captura las respuestas correctas del examen para iniciar la calificación automática.</p>
-                <span class="process-status status-pending">En desarrollo</span>
+                <p>Ingresa respuestas correctas</p>
+                <span class="process-status status-pending">⚡ Activo</span>
             </a>
 
-            <!-- Paso 4 -->
-            <a href="/resultados" class="process-card">
+            <a href="#" onclick="mostrarEnDesarrollo(); return false;" class="process-card card-4">
                 <div class="process-number">4</div>
                 <h3>Ver Resultados</h3>
-                <p>Consulta el ranking completo de postulantes con notas, estadísticas y análisis detallados.</p>
-                <span class="process-status status-pending">Próximamente</span>
+                <p>Ranking con estadísticas</p>
+                <span class="process-status status-pending">🔜 Próximo</span>
             </a>
         </div>
     </div>
 
-    <!-- Sección de medios -->
-    <div class="media-section">
-        <h2 class="section-title">Demostración del Sistema</h2>
+    <!-- 4 Videos Grid 2x2 -->
+    <div class="videos-section">
+        <h2 class="section-title">🎬 Tutoriales del Sistema</h2>
         
-        <div class="media-grid">
-            <!-- Video -->
-            <div class="media-card">
-                <div class="media-placeholder">
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <polygon points="5 3 19 12 5 21 5 3"/>
-                    </svg>
-                </div>
-                <div class="media-content">
-                    <h4>Video Tutorial</h4>
-                    <p>Aprende a usar el sistema paso a paso</p>
-                </div>
-            </div>
-
-            <!-- Screenshot 1 -->
-            <div class="media-card">
-                <div class="media-placeholder">
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                        <polyline points="21 15 16 10 5 21"/>
-                    </svg>
-                </div>
-                <div class="media-content">
-                    <h4>Captura de Hojas</h4>
-                    <p>Proceso de captura con cámara</p>
+        <div class="videos-grid">
+            <!-- Video 1 -->
+            <div class="video-card video-1">
+                <video class="video-player" controls>
+                    <source src="/static/vid/presentacion.mp4" type="video/mp4">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                <div class="video-info">
+                    <h4>Testimonio Instiucional</h4>
+                    <p>Presentación</p>
+                    <span class="video-duration">⏱ 8s</span>
                 </div>
             </div>
 
-            <!-- Screenshot 2 -->
-            <div class="media-card">
-                <div class="media-placeholder">
-                    <svg width="80" height="80" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                        <polyline points="14 2 14 8 20 8"/>
-                        <line x1="16" y1="13" x2="8" y2="13"/>
-                        <line x1="16" y1="17" x2="8" y2="17"/>
-                        <polyline points="10 9 9 9 8 9"/>
-                    </svg>
+            <!-- Video 2 -->
+            <div class="video-card video-2">
+                <video class="video-player" controls>
+                    <source src="/static/vid/paso-1.mp4" type="video/mp4">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                <div class="video-info">
+                    <h4>Generar Hojas PDF</h4>
+                    <p>Pre-procesamiento de imágenes</p>
+                    <span class="video-duration">⏱ 8s</span>
                 </div>
-                <div class="media-content">
-                    <h4>Resultados</h4>
-                    <p>Vista del ranking de postulantes</p>
+            </div>
+
+            <!-- Video 3 -->
+            <div class="video-card video-3">
+                <video class="video-player" controls>
+                    <source src="/static/vid/paso-2.mp4" type="video/mp4">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                <div class="video-info">
+                    <h4>Captura con I.A.</h4>
+                    <p>Calificación</p>
+                    <span class="video-duration">⏱ 8s</span>
+                </div>
+            </div>
+
+            <!-- Video 4 - Testimonio -->
+            <div class="video-card video-4">
+                <video class="video-player" controls>
+                    <source src="/static/vid/paso-3.mp4" type="video/mp4">
+                    Tu navegador no soporta el elemento de video.
+                </video>
+                <div class="video-info">
+                    <h4>Ver Ranking</h4>
+                    <p>Transparencia con IA</p>
+                    <span class="video-duration">⏱ 8s</span>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<!-- Modal En Desarrollo -->
+<div class="modal-overlay" id="modalDesarrollo">
+    <div class="modal-content">
+        <h3>🚧 En Desarrollo</h3>
+        <p>Esta funcionalidad estará disponible próximamente.</p>
+        <button class="modal-close" onclick="cerrarModal()">Entendido</button>
+    </div>
+</div>
+
+<script>
+function mostrarEnDesarrollo() {
+    document.getElementById('modalDesarrollo').classList.add('active');
+}
+
+function cerrarModal() {
+    document.getElementById('modalDesarrollo').classList.remove('active');
+}
+
+// Cerrar modal al hacer clic fuera
+document.getElementById('modalDesarrollo').addEventListener('click', function(e) {
+    if (e.target === this) {
+        cerrarModal();
+    }
+});
+</script>
 {% endblock %}
