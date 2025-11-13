@@ -256,17 +256,17 @@ async def procesar_con_api_seleccionada(imagen_path: str, api_preferida: str = N
         Dict con resultado
     """
     if not api_preferida:
-        api_preferida = "anthropic"
+        api_preferida = "openai"  # ← CAMBIO: OpenAI por defecto
     
     # Orden de prioridad
-    if api_preferida == "anthropic":
+    if api_preferida == "openai":
+        apis_orden = ["openai", "anthropic", "google"]  # ← OpenAI primero
+    elif api_preferida == "anthropic":
         apis_orden = ["anthropic", "google", "openai"]
     elif api_preferida == "google":
         apis_orden = ["google", "anthropic", "openai"]
-    elif api_preferida == "openai":
-        apis_orden = ["openai", "anthropic", "google"]
     else:
-        apis_orden = ["anthropic", "google", "openai"]
+        apis_orden = ["openai", "anthropic", "google"]  # ← Por defecto OpenAI
     
     ultimo_error = None
     
