@@ -6,7 +6,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.pdfgen import canvas
 from reportlab.lib import colors
 from datetime import datetime
-
+import pytz
 
 def generar_hoja_respuestas_pdf(
     output_path: str,
@@ -187,9 +187,11 @@ def generar_hoja_respuestas_pdf(
     c.line(x_start + 70, y - 2, x_start + 190, y - 2)  # Línea más larga
     
     # FECHA-HORA REAL DE IMPRESIÓN
-    fecha_hora_actual = datetime.now().strftime("%d/%m/%Y %H:%M")
+    peru_tz = pytz.timezone('America/Lima')
+    fecha_hora_peru = datetime.now(peru_tz).strftime("%d/%m/%Y %H:%M")
+    
     fecha_x = x_start + content_width - 110
-    c.drawString(fecha_x, y, f"Fecha: {fecha_hora_actual}")
+    c.drawString(fecha_x, y, f"Fecha: {fecha_hora_peru}")
     
     # ------------------------------------------------------------------------
     # GUARDAR
