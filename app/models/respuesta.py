@@ -1,77 +1,86 @@
-"""
-Modelo de Respuesta Individual
-Almacena cada respuesta detectada (1-100) de cada postulante
-"""
+# ============================================================================
+# MODELOS SQLALCHEMY - TABLA RESPUESTAS CON CLASIFICACIÓN GRANULAR
+# Agregar a app/models.py
+# ============================================================================
 
-from sqlalchemy import Column, Integer, String, Boolean, Float, ForeignKey
+from sqlalchemy import Column, Integer, String, Boolean, Numeric, ForeignKey, DateTime, Text
 from sqlalchemy.orm import relationship
-
+from datetime import datetime
 from app.database import Base
-
 
 class Respuesta(Base):
     """
-    Modelo de Respuesta Individual
+    Modelo para almacenar cada respuesta individual de una hoja.
     
-    Cada hoja de respuestas tiene 100 registros de este modelo
-    Uno por cada pregunta del examen
+    CAMPOS PRINCIPALES:
+    - respuesta_marcada: A, B, C, D, E, VACIO, LETRA_INVALIDA, GARABATO, MULTIPLE, ILEGIBLE
+    - es_correcta: TRUE solo si respuesta_marcada in (A,B,C,D,E) Y coincide con gabarito
+    - confianza: 0.0-1.0 para respuestas válidas, NULL para otros casos
     """
     
     __tablename__ = "respuestas"
     
-    # Campos principales
     id = Column(Integer, primary_key=True, index=True)
     hoja_respuesta_id = Column(Integer, ForeignKey("hojas_respuestas.id"), nullable=False, index=True)
-    
-    # Pregunta y respuesta
     numero_pregunta = Column(Integer, nullable=False)  # 1-100
-    respuesta_marcada = Column(String(1), nullable=True)  # A, B, C, D, E, o null si está en blanco
     
-    # Confianza del reconocimiento (0-1)
-    confianza = Column(Float, nullable=True, default=1.0)
+    # VALORES POSIBLES:
+    # 'A', 'B', 'C', 'D', 'E'           → Respuestas válidas (calificables)
+    # 'VACIO'                            → Casilla sin marcar
+    # 'LETRA_INVALIDA'                   → Letra fuera de A-E (F, G, etc.)
+    # 'GARABATO'                         → Símbolos, borrones, trazos
+    # 'MULTIPLE'                         → Marcó 2+ opciones
+    # 'ILEGIBLE'                         → Marca presente pero no reconocible
+    respuesta_marcada = Column(String(20), nullable=False)
     
-    # Validación
-    es_correcta = Column(Boolean, nullable=True)  # Se llena después de calificar
-    marcada_revision = Column(Boolean, default=False)  # Si requiere revisión manual
+    # TRUE/1: Solo si respuesta_marcada in ('A','B','C','D','E') Y coincide con gabarito
+    # FALSE/0: Cualquier otro caso
+    es_correcta = Column(Boolean, nullable=False, default=False)
     
-    # Información adicional (opcional)
-    respuesta_alternativa = Column(String(1), nullable=True)  # Si la API detectó múltiples marcas
+    # Nivel de confianza de la detección (0.0-1.0)
+    # NULL para respuestas no válidas (VACIO, LETRA_INVALIDA, etc.)
+    confianza = Column(Numeric(3, 2), nullable=True)
     
-    # Relaciones
+    # Lo que detectó la API sin procesar (para debugging)
+    respuesta_raw = Column(String(50), nullable=True)
+    
+    # Observaciones adicionales (ej: "Detectada letra F", "Marca borrosa")
+    observacion = Column(Text, nullable=True)
+    
+    # Flag para revisión manual
+    requiere_revision = Column(Boolean, default=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relación con hoja de respuestas
     hoja_respuesta = relationship("HojaRespuesta", back_populates="respuestas")
     
     def __repr__(self):
-        return f"<Respuesta(pregunta={self.numero_pregunta}, respuesta={self.respuesta})>"
+        return f"<Respuesta #{self.numero_pregunta}: {self.respuesta_marcada} (correcta={self.es_correcta})>"
     
-    @property
-    def respuesta_display(self) -> str:
-        """Retorna la respuesta en formato amigable"""
-        if self.respuesta is None:
-            return "EN BLANCO"
-        elif self.respuesta == "?":
-            return "NO LEGIBLE"
-        else:
-            return self.respuesta
-    
-    @property
-    def estado_validacion(self) -> str:
-        """Retorna el estado de validación"""
-        if self.es_correcta is None:
-            return "pendiente"
-        elif self.es_correcta:
-            return "correcta"
-        else:
-            return "incorrecta"
-    
-    def to_dict(self) -> dict:
-        """Convierte el modelo a diccionario"""
+    def to_dict(self):
+        """Convierte a diccionario para serialización JSON."""
         return {
             "id": self.id,
+            "hoja_respuesta_id": self.hoja_respuesta_id,
             "numero_pregunta": self.numero_pregunta,
-            "respuesta": self.respuesta_marcada,
-            "respuesta_display": self.respuesta_display,
-            "confianza": self.confianza,
+            "respuesta_marcada": self.respuesta_marcada,
             "es_correcta": self.es_correcta,
-            "marcada_revision": self.marcada_revision,
-            "estado": self.estado_validacion
+            "confianza": float(self.confianza) if self.confianza else None,
+            "respuesta_raw": self.respuesta_raw,
+            "observacion": self.observacion,
+            "requiere_revision": self.requiere_revision
         }
+    
+    @property
+    def es_valida(self):
+        """Retorna True si la respuesta es A, B, C, D o E."""
+        return self.respuesta_marcada in ['A', 'B', 'C', 'D', 'E']
+    
+    @property
+    def tipo_problema(self):
+        """Retorna el tipo de problema si no es válida."""
+        if self.es_valida:
+            return None
+        return self.respuesta_marcada  # VACIO, LETRA_INVALIDA, etc.

@@ -78,7 +78,7 @@ class HojaRespuesta(Base):
     # Relaciones
     postulante = relationship("Postulante", back_populates="hojas_respuestas")
     respuestas = relationship("Respuesta", back_populates="hoja_respuesta", cascade="all, delete-orphan")
-    
+        
     def __repr__(self):
         return f"<HojaRespuesta(id={self.id}, codigo_hoja='{self.codigo_hoja}', postulante_id={self.postulante_id}, estado='{self.estado}')>"
     
