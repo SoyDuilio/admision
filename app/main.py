@@ -4,11 +4,13 @@ main.py LIMPIO Y MODULARIZADO
 """
 
 from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi.responses import StreamingResponse, JSONResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import func
+from sqlalchemy.exc import DataError, IntegrityError
+from sqlalchemy.orm import Session
 from typing import Optional, List
 from io import BytesIO
 import zipfile
@@ -673,7 +675,7 @@ async def procesar_hoja_completa(
         else:
             nota_final = None
             correctas_count = None
-            estado_hoja = "pendiente_calificacion"
+            estado_hoja = "pendiente_calificar"
             mensajes.append("⏳ Pendiente de calificación")
         
         # 9. Actualizar BD
@@ -729,13 +731,67 @@ async def procesar_hoja_completa(
         
         return response_data
         
-    except HTTPException:
-        raise
+    except HTTPException as he:
+        # Error HTTP controlado
+        return JSONResponse(
+            status_code=he.status_code,
+            content={
+                "success": False,
+                "error": {
+                    "titulo": ERRORES_AMIGABLES.get(str(he.status_code), {}).get("titulo", "Error"),
+                    "mensaje": he.detail,
+                    "icono": ERRORES_AMIGABLES.get(str(he.status_code), {}).get("icono", "⚠️"),
+                    "tipo": "http_error"
+                }
+            }
+        )
     except Exception as e:
         db.rollback()
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+    
+    except DataError as de:
+        # Error de base de datos
+        db.rollback()
+        error_info = ERRORES_AMIGABLES.get("StringDataRightTruncation", {})
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "titulo": error_info.get("titulo", "Error de Datos"),
+                    "mensaje": "Algunos datos exceden el límite permitido. Contacta al administrador del sistema.",
+                    "icono": error_info.get("icono", "⚠️"),
+                    "tipo": "database_error",
+                    "detalles_tecnicos": str(de) if os.getenv("DEBUG") else None
+                }
+            }
+        )
+    
+
+    except Exception as e:
+        # Error genérico
+        db.rollback()
+        import traceback
+        traceback.print_exc()
+        
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success": False,
+                "error": {
+                    "titulo": "Error Inesperado",
+                    "mensaje": "Ocurrió un error al procesar la hoja. Por favor intenta nuevamente.",
+                    "icono": "❌",
+                    "tipo": "unknown_error",
+                    "detalles_tecnicos": str(e) if os.getenv("DEBUG") else None
+                }
+            }
+        )
+
+
     finally:
         db.close()
 
@@ -820,7 +876,7 @@ async def calificar_hojas_pendientes(proceso_admision: str = "2025-2"):
         
         # Obtener pendientes
         hojas_pendientes = db.query(HojaRespuesta).filter_by(
-            estado="pendiente_calificacion",
+            estado="pendiente_calificar",
             proceso_admision=proceso_admision
         ).all()
         
@@ -1042,6 +1098,45 @@ async def verificar_datos_generacion():
         }
     finally:
         db.close()
+
+
+# ============================================================================
+# AGREGAR EN main.py - Manejo de errores amigable
+# ============================================================================
+
+# Diccionario de errores traducidos
+ERRORES_AMIGABLES = {
+    "404": {
+        "titulo": "Hoja No Encontrada",
+        "mensaje": "El código de hoja no existe en el sistema. Verifica que la hoja esté registrada.",
+        "icono": "🔍",
+        "color": "#ef4444"
+    },
+    "StringDataRightTruncation": {
+        "titulo": "Error de Datos",
+        "mensaje": "Algunos datos son demasiado largos para guardar. Contacta al administrador.",
+        "icono": "⚠️",
+        "color": "#f59e0b"
+    },
+    "no_gabarito": {
+        "titulo": "Sin Gabarito",
+        "mensaje": "Hoja procesada correctamente. Será calificada cuando se registre el gabarito.",
+        "icono": "⏳",
+        "color": "#3b82f6"
+    },
+    "gps_required": {
+        "titulo": "GPS Requerido",
+        "mensaje": "Debes activar la ubicación para capturar hojas. Es un requisito de seguridad.",
+        "icono": "📍",
+        "color": "#ef4444"
+    },
+    "all_apis_failed": {
+        "titulo": "Error de Procesamiento",
+        "mensaje": "No se pudo procesar la imagen. Intenta con mejor iluminación o ángulo.",
+        "icono": "❌",
+        "color": "#ef4444"
+    }
+}
 
 # ============================================================================
 # PUNTO DE ENTRADA
