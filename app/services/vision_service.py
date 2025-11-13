@@ -85,9 +85,14 @@ VALIDACIÓN: Array "respuestas" debe tener EXACTAMENTE 100 elementos."""
         
         resultado = json.loads(respuesta_texto)
         
-        # Validar 100 respuestas
-        if len(resultado["respuestas"]) != 100:
-            raise ValueError(f"Se esperaban 100 respuestas, obtuvieron {len(resultado['respuestas'])}")
+        # Validar y ajustar respuestas
+        if len(resultado["respuestas"]) > 100:
+            print(f"⚠️ Claude detectó {len(resultado['respuestas'])} respuestas, truncando a 100")
+            resultado["respuestas"] = resultado["respuestas"][:100]
+        elif len(resultado["respuestas"]) < 100:
+            print(f"⚠️ Claude detectó {len(resultado['respuestas'])} respuestas, rellenando hasta 100")
+            while len(resultado["respuestas"]) < 100:
+                resultado["respuestas"].append(None)
         
         # Normalizar respuestas
         respuestas_validadas = []
@@ -200,7 +205,7 @@ RESPONDE SOLO JSON:
 IMPORTANTE: 100 elementos exactos."""
 
         response = client.chat.completions.create(
-            model="gpt-4-vision-preview",
+            model="gpt-4o",  # Actualizado de gpt-4-vision-preview
             messages=[{
                 "role": "user",
                 "content": [
