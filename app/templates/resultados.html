@@ -1,309 +1,596 @@
 {% extends "base.html" %}
 
-{% block title %}Resultados - Postulando{% endblock %}
+{% block title %}Resultados - POSTULANDO{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-blue: #3b82f6;
+        --secondary-purple: #8b5cf6;
+        --accent-green: #10b981;
+        --accent-orange: #f59e0b;
+        --accent-red: #ef4444;
+        --bg-dark: #0f172a;
+        --bg-card: rgba(255, 255, 255, 0.03);
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+        --border: rgba(255, 255, 255, 0.1);
+    }
+
+    body {
+        background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
+        min-height: 100vh;
+        color: var(--text-light);
+    }
+
+    .container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    /* Header */
+    .page-header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .page-header h1 {
+        font-size: 2.5rem;
+        font-weight: 800;
+        background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 50%, #ec4899 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        margin-bottom: 8px;
+    }
+
+    .page-header p {
+        color: var(--text-muted);
+        font-size: 1rem;
+    }
+
+    /* Stats Overview */
+    .stats-overview {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        border: 2px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        text-align: center;
+        transition: all 0.3s ease;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .stat-card::before {
+        content: '';
+        position: absolute;
+        top: -2px;
+        left: -2px;
+        right: -2px;
+        bottom: -2px;
+        background: var(--gradient);
+        border-radius: 16px;
+        z-index: -1;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover::before {
+        opacity: 1;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+    }
+
+    .stat-card-1 { --gradient: linear-gradient(135deg, #3b82f6, #2563eb); }
+    .stat-card-2 { --gradient: linear-gradient(135deg, #8b5cf6, #7c3aed); }
+    .stat-card-3 { --gradient: linear-gradient(135deg, #10b981, #059669); }
+    .stat-card-4 { --gradient: linear-gradient(135deg, #f59e0b, #d97706); }
+
+    .stat-icon {
+        font-size: 2.5rem;
+        margin-bottom: 12px;
+    }
+
+    .stat-value {
+        font-size: 2.5rem;
+        font-weight: 800;
+        color: var(--text-light);
+        line-height: 1;
+    }
+
+    .stat-label {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-top: 8px;
+    }
+
+    /* Filtros */
+    .filters {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 30px;
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        align-items: center;
+    }
+
+    .filter-group {
+        flex: 1;
+        min-width: 200px;
+    }
+
+    .filter-group label {
+        display: block;
+        font-size: 0.875rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+        font-weight: 600;
+    }
+
+    .filter-input {
+        width: 100%;
+        padding: 12px 16px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 2px solid var(--border);
+        border-radius: 10px;
+        color: var(--text-light);
+        font-size: 0.9375rem;
+        transition: all 0.3s ease;
+    }
+
+    .filter-input:focus {
+        outline: none;
+        border-color: var(--primary-blue);
+        background: rgba(0, 0, 0, 0.5);
+    }
+
+    .btn-filter {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, var(--primary-blue), var(--secondary-purple));
+        border: none;
+        border-radius: 10px;
+        color: white;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        align-self: flex-end;
+    }
+
+    .btn-filter:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+    }
+
+    .btn-export {
+        padding: 12px 24px;
+        background: rgba(16, 185, 129, 0.1);
+        border: 2px solid var(--accent-green);
+        border-radius: 10px;
+        color: var(--accent-green);
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        align-self: flex-end;
+    }
+
+    .btn-export:hover {
+        background: var(--accent-green);
+        color: white;
+    }
+
+    /* Tabla de Resultados */
+    .results-table {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+    }
+
+    .table-header {
+        background: rgba(59, 130, 246, 0.1);
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .table-header h3 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--text-light);
+    }
+
+    table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+
+    thead {
+        background: rgba(0, 0, 0, 0.3);
+    }
+
+    th {
+        padding: 16px;
+        text-align: left;
+        font-size: 0.8125rem;
+        font-weight: 700;
+        color: var(--text-muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr {
+        border-bottom: 1px solid var(--border);
+        transition: all 0.2s ease;
+    }
+
+    tbody tr:hover {
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    td {
+        padding: 20px 16px;
+        font-size: 0.9375rem;
+        color: var(--text-light);
+    }
+
+    /* Badges de estado */
+    .badge {
+        display: inline-block;
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-size: 0.75rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+    }
+
+    .badge-success {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--accent-green);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .badge-warning {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--accent-orange);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .badge-danger {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--accent-red);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    /* Mini stats en tabla */
+    .mini-stats {
+        display: flex;
+        gap: 16px;
+        font-size: 0.875rem;
+    }
+
+    .mini-stat {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .mini-stat-icon {
+        font-size: 1rem;
+    }
+
+    .mini-stat-value {
+        font-weight: 700;
+        color: var(--text-light);
+    }
+
+    .stat-ok { 
+        background: rgba(16, 185, 129, 0.15);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .stat-ok .mini-stat-value { color: #10b981; }
+    
+    .stat-empty { 
+        background: rgba(148, 163, 184, 0.15);
+        border: 1px solid rgba(148, 163, 184, 0.3);
+    }
+    .stat-empty .mini-stat-value { color: #94a3b8; }
+    
+    .stat-invalid { 
+        background: rgba(245, 158, 11, 0.15);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+    .stat-invalid .mini-stat-value { color: #f59e0b; }
+
+    /* Botones de acción */
+    .action-buttons {
+        display: flex;
+        gap: 8px;
+    }
+
+    .btn-action {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        border: none;
+        text-decoration: none;
+    }
+
+    .btn-view {
+        background: rgba(59, 130, 246, 0.1);
+        color: var(--primary-blue);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .btn-view:hover {
+        background: var(--primary-blue);
+        color: white;
+    }
+
+    .btn-download {
+        background: rgba(139, 92, 246, 0.1);
+        color: var(--secondary-purple);
+        border: 1px solid rgba(139, 92, 246, 0.3);
+    }
+
+    .btn-download:hover {
+        background: var(--secondary-purple);
+        color: white;
+    }
+
+    /* Empty state */
+    .empty-state {
+        text-align: center;
+        padding: 80px 20px;
+    }
+
+    .empty-state-icon {
+        font-size: 4rem;
+        margin-bottom: 20px;
+        opacity: 0.5;
+    }
+
+    .empty-state h3 {
+        font-size: 1.5rem;
+        color: var(--text-light);
+        margin-bottom: 12px;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+        margin-bottom: 24px;
+    }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .stats-overview {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .filters {
+            flex-direction: column;
+        }
+
+        .filter-group {
+            width: 100%;
+        }
+
+        table {
+            font-size: 0.875rem;
+        }
+
+        th, td {
+            padding: 12px 8px;
+        }
+
+        .action-buttons {
+            flex-direction: column;
+        }
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="header">
-    <h1>📊 RESULTADOS DEL EXAMEN</h1>
-    <p>Ranking de Postulantes</p>
-</div>
+<div class="container">
+    <!-- Header -->
+    <div class="page-header">
+        <h1>📊 Resultados del Proceso</h1>
+        <p>Hojas procesadas y estadísticas detalladas</p>
+    </div>
 
-<div class="card">
-    <!-- Estadísticas Generales -->
-    <div class="stats-grid mb-4">
-        <div class="stat-card">
-            <div class="stat-value">{{ total_postulantes }}</div>
-            <div class="stat-label">Total Postulantes</div>
+    <!-- Stats Overview -->
+    <div class="stats-overview">
+        <div class="stat-card stat-card-1">
+            <div class="stat-icon">📄</div>
+            <div class="stat-value" id="totalHojas">{{ total_hojas }}</div>
+            <div class="stat-label">Hojas Procesadas</div>
         </div>
-        
-        <div class="stat-card" style="background: linear-gradient(135deg, #10b981, #059669);">
-            <div class="stat-value">{{ examenes_calificados }}</div>
-            <div class="stat-label">Exámenes Calificados</div>
+
+        <div class="stat-card stat-card-2">
+            <div class="stat-icon">✅</div>
+            <div class="stat-value" id="totalValidas">{{ total_validas }}</div>
+            <div class="stat-label">Respuestas Válidas</div>
         </div>
-        
-        <div class="stat-card" style="background: linear-gradient(135deg, #2563eb, #1e40af);">
-            <div class="stat-value">{{ nota_promedio }}</div>
-            <div class="stat-label">Nota Promedio</div>
+
+        <div class="stat-card stat-card-3">
+            <div class="stat-icon">⚪</div>
+            <div class="stat-value" id="totalVacias">{{ total_vacias }}</div>
+            <div class="stat-label">Respuestas Vacías</div>
         </div>
-        
-        <div class="stat-card" style="background: linear-gradient(135deg, #f59e0b, #d97706);">
-            <div class="stat-value">{{ aprobados }}</div>
-            <div class="stat-label">Aprobados (≥60)</div>
+
+        <div class="stat-card stat-card-4">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value" id="totalProblematicas">{{ total_problematicas }}</div>
+            <div class="stat-label">Requieren Revisión</div>
         </div>
     </div>
-    
+
     <!-- Filtros -->
-    <div style="display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center;">
-        <div class="form-group" style="margin-bottom: 0; flex: 1; min-width: 200px;">
-            <input type="text" 
-                   id="search-input" 
-                   class="form-control" 
-                   placeholder="🔍 Buscar por DNI o nombre..."
-                   onkeyup="filtrarTabla()">
+    <div class="filters">
+        <div class="filter-group">
+            <label for="searchCodigo">🔍 Buscar por Código</label>
+            <input type="text" id="searchCodigo" class="filter-input" placeholder="Ej: 1Q325246S">
         </div>
-        
-        <div class="form-group" style="margin-bottom: 0;">
-            <select id="filter-estado" class="form-control" onchange="filtrarTabla()">
-                <option value="">Todos los estados</option>
-                <option value="calificado">Calificados</option>
-                <option value="pendiente">Pendientes</option>
+
+        <div class="filter-group">
+            <label for="filterEstado">Estado</label>
+            <select id="filterEstado" class="filter-input">
+                <option value="">Todos</option>
+                <option value="procesado">Procesado</option>
+                <option value="calificado">Calificado</option>
+                <option value="pendiente">Pendiente</option>
             </select>
         </div>
-        
-        <button onclick="window.location.reload()" class="btn btn-primary">
-            🔄 Actualizar
+
+        <div class="filter-group">
+            <label for="filterAPI">API Utilizada</label>
+            <select id="filterAPI" class="filter-input">
+                <option value="">Todas</option>
+                <option value="google">Google Vision</option>
+                <option value="openai">OpenAI</option>
+                <option value="anthropic">Anthropic Claude</option>
+            </select>
+        </div>
+
+        <button class="btn-filter" onclick="aplicarFiltros()">
+            🔍 Filtrar
         </button>
-        
-        <button onclick="exportarCSV()" class="btn btn-success">
-            📥 Exportar CSV
+
+        <button class="btn-export" onclick="exportarExcel()">
+            📥 Exportar Excel
         </button>
     </div>
-    
+
     <!-- Tabla de Resultados -->
-    <div style="overflow-x: auto;">
-        <table class="results-table" id="tabla-resultados">
+    <div class="results-table">
+        <div class="table-header">
+            <h3>Hojas Registradas</h3>
+            <span style="color: var(--text-muted); font-size: 0.875rem;">
+                Mostrando {{ hojas|length }} de {{ total_hojas }} hojas
+            </span>
+        </div>
+
+        {% if hojas %}
+        <table>
             <thead>
                 <tr>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(0)">
-                        # <span id="sort-0">↕️</span>
-                    </th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(1)">
-                        DNI <span id="sort-1">↕️</span>
-                    </th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(2)">
-                        Nombre Completo <span id="sort-2">↕️</span>
-                    </th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(3)">
-                        Programa <span id="sort-3">↕️</span>
-                    </th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(4)">
-                        Nota <span id="sort-4">↕️</span>
-                    </th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(5)">
-                        Correctas <span id="sort-5">↕️</span>
-                    </th>
-                    <th>Estado</th>
-                    <th style="cursor: pointer;" onclick="ordenarTabla(7)">
-                        Fecha <span id="sort-7">↕️</span>
-                    </th>
+                    <th>Código Hoja</th>
+                    <th>DNI Postulante</th>
+                    <th>Código Aula</th>
+                    <th>Estadísticas</th>
+                    <th>API</th>
+                    <th>Tiempo</th>
+                    <th>Fecha</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
-                {% for postulante in postulantes %}
-                <tr data-estado="{{ postulante.estado }}">
-                    <td style="font-weight: 700;">{{ postulante.ranking }}</td>
-                    <td>{{ postulante.dni }}</td>
-                    <td style="font-weight: 600;">{{ postulante.nombre_completo }}</td>
-                    <td>{{ postulante.programa_educativo }}</td>
+                {% for hoja in hojas %}
+                <tr>
+                    <td style="color:#94a3b8;">
+                        <strong>{{ hoja.codigo_hoja }}</strong>
+                    </td>
+                    <td style="color:#94a3b8;">{{ hoja.dni_postulante or '—' }}</td>
+                    <td style="color:#94a3b8;">{{ hoja.codigo_aula or '—' }}</td>
                     <td>
-                        {% if postulante.nota is not none %}
-                            <span style="font-size: 1.2rem; font-weight: 700; color: {{ 'var(--success)' if postulante.nota >= 60 else 'var(--danger)' }};">
-                                {{ postulante.nota }}
-                            </span>
-                        {% else %}
-                            <span style="color: #9ca3af;">-</span>
-                        {% endif %}
+                        <div class="mini-stats">
+                            <div class="mini-stat stat-ok">
+                                <span class="mini-stat-icon">✅</span>
+                                <span class="mini-stat-value">{{ hoja.stats.validas }}</span>
+                            </div>
+                            <div class="mini-stat stat-empty">
+                                <span class="mini-stat-icon">⚪</span>
+                                <span class="mini-stat-value">{{ hoja.stats.vacias }}</span>
+                            </div>
+                            <div class="mini-stat stat-invalid">
+                                <span class="mini-stat-icon">⚠️</span>
+                                <span class="mini-stat-value">{{ hoja.stats.problematicas }}</span>
+                            </div>
+                        </div>
                     </td>
                     <td>
-                        {% if postulante.respuestas_correctas is not none %}
-                            {{ postulante.respuestas_correctas }}/100
-                        {% else %}
-                            <span style="color: #9ca3af;">-</span>
-                        {% endif %}
+                        <span class="badge badge-success">{{ hoja.api_utilizada|upper }}</span>
                     </td>
+                    <td style="color:#94a3b8;">{{ hoja.tiempo_procesamiento|round(2) }}s</td>
+                    <td style="color:#94a3b8;">{{ hoja.fecha_captura.strftime('%d/%m/%Y %H:%M') }}</td>
                     <td>
-                        {% if postulante.estado == 'calificado' %}
-                            <span class="badge badge-success">✅ Calificado</span>
-                        {% else %}
-                            <span class="badge badge-pending">⏳ Pendiente</span>
-                        {% endif %}
-                    </td>
-                    <td style="font-size: 0.875rem; color: #6b7280;">
-                        {% if postulante.fecha_examen %}
-                            {{ postulante.fecha_examen }}
-                        {% else %}
-                            <span style="color: #9ca3af;">-</span>
-                        {% endif %}
+                        <div class="action-buttons">
+                            <a href="/hoja/{{ hoja.id }}/detalle" 
+                               class="btn-action btn-view"
+                               title="Ver detalle de las 100 respuestas">
+                                👁️ Ver Detalle
+                            </a>
+                            <a href="/hoja/{{ hoja.id }}/pdf" 
+                               class="btn-action btn-download"
+                               title="Descargar reporte en PDF">
+                                📥 Reporte
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <h3>No hay hojas procesadas</h3>
+            <p>Las hojas capturadas aparecerán aquí</p>
+            <a href="/capturar-hojas" class="btn-filter">
+                📸 Ir a Capturar
+            </a>
+        </div>
+        {% endif %}
     </div>
-    
-    {% if not postulantes %}
-    <div style="text-align: center; padding: 3rem; color: #6b7280;">
-        <div style="font-size: 4rem; margin-bottom: 1rem;">📭</div>
-        <h3>No hay resultados disponibles</h3>
-        <p style="margin-top: 0.5rem;">Aún no se han capturado exámenes</p>
-        <a href="/demo" class="btn btn-primary" style="margin-top: 1.5rem;">
-            🚀 Ir a la Demo
-        </a>
-    </div>
-    {% endif %}
-</div>
-
-<div style="text-align: center; margin-top: 2rem;">
-    <a href="/" class="btn btn-primary">
-        🏠 Volver al Inicio
-    </a>
-    <a href="/demo" class="btn btn-success" style="margin-left: 1rem;">
-        📸 Capturar Más Exámenes
-    </a>
 </div>
 
 <script>
-// ==============================================
-// FILTRADO DE TABLA
-// ==============================================
-
-function filtrarTabla() {
-    const searchInput = document.getElementById('search-input').value.toLowerCase();
-    const filterEstado = document.getElementById('filter-estado').value;
-    const tabla = document.getElementById('tabla-resultados');
-    const filas = tabla.getElementsByTagName('tbody')[0].getElementsByTagName('tr');
+function aplicarFiltros() {
+    const codigo = document.getElementById('searchCodigo').value;
+    const estado = document.getElementById('filterEstado').value;
+    const api = document.getElementById('filterAPI').value;
     
-    let visibles = 0;
+    const params = new URLSearchParams();
+    if (codigo) params.append('codigo', codigo);
+    if (estado) params.append('estado', estado);
+    if (api) params.append('api', api);
     
-    for (let i = 0; i < filas.length; i++) {
-        const fila = filas[i];
-        const dni = fila.cells[1].textContent.toLowerCase();
-        const nombre = fila.cells[2].textContent.toLowerCase();
-        const estado = fila.getAttribute('data-estado');
-        
-        const matchBusqueda = dni.includes(searchInput) || nombre.includes(searchInput);
-        const matchEstado = !filterEstado || estado === filterEstado;
-        
-        if (matchBusqueda && matchEstado) {
-            fila.style.display = '';
-            visibles++;
-        } else {
-            fila.style.display = 'none';
-        }
-    }
-    
-    // Renumerar rankings visibles
-    let ranking = 1;
-    for (let i = 0; i < filas.length; i++) {
-        if (filas[i].style.display !== 'none') {
-            filas[i].cells[0].textContent = ranking++;
-        }
-    }
+    window.location.href = '/resultados?' + params.toString();
 }
 
-// ==============================================
-// ORDENAMIENTO DE TABLA
-// ==============================================
-
-let ordenActual = { columna: 4, direccion: 'desc' }; // Inicialmente ordenado por nota descendente
-
-function ordenarTabla(columna) {
-    const tabla = document.getElementById('tabla-resultados');
-    const tbody = tabla.getElementsByTagName('tbody')[0];
-    const filas = Array.from(tbody.getElementsByTagName('tr'));
-    
-    // Determinar dirección
-    if (ordenActual.columna === columna) {
-        ordenActual.direccion = ordenActual.direccion === 'asc' ? 'desc' : 'asc';
-    } else {
-        ordenActual.columna = columna;
-        ordenActual.direccion = 'asc';
-    }
-    
-    // Ordenar filas
-    filas.sort((a, b) => {
-        let valorA = a.cells[columna].textContent.trim();
-        let valorB = b.cells[columna].textContent.trim();
-        
-        // Convertir a número si es posible
-        if (!isNaN(valorA) && !isNaN(valorB)) {
-            valorA = parseFloat(valorA) || 0;
-            valorB = parseFloat(valorB) || 0;
-        }
-        
-        if (valorA < valorB) return ordenActual.direccion === 'asc' ? -1 : 1;
-        if (valorA > valorB) return ordenActual.direccion === 'asc' ? 1 : -1;
-        return 0;
-    });
-    
-    // Limpiar y volver a agregar filas
-    while (tbody.firstChild) {
-        tbody.removeChild(tbody.firstChild);
-    }
-    filas.forEach(fila => tbody.appendChild(fila));
-    
-    // Actualizar iconos de ordenamiento
-    for (let i = 0; i < 8; i++) {
-        const sortIcon = document.getElementById('sort-' + i);
-        if (sortIcon) {
-            if (i === columna) {
-                sortIcon.textContent = ordenActual.direccion === 'asc' ? '⬆️' : '⬇️';
-            } else {
-                sortIcon.textContent = '↕️';
-            }
-        }
-    }
-    
-    // Renumerar rankings
-    let ranking = 1;
-    filas.forEach(fila => {
-        if (fila.style.display !== 'none') {
-            fila.cells[0].textContent = ranking++;
-        }
-    });
+function exportarExcel() {
+    window.location.href = '/api/exportar-resultados';
 }
 
-// ==============================================
-// EXPORTAR A CSV
-// ==============================================
-
-function exportarCSV() {
-    const tabla = document.getElementById('tabla-resultados');
-    const filas = tabla.getElementsByTagName('tr');
-    
-    let csv = [];
-    
-    // Headers
-    const headers = [];
-    for (let cell of filas[0].cells) {
-        headers.push(cell.textContent.replace(/[↕️⬆️⬇️]/g, '').trim());
+// Enter en búsqueda
+document.getElementById('searchCodigo').addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+        aplicarFiltros();
     }
-    csv.push(headers.join(','));
-    
-    // Datos
-    for (let i = 1; i < filas.length; i++) {
-        if (filas[i].style.display !== 'none') {
-            const row = [];
-            for (let cell of filas[i].cells) {
-                let text = cell.textContent.trim();
-                // Limpiar badges y emojis
-                text = text.replace(/[✅⏳]/g, '').trim();
-                row.push('"' + text + '"');
-            }
-            csv.push(row.join(','));
-        }
-    }
-    
-    // Crear y descargar archivo
-    const csvContent = csv.join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    
-    const fecha = new Date().toISOString().split('T')[0];
-    link.setAttribute('href', url);
-    link.setAttribute('download', `resultados_examen_${fecha}.csv`);
-    link.style.visibility = 'hidden';
-    
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-}
-
-// Aplicar orden inicial por nota al cargar
-window.addEventListener('DOMContentLoaded', function() {
-    ordenarTabla(4); // Ordenar por nota
-    ordenarTabla(4); // Segunda vez para que sea descendente
 });
 </script>
 {% endblock %}
