@@ -3,12 +3,12 @@ POSTULANDO - Sistema de Exámenes de Admisión
 main.py LIMPIO Y MODULARIZADO
 """
 
-from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi import FastAPI, Request, UploadFile, File, Form, HTTPException, Depends
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import func
+from sqlalchemy import func, desc
 from sqlalchemy.exc import DataError, IntegrityError
 from sqlalchemy.orm import Session
 from typing import Optional, List
@@ -22,7 +22,7 @@ import time
 import shutil
 
 # Imports locales
-from app.database import SessionLocal, engine, Base
+from app.database import SessionLocal, engine, Base, get_db
 from app.models import (
     Postulante, HojaRespuesta, ClaveRespuesta, 
     Calificacion, Profesor, Aula, Respuesta
@@ -184,15 +184,6 @@ async def registrar_gabarito_page(request: Request):
         })
     finally:
         db.close()
-
-
-@app.get("/resultados")
-async def resultados_page(request: Request):
-    """Página de resultados"""
-    return {
-        "message": "Página de resultados en construcción",
-        "status": "coming_soon"
-    }
 
 
 @app.get("/health")
@@ -999,6 +990,189 @@ async def procesar_hoja_completa(
             "success": False,
             "error": str(e)
         }
+
+
+
+# ============================================================================
+# AGREGAR AL FINAL DE app/main.py
+# ============================================================================
+
+from sqlalchemy import desc, func
+
+@app.get("/resultados", response_class=HTMLResponse)
+async def pagina_resultados(
+    request: Request,
+    codigo: str = None,
+    estado: str = None,
+    api: str = None,
+    db: Session = Depends(get_db)
+):
+    """
+    Página de resultados con todas las hojas procesadas.
+    Más recientes primero.
+    """
+    
+    from app.models import HojaRespuesta, Respuesta
+    
+    # Query base
+    query = db.query(HojaRespuesta)
+    
+    # Aplicar filtros si existen
+    if codigo:
+        query = query.filter(HojaRespuesta.codigo_hoja.ilike(f'%{codigo}%'))
+    
+    if estado:
+        query = query.filter(HojaRespuesta.estado == estado)
+    
+    if api:
+        query = query.filter(HojaRespuesta.api_utilizada == api)
+    
+    # Ordenar por más recientes primero
+    hojas = query.order_by(desc(HojaRespuesta.created_at)).limit(50).all()
+    
+    # Calcular estadísticas para cada hoja
+    hojas_con_stats = []
+    
+    for hoja in hojas:
+        # Obtener estadísticas de respuestas
+        respuestas = db.query(Respuesta).filter(
+            Respuesta.hoja_respuesta_id == hoja.id
+        ).all()
+        
+        validas = sum(1 for r in respuestas if r.respuesta_marcada in ['A', 'B', 'C', 'D', 'E'])
+        vacias = sum(1 for r in respuestas if r.respuesta_marcada == 'VACIO')
+        problematicas = sum(1 for r in respuestas if r.respuesta_marcada in ['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE'])
+        
+        # Obtener DNI del postulante (desde la relación si existe)
+        dni_postulante = None
+        if hoja.postulante_id:
+            from app.models import Postulante
+            postulante = db.query(Postulante).filter(Postulante.id == hoja.postulante_id).first()
+            if postulante:
+                dni_postulante = postulante.dni
+        
+        hojas_con_stats.append({
+            'id': hoja.id,
+            'codigo_hoja': hoja.codigo_hoja,
+            'dni_postulante': dni_postulante or '—',
+            'codigo_aula': hoja.codigo_aula or '—',
+            'api_utilizada': hoja.api_utilizada or 'N/A',
+            'tiempo_procesamiento': hoja.tiempo_procesamiento or 0,
+            'fecha_captura': hoja.created_at,
+            'stats': {
+                'validas': validas,
+                'vacias': vacias,
+                'problematicas': problematicas
+            }
+        })
+    
+    # Estadísticas globales
+    total_hojas = db.query(func.count(HojaRespuesta.id)).scalar()
+    
+    total_respuestas = db.query(Respuesta).count()
+    total_validas = db.query(Respuesta).filter(
+        Respuesta.respuesta_marcada.in_(['A', 'B', 'C', 'D', 'E'])
+    ).count()
+    total_vacias = db.query(Respuesta).filter(
+        Respuesta.respuesta_marcada == 'VACIO'
+    ).count()
+    total_problematicas = db.query(Respuesta).filter(
+        Respuesta.respuesta_marcada.in_(['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE'])
+    ).count()
+    
+    return templates.TemplateResponse("resultados.html", {
+        "request": request,
+        "hojas": hojas_con_stats,
+        "total_hojas": total_hojas,
+        "total_validas": total_validas,
+        "total_vacias": total_vacias,
+        "total_problematicas": total_problematicas
+    })
+
+
+@app.get("/hoja/{hoja_id}/detalle", response_class=HTMLResponse)
+async def detalle_hoja(
+    hoja_id: int,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """
+    Página de detalle de una hoja específica.
+    Muestra las 100 respuestas con su clasificación.
+    """
+    
+    from app.models import HojaRespuesta, Respuesta
+    
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_id).first()
+    
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Hoja no encontrada")
+    
+    respuestas = db.query(Respuesta).filter(
+        Respuesta.hoja_respuesta_id == hoja_id
+    ).order_by(Respuesta.numero_pregunta).all()
+    
+    return templates.TemplateResponse("detalle_hoja.html", {
+        "request": request,
+        "hoja": hoja,
+        "respuestas": respuestas
+    })
+
+
+@app.get("/api/exportar-resultados")
+async def exportar_resultados_excel(db: Session = Depends(get_db)):
+    """
+    Exporta los resultados a Excel.
+    """
+    
+    from app.models import HojaRespuesta, Respuesta
+    import pandas as pd
+    from io import BytesIO
+    from fastapi.responses import StreamingResponse
+    
+    # Obtener todas las hojas
+    hojas = db.query(HojaRespuesta).order_by(desc(HojaRespuesta.created_at)).all()
+    
+    data = []
+    
+    for hoja in hojas:
+        respuestas = db.query(Respuesta).filter(
+            Respuesta.hoja_respuesta_id == hoja.id
+        ).all()
+        
+        validas = sum(1 for r in respuestas if r.respuesta_marcada in ['A', 'B', 'C', 'D', 'E'])
+        vacias = sum(1 for r in respuestas if r.respuesta_marcada == 'VACIO')
+        invalidas = sum(1 for r in respuestas if r.respuesta_marcada == 'LETRA_INVALIDA')
+        garabatos = sum(1 for r in respuestas if r.respuesta_marcada == 'GARABATO')
+        
+        data.append({
+            'Código Hoja': hoja.codigo_hoja,
+            'Estado': hoja.estado,
+            'API': hoja.api_utilizada,
+            'Tiempo (s)': hoja.tiempo_procesamiento,
+            'Válidas': validas,
+            'Vacías': vacias,
+            'Letra Inválida': invalidas,
+            'Garabatos': garabatos,
+            'Fecha': hoja.created_at.strftime('%d/%m/%Y %H:%M')
+        })
+    
+    # Crear DataFrame
+    df = pd.DataFrame(data)
+    
+    # Crear Excel en memoria
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Resultados')
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        output,
+        media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        headers={'Content-Disposition': 'attachment; filename=resultados_postulando.xlsx'}
+    )
+
 
 
 # ============================================================================
