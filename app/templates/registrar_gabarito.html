@@ -261,6 +261,11 @@
 {% block extra_js %}
 <script src="{{ url_for('static', path='/js/camera-capture.js') }}"></script>
 <script>
+
+// ============================================================================
+// REEMPLAZAR EL <script> EN registrar_gabarito.html CON ESTE CÓDIGO
+// ============================================================================
+
 let camera;
 let currentMethod = 'camera';
 
@@ -274,7 +279,6 @@ window.addEventListener('load', () => {
         }, 300);
     } else {
         console.error('❌ CameraCapture no disponible');
-        // Cambiar a método manual por defecto
         selectMethod('manual');
     }
 });
@@ -297,7 +301,6 @@ function selectMethod(method) {
         cameraSection.style.display = 'block';
         manualSection.style.display = 'none';
         
-        // Inicializar cámara
         if (typeof CameraCapture === 'undefined') {
             alert('Error: Sistema de cámara no disponible');
             selectMethod('manual');
@@ -335,13 +338,18 @@ function inicializarCamara() {
             texts: {
                 capture: 'Capturar Gabarito',
                 retake: 'Tomar Otra',
-                confirm: 'Confirmar y Procesar',
+                confirm: 'Procesar Gabarito',
                 switchCamera: 'Cambiar Cámara',
                 loading: 'Procesando gabarito...'
             },
             
             onCameraReady: (settings) => {
                 console.log('✅ Cámara lista para gabarito:', settings);
+            },
+            
+            onConfirm: async (formData) => {
+                // Cuando el usuario confirma la foto
+                await procesarGabaritoImagen(formData);
             },
             
             onError: (error, message) => {
@@ -365,69 +373,99 @@ function inicializarCamara() {
     }
 }
 
-async function procesarGabarito() {
+// PROCESAR GABARITO DESDE IMAGEN
+async function procesarGabaritoImagen(formData) {
     try {
-        const result = await camera.confirmPhoto();
+        // Agregar proceso al FormData
+        formData.append('proceso', 'ADMISION_2025_2');
+        formData.append('api', 'google'); // o 'openai' o 'anthropic'
         
-        const response = await fetch('/api/registrar-gabarito', {
+        const response = await fetch('/api/gabarito/procesar-imagen', {
             method: 'POST',
-            body: result.formData
+            body: formData
         });
         
         if (!response.ok) {
-            throw new Error('Error al procesar gabarito');
+            const error = await response.json();
+            throw new Error(error.detail || 'Error al procesar imagen');
         }
         
         const data = await response.json();
-        alert('✅ Gabarito registrado exitosamente\n' + data.total + ' respuestas guardadas');
-        window.location.href = '/';
+        
+        if (!data.success) {
+            throw new Error(data.error || 'Error desconocido');
+        }
+        
+        // Guardar datos y redirigir a confirmación
+        sessionStorage.setItem('gabarito_temp', JSON.stringify(data));
+        window.location.href = '/gabarito/confirmar';
         
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al procesar: ' + error.message);
+        alert('❌ Error al procesar imagen:\n' + error.message);
         camera.retakePhoto();
     }
 }
 
+// GUARDAR GABARITO MANUAL
 async function guardarGabarito() {
-    const respuestas = [];
+    // Recolectar respuestas del formulario
+    const respuestas = {};
+    let faltantes = [];
     
     for (let i = 1; i <= 100; i++) {
         const select = document.getElementById('respuesta_' + i);
         const valor = select.value;
         
-        if (!valor) {
-            alert('Por favor complete todas las respuestas (falta pregunta ' + i + ')');
-            select.focus();
-            return;
+        if (!valor || valor === '') {
+            faltantes.push(i);
+        } else {
+            respuestas[i.toString()] = valor.toUpperCase();
         }
+    }
+    
+    // Validar que estén todas
+    if (faltantes.length > 0) {
+        alert('⚠️ Faltan respuestas en las preguntas:\n' + faltantes.join(', ') + 
+              '\n\nTotal faltantes: ' + faltantes.length);
         
-        respuestas.push(valor);
+        // Enfocar la primera faltante
+        document.getElementById('respuesta_' + faltantes[0]).focus();
+        return;
     }
     
     try {
-        const response = await fetch('/api/registrar-gabarito-manual', {
+        const response = await fetch('/api/gabarito/procesar-manual', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
-                respuestas: respuestas
+                respuestas: respuestas,
+                proceso: 'ADMISION_2025_2'
             })
         });
         
         if (!response.ok) {
-            throw new Error('Error al guardar gabarito');
+            const error = await response.json();
+            throw new Error(error.detail || 'Error al procesar gabarito');
         }
         
         const data = await response.json();
-        alert('✅ Gabarito guardado exitosamente\n' + data.total + ' respuestas registradas');
-        window.location.href = '/';
+        
+        if (!data.success) {
+            throw new Error(data.message || 'Error desconocido');
+        }
+        
+        // Guardar datos y redirigir a confirmación
+        sessionStorage.setItem('gabarito_temp', JSON.stringify(data));
+        window.location.href = '/gabarito/confirmar';
         
     } catch (error) {
         console.error('Error:', error);
-        alert('Error al guardar: ' + error.message);
+        alert('❌ Error al guardar:\n' + error.message);
     }
 }
+
 </script>
 {% endblock %}

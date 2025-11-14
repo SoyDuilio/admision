@@ -1,0 +1,418 @@
+{% extends "base.html" %}
+
+{% block title %}Confirmar Gabarito - POSTULANDO{% endblock %}
+
+{% block extra_css %}
+<style>
+    body {
+        background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
+        color: white;
+    }
+
+    .container {
+        max-width: 1200px;
+        margin: 40px auto;
+        padding: 20px;
+    }
+
+    .header {
+        text-align: center;
+        margin-bottom: 40px;
+    }
+
+    .header h1 {
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        -webkit-background-clip: text;
+        background-clip: text;  /* ← AGREGAR ESTA LÍNEA */
+        -webkit-text-fill-color: transparent;
+    }
+
+    .alert-warning {
+        background: rgba(245, 158, 11, 0.1);
+        border: 2px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px;
+        margin-bottom: 30px;
+    }
+
+    .alert-warning h3 {
+        color: #f59e0b;
+        margin-bottom: 10px;
+    }
+
+    /* Estadísticas por columna */
+    .columnas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .columna-card {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 20px;
+    }
+
+    .columna-card h3 {
+        color: #3b82f6;
+        margin-bottom: 15px;
+        font-size: 1.1rem;
+    }
+
+    .columna-card p {
+        font-size: 0.875rem;
+        color: #94a3b8;
+        margin-bottom: 15px;
+    }
+
+    .conteo-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 8px 12px;
+        margin-bottom: 8px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 8px;
+        font-size: 0.9375rem;
+    }
+
+    .conteo-letra {
+        font-weight: 700;
+    }
+
+    .conteo-valor {
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    /* Resumen general */
+    .resumen-general {
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px solid #3b82f6;
+        border-radius: 16px;
+        padding: 30px;
+        margin-bottom: 40px;
+    }
+
+    .resumen-general h2 {
+        color: #3b82f6;
+        margin-bottom: 20px;
+        text-align: center;
+    }
+
+    .resumen-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 15px;
+    }
+
+    .resumen-item {
+        text-align: center;
+        padding: 20px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 12px;
+    }
+
+    .resumen-item .letra {
+        font-size: 2rem;
+        font-weight: 800;
+        margin-bottom: 10px;
+    }
+
+    .resumen-item .cantidad {
+        font-size: 1.5rem;
+        color: #10b981;
+        font-weight: 700;
+    }
+
+    /* Botones de acción */
+    .acciones {
+        display: flex;
+        gap: 20px;
+        justify-content: center;
+        margin-top: 40px;
+    }
+
+    .btn {
+        padding: 16px 32px;
+        border-radius: 12px;
+        font-weight: 700;
+        font-size: 1rem;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        border: none;
+    }
+
+    .btn-editar {
+        background: rgba(139, 92, 246, 0.1);
+        color: #8b5cf6;
+        border: 2px solid #8b5cf6;
+    }
+
+    .btn-editar:hover {
+        background: #8b5cf6;
+        color: white;
+    }
+
+    .btn-confirmar {
+        background: linear-gradient(135deg, #10b981, #059669);
+        color: white;
+    }
+
+    .btn-confirmar:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+    }
+
+    .btn-cancelar {
+        background: rgba(239, 68, 68, 0.1);
+        color: #ef4444;
+        border: 2px solid #ef4444;
+    }
+
+    .btn-cancelar:hover {
+        background: #ef4444;
+        color: white;
+    }
+
+    /* Modal de confirmación */
+    .modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        z-index: 1000;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .modal.active {
+        display: flex;
+    }
+
+    .modal-content {
+        background: #1e293b;
+        padding: 40px;
+        border-radius: 16px;
+        max-width: 500px;
+        text-align: center;
+    }
+
+    .modal-content h3 {
+        margin-bottom: 20px;
+        color: #f59e0b;
+    }
+
+    .modal-buttons {
+        display: flex;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 30px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>⚠️ Confirmar Gabarito</h1>
+        <p>Revise cuidadosamente las estadísticas antes de confirmar</p>
+    </div>
+
+    <!-- Alerta de advertencia -->
+    <div class="alert-warning">
+        <h3>⚠️ IMPORTANTE: Revise antes de confirmar</h3>
+        <p>
+            Una vez confirmado, el gabarito se usará para calificar todos los exámenes del proceso.
+            Asegúrese de que las respuestas sean correctas y estén completas.
+        </p>
+        <p><strong>Proceso:</strong> <span id="procesoSpan">—</span></p>
+        <p><strong>Total de preguntas:</strong> <span id="totalPreguntasSpan">—</span></p>
+    </div>
+
+    <!-- Estadísticas por columna -->
+    <h2 style="margin-bottom: 20px;">📊 Distribución por Columna</h2>
+    <div class="columnas-grid" id="columnasContainer">
+        <!-- Se llena con JavaScript -->
+    </div>
+
+    <!-- Resumen general -->
+    <div class="resumen-general">
+        <h2>📈 Resumen General (100 preguntas)</h2>
+        <div class="resumen-grid">
+            <div class="resumen-item">
+                <div class="letra">A</div>
+                <div class="cantidad" id="resumenA">0</div>
+            </div>
+            <div class="resumen-item">
+                <div class="letra">B</div>
+                <div class="cantidad" id="resumenB">0</div>
+            </div>
+            <div class="resumen-item">
+                <div class="letra">C</div>
+                <div class="cantidad" id="resumenC">0</div>
+            </div>
+            <div class="resumen-item">
+                <div class="letra">D</div>
+                <div class="cantidad" id="resumenD">0</div>
+            </div>
+            <div class="resumen-item">
+                <div class="letra">E</div>
+                <div class="cantidad" id="resumenE">0</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Botones de acción -->
+    <div class="acciones">
+        <button class="btn btn-cancelar" onclick="cancelar()">
+            ❌ Cancelar
+        </button>
+        <button class="btn btn-editar" onclick="editar()">
+            ✏️ Editar Respuestas
+        </button>
+        <button class="btn btn-confirmar" onclick="mostrarConfirmacion()">
+            ✅ Confirmar y Guardar
+        </button>
+    </div>
+</div>
+
+<!-- Modal de confirmación final -->
+<div class="modal" id="modalConfirmacion">
+    <div class="modal-content">
+        <h3>⚠️ ¿Está seguro?</h3>
+        <p>
+            Esta acción guardará el gabarito y comenzará a usarse para calificar exámenes.
+            ¿Desea continuar?
+        </p>
+        <div class="modal-buttons">
+            <button class="btn btn-cancelar" onclick="cerrarModal()">
+                No, revisar nuevamente
+            </button>
+            <button class="btn btn-confirmar" onclick="confirmarGabarito()">
+                Sí, confirmar
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+// Obtener datos del sessionStorage
+let datosGabarito = null;
+
+window.addEventListener('load', () => {
+    const dataStr = sessionStorage.getItem('gabarito_temp');
+    
+    if (!dataStr) {
+        alert('No hay datos para confirmar');
+        window.location.href = '/gabarito/registrar';
+        return;
+    }
+    
+    try {
+        datosGabarito = JSON.parse(dataStr);
+        
+        // Llenar la página
+        document.getElementById('procesoSpan').textContent = datosGabarito.proceso;
+        document.getElementById('totalPreguntasSpan').textContent = '100';
+        
+        // Estadísticas por columna
+        const columnasContainer = document.getElementById('columnasContainer');
+        datosGabarito.estadisticas_columnas.forEach(col => {
+            columnasContainer.innerHTML += `
+                <div class="columna-card">
+                    <h3>Columna ${col.columna}</h3>
+                    <p>Preguntas ${col.inicio} - ${col.fin}</p>
+                    <div class="conteo-item">
+                        <span class="conteo-letra">A:</span>
+                        <span class="conteo-valor">${col.conteo.A}</span>
+                    </div>
+                    <div class="conteo-item">
+                        <span class="conteo-letra">B:</span>
+                        <span class="conteo-valor">${col.conteo.B}</span>
+                    </div>
+                    <div class="conteo-item">
+                        <span class="conteo-letra">C:</span>
+                        <span class="conteo-valor">${col.conteo.C}</span>
+                    </div>
+                    <div class="conteo-item">
+                        <span class="conteo-letra">D:</span>
+                        <span class="conteo-valor">${col.conteo.D}</span>
+                    </div>
+                    <div class="conteo-item">
+                        <span class="conteo-letra">E:</span>
+                        <span class="conteo-valor">${col.conteo.E}</span>
+                    </div>
+                </div>
+            `;
+        });
+        
+        // Resumen general
+        const resumen = datosGabarito.resumen_general;
+        document.getElementById('resumenA').textContent = resumen.A;
+        document.getElementById('resumenB').textContent = resumen.B;
+        document.getElementById('resumenC').textContent = resumen.C;
+        document.getElementById('resumenD').textContent = resumen.D;
+        document.getElementById('resumenE').textContent = resumen.E;
+        
+    } catch (error) {
+        console.error('Error al cargar datos:', error);
+        alert('Error al cargar datos del gabarito');
+        window.location.href = '/gabarito/registrar';
+    }
+});
+
+function mostrarConfirmacion() {
+    document.getElementById('modalConfirmacion').classList.add('active');
+}
+
+function cerrarModal() {
+    document.getElementById('modalConfirmacion').classList.remove('active');
+}
+
+function cancelar() {
+    if (confirm('¿Está seguro de cancelar? Se perderán los datos ingresados.')) {
+        sessionStorage.removeItem('gabarito_temp');
+        window.location.href = '/gabarito/registrar';
+    }
+}
+
+function editar() {
+    window.location.href = '/gabarito/registrar?modo=editar';
+}
+
+async function confirmarGabarito() {
+    try {
+        const response = await fetch('/api/gabarito/confirmar', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proceso: datosGabarito.proceso,
+                respuestas: datosGabarito.respuestas,
+                nombre: `Gabarito ${datosGabarito.proceso}`,
+                observaciones: ''
+            })
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            sessionStorage.removeItem('gabarito_temp');
+            alert('✅ Gabarito guardado correctamente\n' + result.total_respuestas + ' respuestas registradas');
+            window.location.href = '/';
+        } else {
+            alert('❌ Error: ' + (result.detail || result.message));
+        }
+    } catch (error) {
+        alert('❌ Error al guardar: ' + error.message);
+    }
+}
+</script>
+{% endblock %}
