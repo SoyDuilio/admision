@@ -271,8 +271,8 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         # Subir imagen
         uploaded_file = genai.upload_file(imagen_path)
         
-        # Usar gemini-1.5-flash (modelo más compatible)
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # Usar gemini-1.5-pro (modelo más compatible)
+        model = genai.GenerativeModel("gemini-1.5-pro")
         
         response = model.generate_content([
             uploaded_file,
@@ -300,7 +300,7 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         return {
             "success": True,
             "api": "google",
-            "modelo": "gemini-1.5-flash",
+            "modelo": "gemini-1.5-pro",
             "datos": datos
         }
         
@@ -353,10 +353,10 @@ async def procesar_hoja_completa_v2(imagen_path: str) -> Dict:
     # ========================================================================
     
     apis_orden = [
-        ("gpt-4o-mini", lambda: extraer_con_openai(imagen_procesada, "gpt-4o-mini")),
+        ("gemini", lambda: extraer_con_google_vision(imagen_procesada)),
         ("gpt-4o", lambda: extraer_con_openai(imagen_procesada, "gpt-4o")),
         ("claude", lambda: extraer_con_claude(imagen_procesada)),
-        ("gemini", lambda: extraer_con_google_vision(imagen_procesada))
+        ("gpt-4o-mini", lambda: extraer_con_openai(imagen_procesada, "gpt-4o-mini"))
     ]
     
     resultado_final = None
