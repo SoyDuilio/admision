@@ -23,7 +23,7 @@ from app.services.image_preprocessor import ImagePreprocessor
 
 from sqlalchemy.orm import Session
 from app.models import HojaRespuesta, Respuesta
-from app.services.prompt_vision_v3 import PROMPT_DETECCION_RESPUESTAS_V3
+from app.services.prompt_vision_v4 import PROMPT_DETECCION_RESPUESTAS_V4 as PROMPT_DETECCION_RESPUESTAS_V3
 
 from app.services.json_parser_robust import parsear_respuesta_vision_api
 
@@ -112,6 +112,10 @@ def validar_100_respuestas(respuestas: List) -> Tuple[List, Dict]:
 
 # ============================================================================
 # EXTRACCIÓN CON OPENAI
+# ============================================================================
+
+# ============================================================================
+# REEMPLAZAR: extraer_con_openai()
 # ============================================================================
 
 # ============================================================================
@@ -255,14 +259,15 @@ def extraer_con_claude(imagen_path: str) -> Dict:
 
 def extraer_con_google_vision(imagen_path: str) -> Dict:
     """
-    Extrae datos con Gemini 1.5 Flash.
+    Extrae datos con Gemini.
     CON PARSING ROBUSTO.
     """
     try:
         # Subir imagen
         uploaded_file = genai.upload_file(imagen_path)
         
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        # CAMBIO: Usar gemini-1.5-pro en lugar de flash
+        model = genai.GenerativeModel("gemini-1.5-pro")
         
         response = model.generate_content([
             uploaded_file,
@@ -288,7 +293,7 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         return {
             "success": True,
             "api": "google",
-            "modelo": "gemini-1.5-flash",
+            "modelo": "gemini-1.5-pro",
             "datos": datos
         }
         
@@ -298,8 +303,6 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
             "api": "google",
             "error": str(e)
         }
-
-
 
 # ============================================================================
 # FUNCIÓN PRINCIPAL CON PRE-PROCESAMIENTO
