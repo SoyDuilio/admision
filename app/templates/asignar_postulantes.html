@@ -1,0 +1,631 @@
+{% extends "base.html" %}
+
+{% block title %}Asignar Postulantes{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary-blue: #2563eb;
+        --success-green: #22c55e;
+        --warning-yellow: #f59e0b;
+        --bg-dark: #0f172a;
+        --bg-card: #1e293b;
+        --text-light: #f8fafc;
+        --text-muted: #94a3b8;
+        --border-color: #334155;
+    }
+
+    body {
+        background: var(--bg-dark);
+        color: var(--text-light);
+    }
+
+    .page-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    .page-header {
+        text-align: center;
+        margin-bottom: 30px;
+        padding-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .page-header h1 {
+        font-size: 1.75rem;
+        color: var(--text-light);
+        margin-bottom: 8px;
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+        margin-bottom: 30px;
+    }
+
+    .stat-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        text-align: center;
+    }
+
+    .stat-card .label {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 8px;
+    }
+
+    .stat-card .value {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--primary-blue);
+    }
+
+    .stat-card.success .value {
+        color: var(--success-green);
+    }
+
+    .stat-card.warning .value {
+        color: var(--warning-yellow);
+    }
+
+    .action-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 30px;
+        margin-bottom: 30px;
+    }
+
+    .action-card h3 {
+        font-size: 1.125rem;
+        margin-bottom: 20px;
+        color: var(--text-light);
+    }
+
+    .form-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .form-group label {
+        display: block;
+        font-weight: 600;
+        color: var(--text-light);
+        margin-bottom: 8px;
+        font-size: 0.9375rem;
+    }
+
+    .form-group input,
+    .form-group select {
+        width: 100%;
+        padding: 10px 14px;
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        color: var(--text-light);
+        font-size: 0.9375rem;
+    }
+
+    .checkbox-option {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 6px;
+        margin-bottom: 8px;
+    }
+
+    .checkbox-option input[type="checkbox"] {
+        width: auto;
+        margin: 0;
+    }
+
+    .btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-size: 0.9375rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .btn-primary {
+        background: var(--primary-blue);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: #1d4ed8;
+        transform: translateY(-1px);
+    }
+
+    .btn-secondary {
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .loading-spinner {
+        display: inline-block;
+        width: 16px;
+        height: 16px;
+        border: 2px solid rgba(255, 255, 255, 0.3);
+        border-top-color: white;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    .resultado {
+        display: none;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+        padding: 20px;
+        margin-top: 20px;
+    }
+
+    .resultado.show {
+        display: block;
+    }
+
+    .resultado.success {
+        border-color: var(--success-green);
+        background: rgba(34, 197, 94, 0.1);
+    }
+
+    .resultado h4 {
+        margin-bottom: 15px;
+        color: var(--success-green);
+    }
+
+    .progress-container {
+        margin-top: 15px;
+        display: none;
+    }
+
+    .progress-container.show {
+        display: block;
+    }
+
+    .progress-bar-bg {
+        width: 100%;
+        height: 30px;
+        background: rgba(0, 0, 0, 0.3);
+        border-radius: 15px;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .progress-bar-fill {
+        height: 100%;
+        background: linear-gradient(90deg, #2563eb 0%, #22c55e 100%);
+        transition: width 0.3s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .progress-text {
+        margin-top: 10px;
+        text-align: center;
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .distribucion-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 15px;
+    }
+
+    .distribucion-table th,
+    .distribucion-table td {
+        padding: 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .distribucion-table th {
+        background: rgba(0, 0, 0, 0.3);
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .btn-volver {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 18px;
+        background: transparent;
+        color: var(--text-light);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        text-decoration: none;
+        font-weight: 600;
+        font-size: 0.9375rem;
+        margin-bottom: 20px;
+    }
+
+    .btn-volver:hover {
+        background: rgba(255, 255, 255, 0.05);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-container">
+    <a href="/" class="btn-volver">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M19 12H5M12 19l-7-7 7-7"/>
+        </svg>
+        Volver al Dashboard
+    </a>
+
+    <div class="page-header">
+        <h1>🎯 Asignar Postulantes a Aulas</h1>
+        <p>Distribución automática o manual de estudiantes</p>
+    </div>
+
+    <!-- Estadísticas -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="label">Total Postulantes</div>
+            <div class="value" id="totalPostulantes">-</div>
+        </div>
+        <div class="stat-card success">
+            <div class="label">Con Hoja Generada</div>
+            <div class="value" id="conHoja">-</div>
+        </div>
+        <div class="stat-card warning">
+            <div class="label">Sin Asignar</div>
+            <div class="value" id="sinAsignar">-</div>
+        </div>
+        <div class="stat-card">
+            <div class="label">Capacidad Total</div>
+            <div class="value" id="capacidadTotal">-</div>
+        </div>
+    </div>
+
+    <!-- Formulario de Asignación -->
+    <div class="action-card">
+        <h3>⚡ Asignación Automática</h3>
+        
+        <form id="formAsignar">
+            <div class="form-grid">
+                <div class="form-group">
+                    <label>Proceso de Admisión</label>
+                    <input type="text" id="procesoAdmision" value="2025-2" readonly>
+                </div>
+            </div>
+
+            <div class="checkbox-option">
+                <input type="checkbox" id="agruparPrograma">
+                <label for="agruparPrograma">Agrupar por programa educativo</label>
+            </div>
+
+            <div class="checkbox-option">
+                <input type="checkbox" id="soloSinAsignar" checked>
+                <label for="soloSinAsignar">Solo postulantes sin asignar</label>
+            </div>
+
+            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                <button type="submit" class="btn btn-primary" id="btnAsignar">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 11l3 3L22 4"/>
+                        <path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+                    </svg>
+                    Asignar Automáticamente
+                </button>
+
+                <button type="button" class="btn btn-primary" id="btnGenerarHojas" style="background: #22c55e;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                        <path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/>
+                    </svg>
+                    Generar Hojas
+                </button>
+
+                <button type="button" class="btn btn-secondary" onclick="cargarEstadisticas()">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M1 4v6h6M23 20v-6h-6"/>
+                        <path d="M20.49 9A9 9 0 005.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 014.51 15"/>
+                    </svg>
+                    Actualizar
+                </button>
+            </div>
+        </form>
+
+        <!-- Resultado -->
+        <div id="resultado" class="resultado">
+            <h4 id="resultadoTitulo">✅ Asignación Completada</h4>
+            <p id="resultadoMensaje"></p>
+            
+            <!-- Barra de progreso -->
+            <div id="progressContainer" class="progress-container">
+                <div class="progress-bar-bg">
+                    <div id="progressBar" class="progress-bar-fill" style="width: 0%;">0%</div>
+                </div>
+                <p id="progressText" class="progress-text">Iniciando...</p>
+            </div>
+            
+            <table class="distribucion-table" id="tablaDistribucion" style="display: none;">
+                <thead>
+                    <tr>
+                        <th>Aula</th>
+                        <th>Nombre</th>
+                        <th>Asignados</th>
+                        <th>Capacidad</th>
+                    </tr>
+                </thead>
+                <tbody id="bodyDistribucion"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Cargar estadísticas al inicio
+window.addEventListener('load', cargarEstadisticas);
+
+async function cargarEstadisticas() {
+    try {
+        const response = await fetch('/api/estadisticas-asignacion');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('totalPostulantes').textContent = data.postulantes.total;
+            document.getElementById('conHoja').textContent = data.postulantes.con_hoja_generada;
+            document.getElementById('sinAsignar').textContent = data.postulantes.sin_asignar;
+            document.getElementById('capacidadTotal').textContent = data.infraestructura.capacidad_total;
+        }
+    } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+    }
+}
+
+// Asignar automáticamente
+document.getElementById('formAsignar').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const btn = document.getElementById('btnAsignar');
+    const originalHTML = btn.innerHTML;
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner"></span> Asignando...';
+    
+    try {
+        const payload = {
+            proceso_admision: document.getElementById('procesoAdmision').value,
+            agrupar_por_programa: document.getElementById('agruparPrograma').checked,
+            solo_sin_asignar: document.getElementById('soloSinAsignar').checked
+        };
+        
+        const response = await fetch('/api/asignar-automatico', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            mostrarResultado(data);
+            await cargarEstadisticas();
+        } else {
+            alert('Error: ' + (data.detail || 'Error desconocido'));
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error de conexión: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+});
+
+function mostrarResultado(data) {
+    const resultado = document.getElementById('resultado');
+    const titulo = document.getElementById('resultadoTitulo');
+    const mensaje = document.getElementById('resultadoMensaje');
+    const tabla = document.getElementById('tablaDistribucion');
+    const tbody = document.getElementById('bodyDistribucion');
+    
+    titulo.textContent = '✅ ' + data.message;
+    mensaje.textContent = `Total asignados: ${data.total_asignados} | Aulas utilizadas: ${data.aulas_utilizadas}`;
+    
+    // Mostrar tabla de distribución
+    if (data.resumen_por_aula && data.resumen_por_aula.length > 0) {
+        tbody.innerHTML = '';
+        
+        data.resumen_por_aula.forEach(aula => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><strong>${aula.codigo}</strong></td>
+                <td>${aula.nombre}</td>
+                <td>${aula.total}</td>
+                <td>-</td>
+            `;
+            tbody.appendChild(tr);
+        });
+        
+        tabla.style.display = 'table';
+    }
+    
+    resultado.classList.add('show', 'success');
+}
+
+// Generar hojas desde asignaciones
+document.getElementById('btnGenerarHojas').addEventListener('click', async () => {
+    const btn = document.getElementById('btnGenerarHojas');
+    const originalHTML = btn.innerHTML;
+    const resultado = document.getElementById('resultado');
+    const progressContainer = document.getElementById('progressContainer');
+    const progressBar = document.getElementById('progressBar');
+    const progressText = document.getElementById('progressText');
+    const tabla = document.getElementById('tablaDistribucion');
+    
+    // Obtener estadísticas antes de empezar
+    const statsResponse = await fetch('/api/estadisticas-asignacion');
+    const stats = await statsResponse.json();
+    const pendientes = stats.postulantes.sin_asignar;
+    
+    if (pendientes === 0) {
+        alert('No hay postulantes pendientes de generar hojas.');
+        return;
+    }
+    
+    if (!confirm(`¿Generar hojas para ${pendientes} postulantes pendientes?\n\nEsto puede tardar varios minutos.`)) {
+        return;
+    }
+    
+    btn.disabled = true;
+    btn.innerHTML = '<span class="loading-spinner"></span> Generando PDFs...';
+    
+    // Mostrar barra de progreso
+    resultado.classList.add('show');
+    resultado.classList.remove('success');
+    resultado.style.background = 'rgba(37, 99, 235, 0.1)';
+    resultado.style.borderColor = '#2563eb';
+    document.getElementById('resultadoTitulo').textContent = '⏳ Generando hojas...';
+    document.getElementById('resultadoMensaje').textContent = `Procesando ${pendientes} hojas. Por favor espera...`;
+    
+    progressContainer.classList.add('show');
+    tabla.style.display = 'none';
+    progressBar.style.width = '0%';
+    progressBar.textContent = '0%';
+    progressText.textContent = 'Iniciando generación...';
+    
+    // Polling para actualizar progreso
+    let totalEsperado = pendientes;
+    const proceso = document.getElementById('procesoAdmision').value;
+    
+    const pollingInterval = setInterval(async () => {
+        try {
+            const progreso = await fetch(`/api/progreso-generacion/${proceso}`);
+            const data = await progreso.json();
+            
+            if (data.success) {
+                const porcentaje = data.porcentaje_completado;
+                progressBar.style.width = porcentaje + '%';
+                progressBar.textContent = Math.round(porcentaje) + '%';
+                progressText.textContent = `${data.confirmadas} de ${data.total_asignaciones} hojas generadas`;
+            }
+        } catch (error) {
+            console.error('Error al consultar progreso:', error);
+        }
+    }, 2000); // Actualizar cada 2 segundos
+    
+    try {
+        const payload = {
+            proceso_admision: proceso,
+            solo_pendientes: true
+        };
+        
+        // Sin timeout, dejar que termine
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 600000); // 10 minutos max
+        
+        const response = await fetch('/api/generar-hojas-desde-asignaciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        clearInterval(pollingInterval);
+        
+        if (response.ok) {
+            // Actualizar progreso al 100%
+            progressBar.style.width = '100%';
+            progressBar.textContent = '100%';
+            
+            const totalHojas = response.headers.get('X-Total-Hojas') || pendientes;
+            progressText.textContent = `✅ ${totalHojas} hojas generadas correctamente`;
+            
+            // Descargar ZIP
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `hojas_${Date.now()}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+            
+            // Mostrar éxito
+            setTimeout(() => {
+                resultado.classList.add('success');
+                resultado.style.background = 'rgba(34, 197, 94, 0.1)';
+                resultado.style.borderColor = '#22c55e';
+                document.getElementById('resultadoTitulo').textContent = '✅ Hojas generadas correctamente';
+                document.getElementById('resultadoMensaje').textContent = `Se generaron ${totalHojas} hojas. El archivo ZIP se descargó correctamente.`;
+                
+                // Ocultar barra de progreso después de 3 segundos
+                setTimeout(() => {
+                    progressContainer.classList.remove('show');
+                }, 3000);
+            }, 1000);
+            
+            await cargarEstadisticas();
+        } else {
+            clearInterval(pollingInterval);
+            const error = await response.json();
+            resultado.classList.remove('show');
+            progressContainer.classList.remove('show');
+            alert('Error: ' + (error.detail || 'Error desconocido'));
+        }
+        
+    } catch (error) {
+        clearInterval(pollingInterval);
+        console.error('Error:', error);
+        
+        resultado.classList.remove('show');
+        progressContainer.classList.remove('show');
+        
+        if (error.name === 'AbortError') {
+            alert('⏱️ Timeout: El proceso tardó demasiado. Verifica las estadísticas para confirmar si completó.');
+            await cargarEstadisticas();
+        } else {
+            alert('Error de conexión: ' + error.message);
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+    }
+});
+</script>
+{% endblock %}
