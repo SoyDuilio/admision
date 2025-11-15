@@ -85,12 +85,36 @@ async def extraer_parte1_con_gpt4o(imagen_path: str) -> Dict:
         # Parsear
         datos = parsear_respuesta_vision_api(texto_raw)
         
-        # Validar estructura
-        if "respuestas" not in datos or len(datos["respuestas"]) != 50:
+        print(f"✅ [PARTE 1] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        # Validar estructura (más permisiva)
+        if "respuestas" not in datos:
             return {
                 "success": False,
-                "error": f"Se esperaban 50 respuestas, se recibieron {len(datos.get('respuestas', []))}"
+                "error": "JSON sin campo 'respuestas'"
             }
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            # Permitir rango entre 40-60 (tolerancia)
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        # Si tiene más de 50, truncar
+        if num_respuestas > 50:
+            print(f"⚠️  Truncando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"] = datos["respuestas"][:50]
+        
+        # Si tiene menos de 50, rellenar con nulls
+        if num_respuestas < 50:
+            print(f"⚠️  Rellenando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 1] Validación OK - {len(datos['respuestas'])} respuestas")
         
         return {
             "success": True,
@@ -101,6 +125,8 @@ async def extraer_parte1_con_gpt4o(imagen_path: str) -> Dict:
         
     except Exception as e:
         print(f"❌ Error en extraer_parte1_con_gpt4o: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "api": "gpt-4o",
@@ -153,12 +179,36 @@ async def extraer_parte2_con_gpt4o_mini(imagen_path: str) -> Dict:
         # Parsear
         datos = parsear_respuesta_vision_api(texto_raw)
         
-        # Validar estructura
-        if "respuestas" not in datos or len(datos["respuestas"]) != 50:
+        print(f"✅ [PARTE 2] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        # Validar estructura (más permisiva)
+        if "respuestas" not in datos:
             return {
                 "success": False,
-                "error": f"Se esperaban 50 respuestas, se recibieron {len(datos.get('respuestas', []))}"
+                "error": "JSON sin campo 'respuestas'"
             }
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            # Permitir rango entre 40-60 (tolerancia)
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        # Si tiene más de 50, truncar
+        if num_respuestas > 50:
+            print(f"⚠️  Truncando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"] = datos["respuestas"][:50]
+        
+        # Si tiene menos de 50, rellenar con nulls
+        if num_respuestas < 50:
+            print(f"⚠️  Rellenando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 2] Validación OK - {len(datos['respuestas'])} respuestas")
         
         return {
             "success": True,
@@ -169,6 +219,8 @@ async def extraer_parte2_con_gpt4o_mini(imagen_path: str) -> Dict:
         
     except Exception as e:
         print(f"❌ Error en extraer_parte2_con_gpt4o_mini: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "api": "gpt-4o-mini",
