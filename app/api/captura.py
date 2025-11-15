@@ -41,8 +41,8 @@ async def procesar_hoja_completa(
     7. Retorna resultado completo
     """
     
-    from app.services.vision_service_v2 import (
-        procesar_hoja_completa_v2,
+    from app.services.vision_service_v3 import (
+        procesar_hoja_completa_v3,
         procesar_y_guardar_respuestas,
         calificar_hoja_con_gabarito
     )
@@ -79,7 +79,7 @@ async def procesar_hoja_completa(
         
         print(f"\n🔍 Extrayendo datos con Vision API...")
         
-        resultado_vision = await procesar_hoja_completa_v2(str(filepath))
+        resultado_vision = await procesar_hoja_completa_v3(str(filepath))
         
         if not resultado_vision.get("success"):
             raise HTTPException(
