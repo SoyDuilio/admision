@@ -1,6 +1,7 @@
+from sqlalchemy.orm import relationship
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from app.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Aula(Base):
     __tablename__ = "aulas"
@@ -13,8 +14,11 @@ class Aula(Base):
     numero = Column(String(10))
     capacidad = Column(Integer)
     activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
+
+    # Relaciones
+    asignaciones = relationship("AsignacionExamen", back_populates="aula")
     
     def __repr__(self):
         return f"<Aula {self.codigo} - {self.nombre}>"

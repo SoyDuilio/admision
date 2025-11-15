@@ -1,6 +1,6 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from app.database import Base
-from datetime import datetime
+from datetime import datetime, timezone
 
 class Profesor(Base):
     __tablename__ = "profesores"
@@ -13,8 +13,8 @@ class Profesor(Base):
     email = Column(String(100))
     telefono = Column(String(15))
     activo = Column(Boolean, default=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
     def __repr__(self):
         return f"<Profesor {self.apellido_paterno} {self.apellido_materno}, {self.nombres}>"

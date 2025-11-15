@@ -50,6 +50,7 @@ class Postulante(Base):
     # Relaciones
     hojas_respuestas = relationship("HojaRespuesta", back_populates="postulante")
     calificaciones = relationship("Calificacion", back_populates="postulante")
+    asignacion = relationship("AsignacionExamen", back_populates="postulante", uselist=False)
 
     @property
     def nombre_completo(self):

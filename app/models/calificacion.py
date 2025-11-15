@@ -5,7 +5,7 @@ Almacena el resultado final de cada postulante después de comparar con la clave
 
 from sqlalchemy import Column, Integer, Float, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import Base
 
@@ -49,7 +49,7 @@ class Calificacion(Base):
     requiere_revision = Column(Boolean, default=False)  # Si tiene muchas respuestas no legibles
     
     # Auditoría
-    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc), nullable=False)
     calificado_at = Column(DateTime, nullable=True)
     
     # Relaciones

@@ -5,7 +5,7 @@
 
 from sqlalchemy import Column, Integer, String, Boolean, Numeric, ForeignKey, DateTime, Text
 from sqlalchemy.orm import relationship
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import Base
 
 class Respuesta(Base):
@@ -51,7 +51,7 @@ class Respuesta(Base):
     requiere_revision = Column(Boolean, default=False)
     
     # Timestamps
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=datetime.now(timezone.utc))
     
     # Relación con hoja de respuestas
     hoja_respuesta = relationship("HojaRespuesta", back_populates="respuestas")
