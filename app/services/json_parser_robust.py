@@ -260,17 +260,16 @@ def parsear_respuesta_vision_api(texto_raw: str) -> Dict:
         texto_raw: Respuesta cruda de la Vision API
         
     Returns:
-        Dict con estructura validada
+        Dict parseado (sin validación estricta de estructura)
         
     Raises:
-        ValueError: Si no se pudo parsear o la estructura es inválida
+        ValueError: Si no se pudo parsear
     """
     
     # Parsear con limpieza robusta
     datos = parsear_json_robusto(texto_raw)
     
-    # Validar estructura
-    if not validar_estructura_respuestas(datos):
-        raise ValueError("El JSON parseado no tiene la estructura esperada de respuestas")
+    # NOTA: No validamos estructura aquí porque los formatos pueden variar
+    # La validación específica se hace en cada servicio (vision_service_v3.py)
     
     return datos
