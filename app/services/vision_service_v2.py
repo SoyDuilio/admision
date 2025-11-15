@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 from app.models import HojaRespuesta, Respuesta
 from app.services.prompt_vision_v3 import PROMPT_DETECCION_RESPUESTAS_V3
 
+from app.services.json_parser_robust import parsear_respuesta_vision_api
 
 # ============================================================================
 # CONFIGURACIÓN DE APIs
@@ -113,9 +114,14 @@ def validar_100_respuestas(respuestas: List) -> Tuple[List, Dict]:
 # EXTRACCIÓN CON OPENAI
 # ============================================================================
 
+# ============================================================================
+# REEMPLAZAR: extraer_con_openai()
+# ============================================================================
+
 def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
     """
     Extrae datos con OpenAI (gpt-4o-mini o gpt-4o).
+    CON PARSING ROBUSTO.
     """
     try:
         with open(imagen_path, "rb") as f:
@@ -126,7 +132,7 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un experto lector OCR de formularios académicos."
+                    "content": "Eres un experto lector OCR de formularios académicos. SOLO responde con JSON válido, sin markdown ni texto adicional."
                 },
                 {
                     "role": "user",
@@ -145,17 +151,10 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
             temperature=0
         )
         
-        texto = response.choices[0].message.content.strip()
+        texto_raw = response.choices[0].message.content.strip()
         
-        # Extraer JSON limpio
-        inicio = texto.find("{")
-        fin = texto.rfind("}") + 1
-        
-        if inicio == -1 or fin == 0:
-            return {"success": False, "error": "No JSON found"}
-        
-        json_str = texto[inicio:fin]
-        datos = json.loads(json_str)
+        # USAR PARSER ROBUSTO
+        datos = parsear_respuesta_vision_api(texto_raw)
         
         # Validar 100 respuestas
         if "respuestas" in datos:
@@ -179,12 +178,13 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
 
 
 # ============================================================================
-# EXTRACCIÓN CON ANTHROPIC (CLAUDE)
+# REEMPLAZAR: extraer_con_claude()
 # ============================================================================
 
 def extraer_con_claude(imagen_path: str) -> Dict:
     """
     Extrae datos con Claude Sonnet 4.
+    CON PARSING ROBUSTO.
     """
     try:
         with open(imagen_path, "rb") as f:
@@ -217,24 +217,17 @@ def extraer_con_claude(imagen_path: str) -> Dict:
                         },
                         {
                             "type": "text",
-                            "text": PROMPT_BASE
+                            "text": PROMPT_BASE + "\n\nIMPORTANTE: Responde SOLO con el objeto JSON, sin explicaciones ni markdown."
                         }
                     ]
                 }
             ]
         )
         
-        texto = message.content[0].text.strip()
+        texto_raw = message.content[0].text.strip()
         
-        # Extraer JSON
-        inicio = texto.find("{")
-        fin = texto.rfind("}") + 1
-        
-        if inicio == -1 or fin == 0:
-            return {"success": False, "error": "No JSON found"}
-        
-        json_str = texto[inicio:fin]
-        datos = json.loads(json_str)
+        # USAR PARSER ROBUSTO
+        datos = parsear_respuesta_vision_api(texto_raw)
         
         # Validar 100 respuestas
         if "respuestas" in datos:
@@ -257,12 +250,13 @@ def extraer_con_claude(imagen_path: str) -> Dict:
 
 
 # ============================================================================
-# EXTRACCIÓN CON GOOGLE (GEMINI)
+# REEMPLAZAR: extraer_con_google_vision()
 # ============================================================================
 
 def extraer_con_google_vision(imagen_path: str) -> Dict:
     """
     Extrae datos con Gemini 1.5 Flash.
+    CON PARSING ROBUSTO.
     """
     try:
         # Subir imagen
@@ -272,20 +266,13 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         
         response = model.generate_content([
             uploaded_file,
-            PROMPT_BASE
+            PROMPT_BASE + "\n\nCRÍTICO: Tu respuesta DEBE ser ÚNICAMENTE el objeto JSON. NO uses markdown. NO agregues explicaciones."
         ])
         
-        texto = response.text.strip()
+        texto_raw = response.text.strip()
         
-        # Extraer JSON
-        inicio = texto.find("{")
-        fin = texto.rfind("}") + 1
-        
-        if inicio == -1 or fin == 0:
-            return {"success": False, "error": "No JSON found"}
-        
-        json_str = texto[inicio:fin]
-        datos = json.loads(json_str)
+        # USAR PARSER ROBUSTO
+        datos = parsear_respuesta_vision_api(texto_raw)
         
         # Validar 100 respuestas
         if "respuestas" in datos:
@@ -293,7 +280,10 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
             datos["stats"] = stats
         
         # Limpiar archivo
-        genai.delete_file(uploaded_file.name)
+        try:
+            genai.delete_file(uploaded_file.name)
+        except:
+            pass
         
         return {
             "success": True,
@@ -308,6 +298,7 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
             "api": "google",
             "error": str(e)
         }
+
 
 
 # ============================================================================
