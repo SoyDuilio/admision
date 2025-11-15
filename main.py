@@ -927,70 +927,326 @@ import uuid
 @app.post("/api/procesar-hoja-completa")
 async def procesar_hoja_completa(
     file: UploadFile = File(...),
-    api: str = "google"
+    metadata_captura: str = Form(None),
+    image_hash: str = Form(None),
+    api: str = Form("auto"),
+    db: Session = Depends(get_db)
 ):
     """
-    Endpoint que procesa una hoja de respuestas completa.
-    
-    ESTE ES EL QUE DABA ERROR 404 - AHORA FUNCIONA
+    Endpoint COMPLETO que:
+    1. Guarda la imagen
+    2. Extrae códigos y respuestas con Vision API (usando vision_service_v2)
+    3. Guarda en BD (hojas_respuestas + respuestas)
+    4. Califica si existe gabarito
+    5. Retorna resultado completo
     """
+    
+    from app.models import HojaRespuesta, Postulante, ClaveRespuesta, Calificacion
+    from app.services.vision_service_v2 import procesar_hoja_completa_v2, procesar_y_guardar_respuestas, calificar_hoja_con_gabarito
+    import json
+    from pathlib import Path
+    import shutil
+    import uuid
+    from datetime import datetime
+    
+    inicio = datetime.now()
     
     try:
         # ====================================================================
-        # 1. GUARDAR IMAGEN TEMPORAL
+        # 1. GUARDAR IMAGEN EN UPLOADS
         # ====================================================================
         
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         unique_id = str(uuid.uuid4())[:8]
-        filename = f"{timestamp}_{unique_id}.jpg"
+        filename = f"hoja_{timestamp}_{unique_id}.jpg"
         
-        # Crear carpeta si no existe
-        temp_dir = Path("temp_uploads")
-        temp_dir.mkdir(parents=True, exist_ok=True)
+        # Carpeta permanente
+        uploads_dir = Path("uploads/hojas_originales")
+        uploads_dir.mkdir(parents=True, exist_ok=True)
         
-        temp_path = temp_dir / filename
+        filepath = uploads_dir / filename
         
         # Guardar archivo
-        with temp_path.open("wb") as buffer:
+        with filepath.open("wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
         
+        imagen_url = f"/uploads/hojas_originales/{filename}"
+        
         # ====================================================================
-        # 2. PROCESAR CON TU CÓDIGO EXISTENTE
+        # 2. PROCESAR CON VISION API (usando tu vision_service_v2)
         # ====================================================================
         
-        # Aquí llamas a tu función existente de procesamiento
-        # Por ejemplo, si tienes algo como:
-        # from app.services.vision_service_v2 import procesar_hoja_con_api
+        print(f"\n🚀 Procesando con Vision Service V2...")
+        print(f"📁 Archivo: {filepath}")
         
-        # Leer la imagen
-        with open(temp_path, "rb") as f:
-            image_bytes = f.read()
+        # Llamar a tu función que ya tiene el fallback inteligente
+        resultado_vision = await procesar_hoja_completa_v2(str(filepath))
         
-        # Procesar (usa tu función existente)
-        # resultado = await procesar_hoja_con_api(image_bytes, api)
+        # Validar resultado
+        if not resultado_vision.get("success"):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Error en Vision API: {resultado_vision.get('error', 'Error desconocido')}"
+            )
         
-        # POR AHORA, retorna esto:
-        resultado = {
-            "success": True,
-            "message": f"Imagen guardada correctamente en {filename}",
-            "api": api,
-            "timestamp": timestamp
+        # Extraer datos
+        datos_vision = resultado_vision.get("datos", {})
+        respuestas_array = datos_vision.get("respuestas", [])
+        
+        # Validar 100 respuestas
+        if len(respuestas_array) != 100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Se esperaban 100 respuestas, se detectaron {len(respuestas_array)}"
+            )
+        
+        # Extraer código de hoja del resultado
+        codigo_hoja = datos_vision.get("codigo_hoja")
+        
+        if not codigo_hoja:
+            # Generar código temporal si no se detectó
+            codigo_hoja = f"TEMP{timestamp}{unique_id}"
+        
+        # ====================================================================
+        # 3. BUSCAR O CREAR POSTULANTE
+        # ====================================================================
+        
+        postulante = db.query(Postulante).filter(
+            Postulante.codigo_unico == codigo_hoja
+        ).first()
+        
+        if not postulante:
+            # Crear postulante temporal
+            postulante = Postulante(
+                codigo_unico=codigo_hoja,
+                dni="PENDIENTE",
+                nombres="Postulante",
+                apellido_paterno="Pendiente",
+                apellido_materno="De Registro",
+                programa_educativo="Por Asignar"
+            )
+            db.add(postulante)
+            db.flush()
+        
+        # ====================================================================
+        # 4. GUARDAR HOJA EN BD
+        # ====================================================================
+        
+        tiempo_procesamiento = (datetime.now() - inicio).total_seconds()
+        
+        # Parsear metadata
+        metadata_dict = {}
+        if metadata_captura:
+            try:
+                metadata_dict = json.loads(metadata_captura)
+            except:
+                pass
+        
+        # Agregar info del procesamiento
+        metadata_dict["vision_result"] = {
+            "api": resultado_vision.get("api"),
+            "modelo": resultado_vision.get("modelo"),
+            "preprocessing": resultado_vision.get("preprocessing", {})
         }
         
+        hoja = HojaRespuesta(
+            postulante_id=postulante.id,
+            codigo_hoja=codigo_hoja,
+            codigo_aula=metadata_dict.get("codigo_aula"),
+            imagen_url=imagen_url,
+            imagen_original_nombre=file.filename,
+            estado="procesado",
+            api_utilizada=resultado_vision.get("api", "auto"),
+            tiempo_procesamiento=tiempo_procesamiento,
+            respuestas_detectadas=len(respuestas_array),
+            metadata_json=metadata_dict,
+            imagen_hash=image_hash
+        )
+        
+        db.add(hoja)
+        db.flush()  # Para obtener hoja.id
+        
         # ====================================================================
-        # 3. LIMPIAR TEMPORAL (opcional - comentado por ahora)
+        # 5. GUARDAR LAS 100 RESPUESTAS (usando tu función)
         # ====================================================================
         
-        # temp_path.unlink()  # Descomentar para borrar
+        print(f"💾 Guardando 100 respuestas en BD...")
         
-        return resultado
+        # Preparar resultado para tu función
+        resultado_para_guardar = {
+            "respuestas": respuestas_array
+        }
         
+        stats_guardado = await procesar_y_guardar_respuestas(
+            hoja_respuesta_id=hoja.id,
+            resultado_api=resultado_para_guardar,
+            db=db
+        )
+        
+        # ====================================================================
+        # 6. CALIFICAR SI EXISTE GABARITO
+        # ====================================================================
+        
+        gabarito = db.query(ClaveRespuesta).filter(
+            ClaveRespuesta.proceso_admision == "ADMISION_2025_2"
+        ).first()
+        
+        calificacion_data = None
+        
+        if gabarito:
+            print(f"📊 Calificando con gabarito existente...")
+            
+            # Usar tu función de calificación
+            resultado_calificacion = await calificar_hoja_con_gabarito(
+                hoja_respuesta_id=hoja.id,
+                gabarito_id=gabarito.id,
+                db=db
+            )
+            
+            # Guardar en tabla calificaciones
+            calificacion_existente = db.query(Calificacion).filter(
+                Calificacion.postulante_id == postulante.id
+            ).first()
+            
+            if calificacion_existente:
+                calificacion_existente.nota = resultado_calificacion["nota_final"]
+                calificacion_existente.correctas = resultado_calificacion["correctas"]
+                calificacion_existente.incorrectas = resultado_calificacion["incorrectas"]
+                calificacion_existente.en_blanco = resultado_calificacion["no_calificables"]
+                calificacion_existente.porcentaje_aciertos = resultado_calificacion["porcentaje"]
+                calificacion_existente.aprobado = resultado_calificacion["nota_final"] >= 10.5
+                calificacion_existente.calificado_at = datetime.now()
+            else:
+                calificacion = Calificacion(
+                    postulante_id=postulante.id,
+                    nota=resultado_calificacion["nota_final"],
+                    correctas=resultado_calificacion["correctas"],
+                    incorrectas=resultado_calificacion["incorrectas"],
+                    en_blanco=resultado_calificacion["no_calificables"],
+                    porcentaje_aciertos=resultado_calificacion["porcentaje"],
+                    aprobado=resultado_calificacion["nota_final"] >= 10.5,
+                    nota_minima=10.5,
+                    calificado_at=datetime.now()
+                )
+                db.add(calificacion)
+            
+            db.commit()
+            
+            calificacion_data = {
+                "nota": resultado_calificacion["nota_final"],
+                "correctas": resultado_calificacion["correctas"],
+                "incorrectas": resultado_calificacion["incorrectas"],
+                "en_blanco": resultado_calificacion["no_calificables"],
+                "porcentaje": resultado_calificacion["porcentaje"],
+                "aprobado": resultado_calificacion["nota_final"] >= 10.5
+            }
+        else:
+            db.commit()
+        
+        # ====================================================================
+        # 7. PREPARAR RESPUESTA
+        # ====================================================================
+        
+        stats = stats_guardado.get("estadisticas", {})
+        
+        return {
+            "success": True,
+            "message": "Hoja procesada exitosamente",
+            
+            # Datos de la hoja
+            "hoja_respuesta_id": hoja.id,
+            "codigo_hoja": codigo_hoja,
+            
+            # Postulante
+            "postulante": {
+                "id": postulante.id,
+                "dni": postulante.dni,
+                "nombres": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
+                "programa": postulante.programa_educativo
+            },
+            
+            # Procesamiento
+            "procesamiento": {
+                "api": resultado_vision.get("api"),
+                "modelo": resultado_vision.get("modelo"),
+                "tiempo": round(tiempo_procesamiento, 2)
+            },
+            
+            # Respuestas detectadas
+            "respuestas_detectadas": len(respuestas_array),
+            "detalle": {
+                "total_respuestas": 100,
+                "validas": stats.get("validas", 0),
+                "vacias": stats.get("vacias", 0),
+                "problematicas": stats.get("letra_invalida", 0) + stats.get("garabatos", 0) + stats.get("multiple", 0) + stats.get("ilegible", 0)
+            },
+            
+            # Calificación (si existe)
+            "calificacion": calificacion_data
+        }
+        
+    except HTTPException:
+        raise
+    
     except Exception as e:
+        db.rollback()
+        
+        import traceback
+        error_detail = traceback.format_exc()
+        
+        print(f"\n❌ ERROR EN PROCESAMIENTO:")
+        print(error_detail)
+        
         return {
             "success": False,
-            "error": str(e)
+            "error": {
+                "titulo": "Error en Procesamiento",
+                "mensaje": str(e),
+                "icono": "❌",
+                "detalles_tecnicos": error_detail
+            }
         }
 
+
+# ============================================================================
+# ENDPOINT ADICIONAL: Marcar hoja para revisión manual
+# ============================================================================
+
+@app.post("/api/hoja/{hoja_id}/marcar-revision")
+async def marcar_hoja_revision(
+    hoja_id: int,
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Marca una hoja para revisión manual después de la validación visual del operador.
+    """
+    
+    from app.models import HojaRespuesta
+    from datetime import datetime
+    
+    requiere_revision_manual = data.get('requiere_revision_manual')
+    observacion = data.get('observacion')
+    
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_id).first()
+    
+    if not hoja:
+        raise HTTPException(status_code=404, detail="Hoja no encontrada")
+    
+    # Actualizar metadata
+    metadata = hoja.metadata_json or {}
+    metadata['requiere_revision_manual'] = requiere_revision_manual
+    metadata['observacion_operador'] = observacion
+    metadata['marcado_revision_at'] = datetime.now().isoformat()
+    
+    hoja.metadata_json = metadata
+    
+    db.commit()
+    
+    return {
+        "success": True,
+        "message": "Hoja marcada para revisión" if requiere_revision_manual else "Hoja marcada como OK"
+    }
 
 
 # ============================================================================
