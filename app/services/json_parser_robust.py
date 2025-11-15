@@ -18,12 +18,16 @@ from typing import Dict, Optional
 
 def limpiar_markdown(texto: str) -> str:
     """
-    Remueve markdown de bloques de código.
+    Remueve markdown de bloques de código y caracteres invisibles.
     
     Ejemplos:
         ```json\n{...}\n``` → {...}
         ```\n{...}\n``` → {...}
+        \ufeff{...} → {...}  (BOM)
     """
+    # Limpiar BOM y caracteres invisibles
+    texto = texto.strip().lstrip("\ufeff").lstrip("\u200b").lstrip("\u200c").lstrip("\u200d")
+    
     # Remover ```json o ``` al inicio
     texto = re.sub(r'^```(?:json)?\s*\n?', '', texto.strip())
     

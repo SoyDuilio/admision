@@ -26,6 +26,13 @@ from app.models import HojaRespuesta, Respuesta
 from app.services.prompt_vision_v4 import PROMPT_DETECCION_RESPUESTAS_V4 as PROMPT_DETECCION_RESPUESTAS_V3
 
 from app.services.json_parser_robust import parsear_respuesta_vision_api
+from app.services.prompt_vision_v5 import (
+    PROMPT_DETECCION_RESPUESTAS_V5,
+    SYSTEM_MESSAGE_OPENAI,
+    SUFFIX_CLAUDE,
+    SUFFIX_GEMINI
+)
+
 
 # ============================================================================
 # CONFIGURACIÓN DE APIs
@@ -41,7 +48,7 @@ genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 # ============================================================================
 
 # Usar el nuevo prompt
-PROMPT_BASE = PROMPT_DETECCION_RESPUESTAS_V3
+PROMPT_BASE = PROMPT_DETECCION_RESPUESTAS_V5
 
 
 # ============================================================================
@@ -111,21 +118,13 @@ def validar_100_respuestas(respuestas: List) -> Tuple[List, Dict]:
 
 
 # ============================================================================
-# EXTRACCIÓN CON OPENAI
-# ============================================================================
-
-# ============================================================================
-# REEMPLAZAR: extraer_con_openai()
-# ============================================================================
-
-# ============================================================================
 # REEMPLAZAR: extraer_con_openai()
 # ============================================================================
 
 def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
     """
     Extrae datos con OpenAI (gpt-4o-mini o gpt-4o).
-    CON PARSING ROBUSTO.
+    CON PARSING ROBUSTO Y PROMPT V5.
     """
     try:
         with open(imagen_path, "rb") as f:
@@ -136,7 +135,7 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
             messages=[
                 {
                     "role": "system",
-                    "content": "Eres un experto lector OCR de formularios académicos. SOLO responde con JSON válido, sin markdown ni texto adicional."
+                    "content": SYSTEM_MESSAGE_OPENAI
                 },
                 {
                     "role": "user",
@@ -157,13 +156,15 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
         
         texto_raw = response.choices[0].message.content.strip()
         
+        print(f"📄 Respuesta cruda OpenAI (primeros 200 chars):")
+        print(texto_raw[:200])
+        
         # USAR PARSER ROBUSTO
         datos = parsear_respuesta_vision_api(texto_raw)
         
-        # Validar 100 respuestas
-        if "respuestas" in datos:
-            datos["respuestas"], stats = validar_100_respuestas(datos["respuestas"])
-            datos["stats"] = stats
+        # Validar estructura esperada
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
         
         return {
             "success": True,
@@ -173,6 +174,7 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
         }
         
     except Exception as e:
+        print(f"❌ Error en extraer_con_openai: {str(e)}")
         return {
             "success": False,
             "api": "openai",
@@ -188,7 +190,7 @@ def extraer_con_openai(imagen_path: str, modelo: str = "gpt-4o-mini") -> Dict:
 def extraer_con_claude(imagen_path: str) -> Dict:
     """
     Extrae datos con Claude Sonnet 4.
-    CON PARSING ROBUSTO.
+    CON PARSING ROBUSTO Y PROMPT V5.
     """
     try:
         with open(imagen_path, "rb") as f:
@@ -221,7 +223,7 @@ def extraer_con_claude(imagen_path: str) -> Dict:
                         },
                         {
                             "type": "text",
-                            "text": PROMPT_BASE + "\n\nIMPORTANTE: Responde SOLO con el objeto JSON, sin explicaciones ni markdown."
+                            "text": PROMPT_BASE + SUFFIX_CLAUDE
                         }
                     ]
                 }
@@ -230,13 +232,15 @@ def extraer_con_claude(imagen_path: str) -> Dict:
         
         texto_raw = message.content[0].text.strip()
         
+        print(f"📄 Respuesta cruda Claude (primeros 200 chars):")
+        print(texto_raw[:200])
+        
         # USAR PARSER ROBUSTO
         datos = parsear_respuesta_vision_api(texto_raw)
         
-        # Validar 100 respuestas
-        if "respuestas" in datos:
-            datos["respuestas"], stats = validar_100_respuestas(datos["respuestas"])
-            datos["stats"] = stats
+        # Validar estructura esperada
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
         
         return {
             "success": True,
@@ -246,6 +250,7 @@ def extraer_con_claude(imagen_path: str) -> Dict:
         }
         
     except Exception as e:
+        print(f"❌ Error en extraer_con_claude: {str(e)}")
         return {
             "success": False,
             "api": "anthropic",
@@ -259,30 +264,32 @@ def extraer_con_claude(imagen_path: str) -> Dict:
 
 def extraer_con_google_vision(imagen_path: str) -> Dict:
     """
-    Extrae datos con Gemini.
-    CON PARSING ROBUSTO.
+    Extrae datos con Gemini Pro Vision.
+    CON PARSING ROBUSTO Y PROMPT V5.
     """
     try:
         # Subir imagen
         uploaded_file = genai.upload_file(imagen_path)
         
-        # CAMBIO: Usar gemini-1.5-pro en lugar de flash
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        # Usar gemini-pro-vision (modelo más compatible)
+        model = genai.GenerativeModel("gemini-pro-vision")
         
         response = model.generate_content([
             uploaded_file,
-            PROMPT_BASE + "\n\nCRÍTICO: Tu respuesta DEBE ser ÚNICAMENTE el objeto JSON. NO uses markdown. NO agregues explicaciones."
+            PROMPT_BASE + SUFFIX_GEMINI
         ])
         
         texto_raw = response.text.strip()
         
+        print(f"📄 Respuesta cruda Gemini (primeros 200 chars):")
+        print(texto_raw[:200])
+        
         # USAR PARSER ROBUSTO
         datos = parsear_respuesta_vision_api(texto_raw)
         
-        # Validar 100 respuestas
-        if "respuestas" in datos:
-            datos["respuestas"], stats = validar_100_respuestas(datos["respuestas"])
-            datos["stats"] = stats
+        # Validar estructura esperada
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
         
         # Limpiar archivo
         try:
@@ -293,16 +300,18 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         return {
             "success": True,
             "api": "google",
-            "modelo": "gemini-1.5-pro",
+            "modelo": "gemini-pro-vision",
             "datos": datos
         }
         
     except Exception as e:
+        print(f"❌ Error en extraer_con_google_vision: {str(e)}")
         return {
             "success": False,
             "api": "google",
             "error": str(e)
         }
+
 
 # ============================================================================
 # FUNCIÓN PRINCIPAL CON PRE-PROCESAMIENTO
