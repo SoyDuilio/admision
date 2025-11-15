@@ -271,8 +271,8 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         # Subir imagen
         uploaded_file = genai.upload_file(imagen_path)
         
-        # Usar gemini-pro-vision (modelo más compatible)
-        model = genai.GenerativeModel("gemini-pro-vision")
+        # Usar gemini-1.5-flash (modelo más compatible)
+        model = genai.GenerativeModel("gemini-1.5-flash")
         
         response = model.generate_content([
             uploaded_file,
@@ -300,7 +300,7 @@ def extraer_con_google_vision(imagen_path: str) -> Dict:
         return {
             "success": True,
             "api": "google",
-            "modelo": "gemini-pro-vision",
+            "modelo": "gemini-1.5-flash",
             "datos": datos
         }
         
