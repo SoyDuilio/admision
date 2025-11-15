@@ -3,14 +3,11 @@ Vision Service V3 - Procesamiento Dividido en 2 Partes
 app/services/vision_service_v3.py
 
 ESTRATEGIA:
+- Pre-procesamiento OpenCV V2 (mejorado)
+- Prompt V6 (ultra-específico para estructura de 5 columnas)
 - Request 1 (GPT-4O): Metadatos + Respuestas 1-50
 - Request 2 (GPT-4O-MINI): Respuestas 51-100
 - Merge de resultados en paralelo
-
-VENTAJAS:
-- Más rápido (requests paralelos)
-- Sin timeout (cada request es más corto)
-- Mayor precisión (menos datos por request)
 """
 
 import os
@@ -24,9 +21,10 @@ from openai import OpenAI
 import google.generativeai as genai
 
 from app.services.json_parser_robust import parsear_respuesta_vision_api
-from app.services.prompt_vision_dividido import (
-    PROMPT_PARTE_1_METADATOS_Y_PRIMERA_MITAD,
-    PROMPT_PARTE_2_SEGUNDA_MITAD,
+from app.services.image_preprocessor_v2 import ImagePreprocessorV2
+from app.services.prompt_vision_v6 import (
+    PROMPT_PARTE_1_V6,
+    PROMPT_PARTE_2_V6,
     SYSTEM_MESSAGE_OPENAI,
     SUFFIX_CLAUDE,
     SUFFIX_GEMINI
@@ -63,7 +61,7 @@ async def extraer_parte1_con_gpt4o(imagen_path: str) -> Dict:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": PROMPT_PARTE_1_METADATOS_Y_PRIMERA_MITAD},
+                        {"type": "text", "text": PROMPT_PARTE_1_V6},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -157,7 +155,7 @@ async def extraer_parte2_con_gpt4o_mini(imagen_path: str) -> Dict:
                 {
                     "role": "user",
                     "content": [
-                        {"type": "text", "text": PROMPT_PARTE_2_SEGUNDA_MITAD},
+                        {"type": "text", "text": PROMPT_PARTE_2_V6},
                         {
                             "type": "image_url",
                             "image_url": {
@@ -167,7 +165,7 @@ async def extraer_parte2_con_gpt4o_mini(imagen_path: str) -> Dict:
                     ]
                 }
             ],
-            max_tokens=2500,
+            max_tokens=3500,  # Aumentado de 2500 a 3500
             temperature=0
         )
         
@@ -281,6 +279,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     Procesa una hoja dividiéndola en 2 requests paralelos.
     
     FLUJO:
+    0. Pre-procesamiento OpenCV V2 (mejorado)
     1. Request 1 (GPT-4O): Metadatos + Resp 1-50  → ~8 seg
     2. Request 2 (GPT-4O-MINI): Resp 51-100       → ~6 seg
     3. Merge de resultados
@@ -288,7 +287,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     Total: ~8-10 segundos (en paralelo)
     
     Args:
-        imagen_path: Ruta de la imagen procesada con OpenCV
+        imagen_path: Ruta de la imagen original
         
     Returns:
         Dict con todos los datos extraídos
@@ -297,9 +296,30 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     inicio = time.time()
     
     print("\n" + "="*60)
-    print("🚀 PROCESAMIENTO DIVIDIDO EN 2 PARTES (PARALELO)")
+    print("🚀 PROCESAMIENTO DIVIDIDO EN 2 PARTES (V2 + V6)")
     print("="*60)
-    print(f"📸 Imagen: {os.path.basename(imagen_path)}")
+    print(f"📸 Imagen original: {os.path.basename(imagen_path)}")
+    
+    # ========================================================================
+    # PASO 0: PRE-PROCESAMIENTO OPENCV V2
+    # ========================================================================
+    
+    preprocessor = ImagePreprocessorV2()
+    imagen_procesada = imagen_path
+    preprocessing_metadata = {"used": False}
+    
+    try:
+        imagen_procesada, preprocessing_metadata = preprocessor.procesar_completo(imagen_path)
+        preprocessing_metadata["used"] = True
+        print(f"✅ Pre-procesamiento V2 completado")
+        print(f"📸 Imagen procesada: {os.path.basename(imagen_procesada)}")
+    except Exception as e:
+        print(f"⚠️ Pre-procesamiento V2 falló: {e}")
+        print(f"ℹ️  Usando imagen original")
+    
+    # ========================================================================
+    # PASO 1-2: REQUESTS PARALELOS
+    # ========================================================================
     
     try:
         # Ejecutar ambos requests EN PARALELO
@@ -308,8 +328,8 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         print("   📍 Parte 2: GPT-4O-MINI (Resp 51-100)")
         
         resultado1, resultado2 = await asyncio.gather(
-            extraer_parte1_con_gpt4o(imagen_path),
-            extraer_parte2_con_gpt4o_mini(imagen_path)
+            extraer_parte1_con_gpt4o(imagen_procesada),
+            extraer_parte2_con_gpt4o_mini(imagen_procesada)
         )
         
         print(f"\n✅ Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
@@ -329,14 +349,21 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         print(f"   - Código Aula: {datos_completos['codigo_aula']}")
         print(f"   - Código Hoja: {datos_completos['codigo_hoja']}")
         print(f"📝 Respuestas: {len(datos_completos['respuestas'])}/100")
+        
+        # Contar válidas vs null
+        validas = sum(1 for r in datos_completos['respuestas'] if r in ['A','B','C','D','E'])
+        nulas = sum(1 for r in datos_completos['respuestas'] if r is None)
+        print(f"   - Válidas: {validas}")
+        print(f"   - Nulls: {nulas}")
         print("="*60 + "\n")
         
         return {
             "success": True,
             "datos": datos_completos,
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_paralelo",
-            "apis_usadas": ["gpt-4o", "gpt-4o-mini"]
+            "metodo": "dividido_paralelo_v2",
+            "apis_usadas": ["gpt-4o", "gpt-4o-mini"],
+            "preprocessing": preprocessing_metadata
         }
         
     except Exception as e:
@@ -348,7 +375,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": False,
             "error": str(e),
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_paralelo"
+            "metodo": "dividido_paralelo_v2"
         }
 
 
