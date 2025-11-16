@@ -760,8 +760,10 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     try:
         print("\n🤖 Extrayendo datos con GEMINI ESTRUCTURADO...")
         print("   📍 Schema-based extraction (100 respuestas + metadatos)")
+        print("   ℹ️  Usando imagen ORIGINAL (sin OpenCV para mejor OCR de códigos)")
         
-        resultado_gemini = await extract_data_compatible(imagen_procesada)
+        # Usar imagen ORIGINAL para Gemini (mejor para OCR de texto pequeño)
+        resultado_gemini = await extract_data_compatible(imagen_path)
         
         if resultado_gemini["success"]:
             print("\n✅ GEMINI ESTRUCTURADO: ÉXITO")
