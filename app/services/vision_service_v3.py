@@ -1,27 +1,27 @@
 """
 Vision Service V3 - Procesamiento con Gemini Estructurado
 
-ESTRATEGIA V7 - GEMINI STRUCTURED SCHEMA:
-- Pre-procesamiento OpenCV V2 + ZOOM 2X (sin corrección de perspectiva)
-- PRIMARIO: Gemini 2.0 Flash con Schema Estructurado (1 llamada para todo)
-- FALLBACK: Claude Sonnet 4 dividido en 2 partes
+ESTRATEGIA V8 - IMAGEN ORIGINAL PARA GEMINI:
+- PRIMARIO: Gemini 2.0 Flash con Schema Estructurado (imagen ORIGINAL)
+- FALLBACK: Claude Sonnet 4 dividido en 2 partes (imagen con OpenCV)
 - Validación y merge de resultados
 
-VENTAJAS DEL SCHEMA ESTRUCTURADO:
-✅ Formato JSON garantizado por Gemini
-✅ 100 respuestas SIEMPRE presentes (1-100)
-✅ 4 códigos SIEMPRE presentes (validación automática)
-✅ Una sola llamada (vs 2 llamadas divididas)
-✅ ~6-8 segundos total (vs 15-20 seg con división)
-✅ Más económico (1 request vs 2)
-✅ Menos propenso a errores de merge
+FLUJO OPTIMIZADO:
+1. Imagen original → Gemini directamente (SIN OpenCV)
+   - Mejor OCR de códigos alfanuméricos pequeños
+   - Mejor detección de escritura manuscrita
+   - ~6-8 segundos
+2. Si falla → Pre-procesar con OpenCV → Claude
+   - Zoom 2X + CLAHE + Nitidez
+   - Mejor para rectángulos de respuestas
+   - ~15-20 segundos
 
-MEJORAS OPENCV:
-✅ Zoom 2X con interpolación bicúbica (letras 2x más grandes)
-✅ CLAHE agresivo para mejor contraste
-✅ Nitidez aumentada
-✅ Sin corrección de perspectiva (evita reducción de imagen)
-✅ Imagen final mantiene tamaño 2880x3840px
+VENTAJAS:
+✅ Gemini: Imagen original = mejor OCR general
+✅ Claude: Imagen procesada = mejor detección de rectángulos
+✅ Cada API recibe la imagen óptima para su caso de uso
+✅ Formato JSON garantizado por schema estructurado
+✅ Más rápido (no procesar si no es necesario)
 """
 
 import os
@@ -736,22 +736,19 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     print(f"📸 Imagen original: {os.path.basename(imagen_path)}")
     
     # ========================================================================
-    # PASO 0: PRE-PROCESAMIENTO OPENCV V2 + ZOOM 2X
+    # PASO 0: SALTAR PRE-PROCESAMIENTO OPENCV PARA GEMINI
     # ========================================================================
     
-    preprocessor = ImagePreprocessorV2()
-    imagen_procesada = imagen_path
-    preprocessing_metadata = {"used": False}
+    # Gemini funciona MEJOR con imagen original (sin procesar)
+    # OpenCV está diseñado para mejorar rectángulos, pero destruye OCR de texto
+    imagen_para_gemini = imagen_path  # Usar ORIGINAL
+    preprocessing_metadata = {
+        "used": False,
+        "reason": "Gemini works better with original images"
+    }
     
-    try:
-        imagen_procesada, preprocessing_metadata = preprocessor.procesar_completo(imagen_path)
-        preprocessing_metadata["used"] = True
-        print(f"✅ Pre-procesamiento V2 + ZOOM 2X completado")
-        print(f"📸 Imagen procesada: {os.path.basename(imagen_procesada)}")
-    except Exception as e:
-        print(f"⚠️ Pre-procesamiento falló: {e}")
-        print(f"ℹ️  Usando imagen original")
-        imagen_procesada = imagen_path
+    print("ℹ️  OpenCV DESACTIVADO para Gemini")
+    print("📸 Usando imagen ORIGINAL sin procesamiento")
     
     # ========================================================================
     # PASO 1: GEMINI ESTRUCTURADO (UNA SOLA LLAMADA)
@@ -760,10 +757,10 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     try:
         print("\n🤖 Extrayendo datos con GEMINI ESTRUCTURADO...")
         print("   📍 Schema-based extraction (100 respuestas + metadatos)")
-        print("   ℹ️  Usando imagen ORIGINAL (sin OpenCV para mejor OCR de códigos)")
+        print("   📸 Imagen: ORIGINAL (sin OpenCV)")
         
-        # Usar imagen ORIGINAL para Gemini (mejor para OCR de texto pequeño)
-        resultado_gemini = await extract_data_compatible(imagen_path)
+        # Usar imagen ORIGINAL para Gemini (mejor para OCR)
+        resultado_gemini = await extract_data_compatible(imagen_para_gemini)
         
         if resultado_gemini["success"]:
             print("\n✅ GEMINI ESTRUCTURADO: ÉXITO")
@@ -812,6 +809,22 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     
     try:
         print("\n🔄 Ejecutando fallback con CLAUDE...")
+        print("🔧 Pre-procesando imagen con OpenCV para Claude...")
+        
+        # Para Claude, SÍ usar OpenCV (mejor para rectángulos)
+        preprocessor = ImagePreprocessorV2()
+        imagen_procesada = imagen_path
+        
+        try:
+            imagen_procesada, preprocessing_metadata = preprocessor.procesar_completo(imagen_path)
+            preprocessing_metadata["used"] = True
+            print(f"✅ Pre-procesamiento completado para Claude")
+            print(f"📸 Imagen procesada: {os.path.basename(imagen_procesada)}")
+        except Exception as e:
+            print(f"⚠️ Pre-procesamiento falló: {e}")
+            print(f"ℹ️  Usando imagen original")
+            imagen_procesada = imagen_path
+        
         print("   📍 Parte 1: CLAUDE (Metadatos + Resp 1-50)")
         print("   📍 Parte 2: CLAUDE (Resp 51-100)")
         
@@ -951,7 +964,7 @@ async def procesar_y_guardar_respuestas(
     for idx, respuesta_detectada in enumerate(respuestas_array, start=1):
         # Normalizar
         if respuesta_detectada is None:
-            respuesta_final = "VACIO"
+            respuesta_final = ""  # Vacío = string vacío (no "VACIO")
             es_valida = False
             confianza = None
         elif respuesta_detectada in ['A', 'B', 'C', 'D', 'E']:
@@ -959,8 +972,8 @@ async def procesar_y_guardar_respuestas(
             es_valida = True
             confianza = 0.95  # Alta confianza por defecto
         else:
-            # Casos raros
-            respuesta_final = "INVALIDA"
+            # Casos raros: símbolos, garabatos, etc.
+            respuesta_final = "?"  # Invalida = "?" (1 carácter)
             es_valida = False
             confianza = 0.5
         
