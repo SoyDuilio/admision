@@ -36,7 +36,6 @@ import google.generativeai as genai
 
 from app.services.json_parser_robust import parsear_respuesta_vision_api
 from app.services.image_preprocessor_v2 import ImagePreprocessorV2
-from app.services.gemini_extractor_structured import extract_data_compatible
 from app.services.prompt_vision_v6 import (
     PROMPT_PARTE_1_V6,
     PROMPT_PARTE_2_V6,
@@ -52,6 +51,9 @@ from app.services.prompt_vision_v6 import (
 openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+
+# Importar DESPUÉS de configurar Gemini
+from app.services.gemini_extractor_structured import extract_data_compatible
 
 
 # ============================================================================
@@ -436,8 +438,8 @@ async def extraer_parte1_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        # Usar gemini-2.5-flash (más disponible)
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        # Usar gemini-2.5-flash-exp (más disponible)
+        model = genai.GenerativeModel("gemini-2.5-flash-exp")
         
         response = model.generate_content([
             uploaded_file,
@@ -506,7 +508,7 @@ async def extraer_parte2_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        model = genai.GenerativeModel("gemini-2.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash-exp")
         
         response = model.generate_content([
             uploaded_file,

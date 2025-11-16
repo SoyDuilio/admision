@@ -15,12 +15,15 @@ from google.generativeai.types import GenerationConfig, content_types
 # CONFIGURACIÓN
 # ============================================================================
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY environment variable is not set")
-
-genai.configure(api_key=GEMINI_API_KEY)
+# Usar la configuración existente de Gemini desde vision_service_v3
+# No requerir GEMINI_API_KEY separada
+try:
+    import google.generativeai as genai
+    # La configuración ya está hecha en vision_service_v3.py
+    # No necesitamos configurar de nuevo aquí
+except Exception as e:
+    print(f"⚠️  Warning al importar Gemini: {e}")
+    genai = None
 
 
 # ============================================================================
