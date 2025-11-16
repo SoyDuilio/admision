@@ -44,7 +44,8 @@ async def procesar_hoja_completa(
     from app.services.vision_service_v3 import (
         procesar_hoja_completa_v3,
         procesar_y_guardar_respuestas,
-        calificar_hoja_con_gabarito
+        calificar_hoja_con_gabarito,
+        generar_reporte_detallado
     )
     
     inicio = datetime.now()
@@ -215,7 +216,31 @@ async def procesar_hoja_completa(
         hoja.imagen_url = imagen_url
         hoja.imagen_original_nombre = file.filename
         hoja.estado = "procesado"
-        hoja.api_utilizada = resultado_vision.get("api", "auto")
+        
+        # Mapear API usada a valores permitidos por el constraint
+        apis_usadas = resultado_vision.get("apis_usadas", [])
+        if apis_usadas:
+            # Extraer nombre de API (ej: "parte1:gpt-4o" → "gpt-4o")
+            primera_api = apis_usadas[0]
+            if ':' in primera_api:
+                api_name = primera_api.split(':')[1]
+            else:
+                api_name = primera_api
+            
+            # Mapear a valores permitidos en BD
+            api_map = {
+                "gpt-4o": "openai",
+                "gpt-4o-mini": "openai",
+                "claude": "anthropic",
+                "gemini": "google"
+            }
+            
+            hoja.api_utilizada = api_map.get(api_name, "openai")
+        else:
+            # Fallback al valor antiguo si existe
+            hoja.api_utilizada = resultado_vision.get("api", "openai")
+
+        
         hoja.tiempo_procesamiento = tiempo_procesamiento
         hoja.respuestas_detectadas = len(respuestas_array)
         hoja.metadata_json = json.dumps(metadata_dict)
