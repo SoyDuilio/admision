@@ -134,7 +134,282 @@ async def extraer_parte1_con_gpt4o(imagen_path: str) -> Dict:
 
 
 # ============================================================================
-# EXTRACCIÓN PARTE 2: SEGUNDA MITAD
+# EXTRACCIÓN PARTE 2: SEGUNDA MITAD CON GPT-4O
+# ============================================================================
+
+async def extraer_parte2_con_gpt4o(imagen_path: str) -> Dict:
+    """
+    Extrae respuestas 51-100 con GPT-4O (en lugar de GPT-4O-MINI).
+    """
+    try:
+        with open(imagen_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {
+                    "role": "system",
+                    "content": SYSTEM_MESSAGE_OPENAI
+                },
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": PROMPT_PARTE_2_V6},
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{image_data}"
+                            }
+                        }
+                    ]
+                }
+            ],
+            max_tokens=3500,
+            temperature=0
+        )
+        
+        texto_raw = response.choices[0].message.content.strip()
+        
+        print(f"📄 [PARTE 2 - GPT-4O] Respuesta (primeros 200 chars):")
+        print(texto_raw[:200])
+        
+        # Parsear
+        datos = parsear_respuesta_vision_api(texto_raw)
+        
+        print(f"✅ [PARTE 2] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        # Validar estructura (más permisiva)
+        if "respuestas" not in datos:
+            return {
+                "success": False,
+                "error": "JSON sin campo 'respuestas'"
+            }
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        # Auto-ajuste
+        if num_respuestas > 50:
+            print(f"⚠️  Truncando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"] = datos["respuestas"][:50]
+        
+        if num_respuestas < 50:
+            print(f"⚠️  Rellenando de {num_respuestas} a 50 respuestas")
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 2] Validación OK - {len(datos['respuestas'])} respuestas")
+        
+        return {
+            "success": True,
+            "api": "gpt-4o",
+            "parte": 2,
+            "datos": datos
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en extraer_parte2_con_gpt4o: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "api": "gpt-4o",
+            "parte": 2,
+            "error": str(e)
+        }
+
+
+# ============================================================================
+# EXTRACCIÓN CON CLAUDE (FALLBACK)
+# ============================================================================
+
+async def extraer_parte1_con_claude(imagen_path: str) -> Dict:
+    """
+    Extrae metadatos + respuestas 1-50 con Claude Sonnet 4.
+    Usado como fallback si GPT-4O falla.
+    """
+    try:
+        with open(imagen_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        # Detectar tipo de imagen
+        ext = imagen_path.lower().split('.')[-1]
+        media_type_map = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'webp': 'image/webp'
+        }
+        media_type = media_type_map.get(ext, 'image/jpeg')
+        
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=3000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": PROMPT_PARTE_1_V6 + SUFFIX_CLAUDE
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        texto_raw = message.content[0].text.strip()
+        
+        print(f"📄 [PARTE 1 - CLAUDE] Respuesta (primeros 200 chars):")
+        print(texto_raw[:200])
+        
+        datos = parsear_respuesta_vision_api(texto_raw)
+        
+        print(f"✅ [PARTE 1 CLAUDE] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        if num_respuestas > 50:
+            datos["respuestas"] = datos["respuestas"][:50]
+        if num_respuestas < 50:
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 1 CLAUDE] Validación OK - {len(datos['respuestas'])} respuestas")
+        
+        return {
+            "success": True,
+            "api": "claude",
+            "parte": 1,
+            "datos": datos
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en extraer_parte1_con_claude: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "api": "claude",
+            "parte": 1,
+            "error": str(e)
+        }
+
+
+async def extraer_parte2_con_claude(imagen_path: str) -> Dict:
+    """
+    Extrae respuestas 51-100 con Claude Sonnet 4.
+    Usado como fallback si GPT-4O falla.
+    """
+    try:
+        with open(imagen_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        ext = imagen_path.lower().split('.')[-1]
+        media_type_map = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'webp': 'image/webp'
+        }
+        media_type = media_type_map.get(ext, 'image/jpeg')
+        
+        message = anthropic_client.messages.create(
+            model="claude-sonnet-4-20250514",
+            max_tokens=2500,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {
+                                "type": "base64",
+                                "media_type": media_type,
+                                "data": image_data
+                            }
+                        },
+                        {
+                            "type": "text",
+                            "text": PROMPT_PARTE_2_V6 + SUFFIX_CLAUDE
+                        }
+                    ]
+                }
+            ]
+        )
+        
+        texto_raw = message.content[0].text.strip()
+        
+        print(f"📄 [PARTE 2 - CLAUDE] Respuesta (primeros 200 chars):")
+        print(texto_raw[:200])
+        
+        datos = parsear_respuesta_vision_api(texto_raw)
+        
+        print(f"✅ [PARTE 2 CLAUDE] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        if num_respuestas > 50:
+            datos["respuestas"] = datos["respuestas"][:50]
+        if num_respuestas < 50:
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 2 CLAUDE] Validación OK - {len(datos['respuestas'])} respuestas")
+        
+        return {
+            "success": True,
+            "api": "claude",
+            "parte": 2,
+            "datos": datos
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en extraer_parte2_con_claude: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "api": "claude",
+            "parte": 2,
+            "error": str(e)
+        }
+
+
+# ============================================================================
+# EXTRACCIÓN PARTE 2: SEGUNDA MITAD CON GPT-4O-MINI (MANTENER POR COMPATIBILIDAD)
 # ============================================================================
 
 async def extraer_parte2_con_gpt4o_mini(imagen_path: str) -> Dict:
@@ -278,11 +553,12 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     """
     Procesa una hoja dividiéndola en 2 requests paralelos.
     
-    FLUJO:
-    0. Pre-procesamiento OpenCV V2 (mejorado)
+    FLUJO V4 (SIN OPENCV):
+    0. NO pre-procesamiento (enviar imagen original)
     1. Request 1 (GPT-4O): Metadatos + Resp 1-50  → ~8 seg
-    2. Request 2 (GPT-4O-MINI): Resp 51-100       → ~6 seg
-    3. Merge de resultados
+    2. Request 2 (GPT-4O): Resp 51-100            → ~6 seg
+    3. Si falla → Fallback con Claude
+    4. Merge de resultados
     
     Total: ~8-10 segundos (en paralelo)
     
@@ -296,44 +572,56 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     inicio = time.time()
     
     print("\n" + "="*60)
-    print("🚀 PROCESAMIENTO DIVIDIDO EN 2 PARTES (V2 + V6)")
+    print("🚀 PROCESAMIENTO DIVIDIDO V4 (SIN OPENCV)")
     print("="*60)
     print(f"📸 Imagen original: {os.path.basename(imagen_path)}")
     
     # ========================================================================
-    # PASO 0: PRE-PROCESAMIENTO OPENCV V2
+    # PASO 0: NO PRE-PROCESAMIENTO - USAR IMAGEN ORIGINAL
     # ========================================================================
     
-    preprocessor = ImagePreprocessorV2()
-    imagen_procesada = imagen_path
-    preprocessing_metadata = {"used": False}
-    
-    try:
-        imagen_procesada, preprocessing_metadata = preprocessor.procesar_completo(imagen_path)
-        preprocessing_metadata["used"] = True
-        print(f"✅ Pre-procesamiento V2 completado")
-        print(f"📸 Imagen procesada: {os.path.basename(imagen_procesada)}")
-    except Exception as e:
-        print(f"⚠️ Pre-procesamiento V2 falló: {e}")
-        print(f"ℹ️  Usando imagen original")
+    imagen_procesada = imagen_path  # Usar directamente la original
+    print("ℹ️  Usando imagen ORIGINAL (sin pre-procesamiento OpenCV)")
     
     # ========================================================================
-    # PASO 1-2: REQUESTS PARALELOS
+    # PASO 1-2: REQUESTS PARALELOS CON GPT-4O
     # ========================================================================
     
     try:
-        # Ejecutar ambos requests EN PARALELO
-        print("\n🔄 Iniciando requests paralelos...")
+        # Ejecutar ambos requests EN PARALELO con GPT-4O
+        print("\n🔄 Iniciando requests paralelos con GPT-4O...")
         print("   📍 Parte 1: GPT-4O (Metadatos + Resp 1-50)")
-        print("   📍 Parte 2: GPT-4O-MINI (Resp 51-100)")
+        print("   📍 Parte 2: GPT-4O (Resp 51-100)")
         
         resultado1, resultado2 = await asyncio.gather(
             extraer_parte1_con_gpt4o(imagen_procesada),
-            extraer_parte2_con_gpt4o_mini(imagen_procesada)
+            extraer_parte2_con_gpt4o(imagen_procesada)  # Cambio: GPT-4O en lugar de MINI
         )
         
-        print(f"\n✅ Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
-        print(f"✅ Parte 2: {'OK' if resultado2['success'] else 'FALLÓ'}")
+        print(f"\n✅ Parte 1 (GPT-4O): {'OK' if resultado1['success'] else 'FALLÓ'}")
+        print(f"✅ Parte 2 (GPT-4O): {'OK' if resultado2['success'] else 'FALLÓ'}")
+        
+        # ====================================================================
+        # FALLBACK: Si alguna parte falló, intentar con CLAUDE
+        # ====================================================================
+        
+        if not resultado1['success']:
+            print("\n⚠️  Parte 1 falló con GPT-4O, intentando con CLAUDE...")
+            resultado1 = await extraer_parte1_con_claude(imagen_procesada)
+            print(f"   Claude Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
+        
+        if not resultado2['success']:
+            print("\n⚠️  Parte 2 falló con GPT-4O, intentando con CLAUDE...")
+            resultado2 = await extraer_parte2_con_claude(imagen_procesada)
+            print(f"   Claude Parte 2: {'OK' if resultado2['success'] else 'FALLÓ'}")
+        
+        # Verificar que al menos una combinación funcionó
+        if not resultado1['success'] or not resultado2['success']:
+            raise ValueError(
+                f"Ambas APIs fallaron. "
+                f"Parte 1: {resultado1.get('error', 'Unknown')}, "
+                f"Parte 2: {resultado2.get('error', 'Unknown')}"
+            )
         
         # Merge
         print("\n🔗 Combinando resultados...")
@@ -341,9 +629,17 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         
         tiempo_total = time.time() - inicio
         
+        # Registrar qué APIs se usaron
+        apis_usadas = []
+        if resultado1.get('api'):
+            apis_usadas.append(f"parte1:{resultado1['api']}")
+        if resultado2.get('api'):
+            apis_usadas.append(f"parte2:{resultado2['api']}")
+        
         print("\n" + "="*60)
         print(f"✅ PROCESAMIENTO EXITOSO")
         print(f"⏱️  Tiempo total: {tiempo_total:.2f}s")
+        print(f"🤖 APIs usadas: {', '.join(apis_usadas)}")
         print(f"📊 Metadatos extraídos:")
         print(f"   - DNI Postulante: {datos_completos['dni_postulante']}")
         print(f"   - Código Aula: {datos_completos['codigo_aula']}")
@@ -361,9 +657,9 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": True,
             "datos": datos_completos,
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_paralelo_v2",
-            "apis_usadas": ["gpt-4o", "gpt-4o-mini"],
-            "preprocessing": preprocessing_metadata
+            "metodo": "dividido_sin_opencv_v4",
+            "apis_usadas": apis_usadas,
+            "preprocessing": {"used": False, "reason": "disabled"}
         }
         
     except Exception as e:
@@ -375,7 +671,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": False,
             "error": str(e),
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_paralelo_v2"
+            "metodo": "dividido_sin_opencv_v4"
         }
 
 
