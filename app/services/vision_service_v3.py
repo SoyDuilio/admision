@@ -1,21 +1,27 @@
 """
-Vision Service V3 - Procesamiento Dividido en 2 Partes
+Vision Service V3 - Procesamiento con Gemini Estructurado
 
-ESTRATEGIA V5:
+ESTRATEGIA V7 - GEMINI STRUCTURED SCHEMA:
 - Pre-procesamiento OpenCV V2 + ZOOM 2X (sin corrección de perspectiva)
-- Prompt V6 (ultra-específico para estructura de 5 columnas)
-- Request 1 (CLAUDE): Metadatos + Respuestas 1-50
-- Request 2 (CLAUDE): Respuestas 51-100
-- Fallback (GEMINI): Si Claude falla
-- Merge de resultados en paralelo
+- PRIMARIO: Gemini 2.0 Flash con Schema Estructurado (1 llamada para todo)
+- FALLBACK: Claude Sonnet 4 dividido en 2 partes
+- Validación y merge de resultados
 
-MEJORAS:
-✅ Zoom 2X con interpolación bicúbica
+VENTAJAS DEL SCHEMA ESTRUCTURADO:
+✅ Formato JSON garantizado por Gemini
+✅ 100 respuestas SIEMPRE presentes (1-100)
+✅ 4 códigos SIEMPRE presentes (validación automática)
+✅ Una sola llamada (vs 2 llamadas divididas)
+✅ ~6-8 segundos total (vs 15-20 seg con división)
+✅ Más económico (1 request vs 2)
+✅ Menos propenso a errores de merge
+
+MEJORAS OPENCV:
+✅ Zoom 2X con interpolación bicúbica (letras 2x más grandes)
 ✅ CLAHE agresivo para mejor contraste
 ✅ Nitidez aumentada
 ✅ Sin corrección de perspectiva (evita reducción de imagen)
-✅ Claude primario (sin restricciones de contenido)
-✅ Gemini como fallback confiable
+✅ Imagen final mantiene tamaño 2880x3840px
 """
 
 import os
@@ -30,6 +36,7 @@ import google.generativeai as genai
 
 from app.services.json_parser_robust import parsear_respuesta_vision_api
 from app.services.image_preprocessor_v2 import ImagePreprocessorV2
+from app.services.gemini_extractor_structured import extract_data_compatible
 from app.services.prompt_vision_v6 import (
     PROMPT_PARTE_1_V6,
     PROMPT_PARTE_2_V6,
@@ -702,16 +709,15 @@ def merge_resultados_divididos(resultado1: Dict, resultado2: Dict) -> Dict:
 
 async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     """
-    Procesa una hoja dividiéndola en 2 requests paralelos.
+    Procesa una hoja usando Gemini con schema estructurado.
     
-    FLUJO V5 (CON OPENCV + ZOOM 2X):
+    FLUJO V7 (GEMINI ESTRUCTURADO):
     0. Pre-procesamiento OpenCV V2 + ZOOM 2X
-    1. Request 1 (GPT-4O): Metadatos + Resp 1-50  → ~8 seg
-    2. Request 2 (GPT-4O): Resp 51-100            → ~6 seg
-    3. Si falla → Fallback con Claude
-    4. Merge de resultados
+    1. GEMINI con schema estructurado (UNA SOLA LLAMADA para todo)
+    2. Si falla → Fallback con CLAUDE dividido (2 llamadas)
+    3. Merge y validación
     
-    Total: ~15-20 segundos
+    Total: ~6-8 segundos (1 llamada) o ~15 seg (fallback)
     
     Args:
         imagen_path: Ruta de la imagen original
@@ -723,7 +729,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     inicio = time.time()
     
     print("\n" + "="*60)
-    print("🚀 PROCESAMIENTO V5 (OPENCV + ZOOM 2X)")
+    print("🚀 PROCESAMIENTO V7 (GEMINI ESTRUCTURADO)")
     print("="*60)
     print(f"📸 Imagen original: {os.path.basename(imagen_path)}")
     
@@ -746,12 +752,62 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         imagen_procesada = imagen_path
     
     # ========================================================================
-    # PASO 1-2: REQUESTS PARALELOS CON GPT-4O
+    # PASO 1: GEMINI ESTRUCTURADO (UNA SOLA LLAMADA)
     # ========================================================================
     
     try:
-        # Ejecutar ambos requests EN PARALELO con CLAUDE
-        print("\n🔄 Iniciando requests paralelos con CLAUDE...")
+        print("\n🤖 Extrayendo datos con GEMINI ESTRUCTURADO...")
+        print("   📍 Schema-based extraction (100 respuestas + metadatos)")
+        
+        resultado_gemini = await extract_data_compatible(imagen_procesada)
+        
+        if resultado_gemini["success"]:
+            print("\n✅ GEMINI ESTRUCTURADO: ÉXITO")
+            
+            datos_completos = resultado_gemini["data"]
+            tiempo_total = time.time() - inicio
+            
+            # Contar válidas vs null
+            validas = sum(1 for r in datos_completos['respuestas'] if r in ['A','B','C','D','E'])
+            nulas = sum(1 for r in datos_completos['respuestas'] if r is None)
+            
+            print("\n" + "="*60)
+            print(f"✅ PROCESAMIENTO EXITOSO")
+            print(f"⏱️  Tiempo total: {tiempo_total:.2f}s")
+            print(f"🤖 API: Gemini 2.0 Flash (Structured)")
+            print(f"📊 Metadatos extraídos:")
+            print(f"   - DNI Postulante: {datos_completos['dni_postulante']}")
+            print(f"   - Código Aula: {datos_completos['codigo_aula']}")
+            print(f"   - Código Hoja: {datos_completos['codigo_hoja']}")
+            print(f"📝 Respuestas: {len(datos_completos['respuestas'])}/100")
+            print(f"   - Válidas: {validas}")
+            print(f"   - Nulls: {nulas}")
+            print("="*60 + "\n")
+            
+            return {
+                "success": True,
+                "datos": datos_completos,
+                "tiempo_procesamiento": tiempo_total,
+                "metodo": "gemini_structured_v7",
+                "apis_usadas": ["gemini-structured"],
+                "preprocessing": preprocessing_metadata
+            }
+        
+        else:
+            # Gemini falló, intentar con Claude
+            print(f"\n⚠️  GEMINI falló: {resultado_gemini.get('error')}")
+            print("🔄 Intentando con CLAUDE (fallback)...")
+            
+    except Exception as e:
+        print(f"\n⚠️  GEMINI exception: {str(e)}")
+        print("🔄 Intentando con CLAUDE (fallback)...")
+    
+    # ========================================================================
+    # PASO 2: FALLBACK CON CLAUDE (DIVIDIDO EN 2 PARTES)
+    # ========================================================================
+    
+    try:
+        print("\n🔄 Ejecutando fallback con CLAUDE...")
         print("   📍 Parte 1: CLAUDE (Metadatos + Resp 1-50)")
         print("   📍 Parte 2: CLAUDE (Resp 51-100)")
         
@@ -763,45 +819,27 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         print(f"\n✅ Parte 1 (CLAUDE): {'OK' if resultado1['success'] else 'FALLÓ'}")
         print(f"✅ Parte 2 (CLAUDE): {'OK' if resultado2['success'] else 'FALLÓ'}")
         
-        # ====================================================================
-        # FALLBACK: Si alguna parte falló, intentar con GEMINI
-        # ====================================================================
-        
-        if not resultado1['success']:
-            print("\n⚠️  Parte 1 falló con CLAUDE, intentando con GEMINI...")
-            resultado1 = await extraer_parte1_con_gemini(imagen_procesada)
-            print(f"   Gemini Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
-        
-        if not resultado2['success']:
-            print("\n⚠️  Parte 2 falló con CLAUDE, intentando con GEMINI...")
-            resultado2 = await extraer_parte2_con_gemini(imagen_procesada)
-            print(f"   Gemini Parte 2: {'OK' if resultado2['success'] else 'FALLÓ'}")
-        
-        # Verificar que al menos una combinación funcionó
+        # Verificar que funcionó
         if not resultado1['success'] or not resultado2['success']:
             raise ValueError(
-                f"Ambas APIs fallaron. "
+                f"Fallback con Claude también falló. "
                 f"Parte 1: {resultado1.get('error', 'Unknown')}, "
                 f"Parte 2: {resultado2.get('error', 'Unknown')}"
             )
         
         # Merge
-        print("\n🔗 Combinando resultados...")
+        print("\n🔗 Combinando resultados de Claude...")
         datos_completos = merge_resultados_divididos(resultado1, resultado2)
         
         tiempo_total = time.time() - inicio
         
         # Registrar qué APIs se usaron
-        apis_usadas = []
-        if resultado1.get('api'):
-            apis_usadas.append(f"parte1:{resultado1['api']}")
-        if resultado2.get('api'):
-            apis_usadas.append(f"parte2:{resultado2['api']}")
+        apis_usadas = ["claude-fallback"]
         
         print("\n" + "="*60)
-        print(f"✅ PROCESAMIENTO EXITOSO")
+        print(f"✅ PROCESAMIENTO EXITOSO (FALLBACK)")
         print(f"⏱️  Tiempo total: {tiempo_total:.2f}s")
-        print(f"🤖 APIs usadas: {', '.join(apis_usadas)}")
+        print(f"🤖 APIs usadas: Claude Sonnet 4 (fallback)")
         print(f"📊 Metadatos extraídos:")
         print(f"   - DNI Postulante: {datos_completos['dni_postulante']}")
         print(f"   - Código Aula: {datos_completos['codigo_aula']}")
@@ -819,21 +857,22 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": True,
             "datos": datos_completos,
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "opencv_zoom2x_v5",
+            "metodo": "claude_fallback_v7",
             "apis_usadas": apis_usadas,
             "preprocessing": preprocessing_metadata
         }
         
     except Exception as e:
         tiempo_total = time.time() - inicio
-        print(f"\n❌ ERROR: {str(e)}")
-        print(f"⏱️  Tiempo hasta error: {tiempo_total:.2f}s\n")
+        print(f"\n❌ ERROR: Todas las APIs fallaron")
+        print(f"⏱️  Tiempo hasta error: {tiempo_total:.2f}s")
+        print(f"💥 {str(e)}\n")
         
         return {
             "success": False,
             "error": str(e),
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "opencv_zoom2x_v5"
+            "metodo": "all_failed_v7"
         }
 
 
