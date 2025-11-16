@@ -196,14 +196,15 @@ class ImagePreprocessorV2:
     
     def procesar_completo(self, imagen_path: str) -> Tuple[str, Dict]:
         """
-        Pipeline completo de pre-procesamiento V2.
+        Pipeline completo de pre-procesamiento V2 con ZOOM 2X.
         
         Orden optimizado:
-        1. Reducir sombras (primero, para facilitar otros pasos)
-        2. Corregir perspectiva
-        3. Mejorar contraste (CLAHE)
-        4. Aumentar nitidez
-        5. Binarizar (opcional, solo si mejora)
+        1. ZOOM 2X (primero, para mayor resolución)
+        2. Reducir sombras
+        3. Corregir perspectiva
+        4. Mejorar contraste (CLAHE)
+        5. Aumentar nitidez
+        6. Threshold Otsu
         
         Args:
             imagen_path: Ruta de la imagen original
@@ -212,7 +213,7 @@ class ImagePreprocessorV2:
             tuple: (ruta_imagen_procesada, metadata)
         """
         
-        print("🔧 Iniciando pre-procesamiento OpenCV V2...")
+        print("🔧 Iniciando pre-procesamiento OpenCV V2 + ZOOM 2X...")
         
         try:
             # Cargar imagen
@@ -230,40 +231,97 @@ class ImagePreprocessorV2:
                 "pasos_aplicados": []
             }
             
-            # 1. Reducir sombras
+            # ================================================================
+            # PASO 0: ZOOM 2X (NUEVO)
+            # ================================================================
+            nuevo_ancho = int(w * 2)
+            nuevo_alto = int(h * 2)
+            
+            # Interpolación bicúbica para mejor calidad
+            imagen = cv2.resize(
+                imagen, 
+                (nuevo_ancho, nuevo_alto), 
+                interpolation=cv2.INTER_CUBIC
+            )
+            
+            metadata["pasos_aplicados"].append("zoom_2x")
+            metadata["zoom_size"] = (nuevo_ancho, nuevo_alto)
+            print(f"✅ Zoom 2x aplicado: {nuevo_ancho}x{nuevo_alto}px")
+            
+            # ================================================================
+            # PASO 1: Reducir sombras
+            # ================================================================
             imagen = self.reducir_sombras(imagen)
             metadata["pasos_aplicados"].append("reduccion_sombras")
             print("✅ Sombras reducidas")
             
-            # 2. Corregir perspectiva
+            # ================================================================
+            # PASO 2: Corregir perspectiva
+            # ================================================================
             imagen = self.corregir_perspectiva(imagen)
             metadata["pasos_aplicados"].append("correccion_perspectiva")
             print("✅ Perspectiva corregida")
             
-            # 3. Mejorar contraste con CLAHE
-            imagen = self.mejorar_contraste_clahe(imagen)
-            metadata["pasos_aplicados"].append("clahe")
-            print("✅ Contraste mejorado (CLAHE)")
+            # ================================================================
+            # PASO 3: Mejorar contraste con CLAHE (más agresivo)
+            # ================================================================
+            try:
+                lab = cv2.cvtColor(imagen, cv2.COLOR_BGR2LAB)
+                l, a, b = cv2.split(lab)
+                
+                # CLAHE más agresivo para zoom
+                clahe = cv2.createCLAHE(clipLimit=4.0, tileGridSize=(8, 8))
+                l_clahe = clahe.apply(l)
+                
+                lab_clahe = cv2.merge([l_clahe, a, b])
+                imagen = cv2.cvtColor(lab_clahe, cv2.COLOR_LAB2BGR)
+                
+                metadata["pasos_aplicados"].append("clahe_agresivo")
+                print("✅ Contraste mejorado (CLAHE agresivo)")
+            except Exception as e:
+                print(f"⚠️  CLAHE falló: {e}")
             
-            # 4. Aumentar nitidez
-            imagen = self.aumentar_nitidez(imagen)
-            metadata["pasos_aplicados"].append("nitidez")
-            print("✅ Nitidez aumentada")
+            # ================================================================
+            # PASO 4: Aumentar nitidez (más agresivo)
+            # ================================================================
+            try:
+                # Kernel de nitidez más fuerte
+                kernel = np.array([
+                    [-1, -1, -1],
+                    [-1, 10, -1],  # Centro más fuerte
+                    [-1, -1, -1]
+                ])
+                
+                imagen = cv2.filter2D(imagen, -1, kernel)
+                metadata["pasos_aplicados"].append("nitidez_agresiva")
+                print("✅ Nitidez aumentada (agresiva)")
+            except Exception as e:
+                print(f"⚠️  Nitidez falló: {e}")
             
-            # 5. NO binarizar - mantener escala de grises con contraste
-            # La binarización puede perder información sutil
-            # Solo convertir a escala de grises para reducir ruido de color
-            gray = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
-            # Aplicar un leve threshold para eliminar ruido de fondo
-            _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-            imagen_final = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-            metadata["pasos_aplicados"].append("threshold_otsu")
-            print("✅ Threshold Otsu aplicado")
+            # ================================================================
+            # PASO 5: Threshold Otsu
+            # ================================================================
+            try:
+                gray = cv2.cvtColor(imagen, cv2.COLOR_BGR2GRAY)
+                
+                # Otsu threshold
+                _, thresh = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+                
+                # Convertir de vuelta a BGR
+                imagen_final = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+                
+                metadata["pasos_aplicados"].append("threshold_otsu")
+                print("✅ Threshold Otsu aplicado")
+            except Exception as e:
+                print(f"⚠️  Threshold falló: {e}")
+                imagen_final = imagen
             
-            # Guardar imagen procesada
+            # ================================================================
+            # GUARDAR
+            # ================================================================
             path_obj = Path(imagen_path)
             output_dir = path_obj.parent
-            output_filename = f"{path_obj.stem}_processed_v2{path_obj.suffix}"
+            output_filename = f"{path_obj.stem}_processed_v2_zoom2x{path_obj.suffix}"
             output_path = output_dir / output_filename
             
             cv2.imwrite(str(output_path), imagen_final)
@@ -272,6 +330,9 @@ class ImagePreprocessorV2:
             metadata["output_size"] = imagen_final.shape[:2]
             
             print(f"✅ Guardado: {output_path}")
+            
+            final_h, final_w = imagen_final.shape[:2]
+            print(f"📐 Final: {final_w}x{final_h}px")
             
             return str(output_path), metadata
             

@@ -553,14 +553,14 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     """
     Procesa una hoja dividiéndola en 2 requests paralelos.
     
-    FLUJO V4 (SIN OPENCV):
-    0. NO pre-procesamiento (enviar imagen original)
+    FLUJO V5 (CON OPENCV + ZOOM 2X):
+    0. Pre-procesamiento OpenCV V2 + ZOOM 2X
     1. Request 1 (GPT-4O): Metadatos + Resp 1-50  → ~8 seg
     2. Request 2 (GPT-4O): Resp 51-100            → ~6 seg
     3. Si falla → Fallback con Claude
     4. Merge de resultados
     
-    Total: ~8-10 segundos (en paralelo)
+    Total: ~15-20 segundos
     
     Args:
         imagen_path: Ruta de la imagen original
@@ -572,16 +572,27 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     inicio = time.time()
     
     print("\n" + "="*60)
-    print("🚀 PROCESAMIENTO DIVIDIDO V4 (SIN OPENCV)")
+    print("🚀 PROCESAMIENTO V5 (OPENCV + ZOOM 2X)")
     print("="*60)
     print(f"📸 Imagen original: {os.path.basename(imagen_path)}")
     
     # ========================================================================
-    # PASO 0: NO PRE-PROCESAMIENTO - USAR IMAGEN ORIGINAL
+    # PASO 0: PRE-PROCESAMIENTO OPENCV V2 + ZOOM 2X
     # ========================================================================
     
-    imagen_procesada = imagen_path  # Usar directamente la original
-    print("ℹ️  Usando imagen ORIGINAL (sin pre-procesamiento OpenCV)")
+    preprocessor = ImagePreprocessorV2()
+    imagen_procesada = imagen_path
+    preprocessing_metadata = {"used": False}
+    
+    try:
+        imagen_procesada, preprocessing_metadata = preprocessor.procesar_completo(imagen_path)
+        preprocessing_metadata["used"] = True
+        print(f"✅ Pre-procesamiento V2 + ZOOM 2X completado")
+        print(f"📸 Imagen procesada: {os.path.basename(imagen_procesada)}")
+    except Exception as e:
+        print(f"⚠️ Pre-procesamiento falló: {e}")
+        print(f"ℹ️  Usando imagen original")
+        imagen_procesada = imagen_path
     
     # ========================================================================
     # PASO 1-2: REQUESTS PARALELOS CON GPT-4O
@@ -595,7 +606,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
         
         resultado1, resultado2 = await asyncio.gather(
             extraer_parte1_con_gpt4o(imagen_procesada),
-            extraer_parte2_con_gpt4o(imagen_procesada)  # Cambio: GPT-4O en lugar de MINI
+            extraer_parte2_con_gpt4o(imagen_procesada)
         )
         
         print(f"\n✅ Parte 1 (GPT-4O): {'OK' if resultado1['success'] else 'FALLÓ'}")
@@ -657,9 +668,9 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": True,
             "datos": datos_completos,
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_sin_opencv_v4",
+            "metodo": "opencv_zoom2x_v5",
             "apis_usadas": apis_usadas,
-            "preprocessing": {"used": False, "reason": "disabled"}
+            "preprocessing": preprocessing_metadata
         }
         
     except Exception as e:
@@ -671,7 +682,7 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
             "success": False,
             "error": str(e),
             "tiempo_procesamiento": tiempo_total,
-            "metodo": "dividido_sin_opencv_v4"
+            "metodo": "opencv_zoom2x_v5"
         }
 
 
