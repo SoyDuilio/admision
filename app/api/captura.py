@@ -215,7 +215,7 @@ async def procesar_hoja_completa(
         # Actualizar campos
         hoja.imagen_url = imagen_url
         hoja.imagen_original_nombre = file.filename
-        hoja.estado = "procesado"
+        hoja.estado = "capturada"
         
         # Mapear API usada a valores permitidos por el constraint
         apis_usadas = resultado_vision.get("apis_usadas", [])
@@ -465,4 +465,5 @@ async def marcar_hoja_revision(
     return {
         "success": True,
         "message": "Hoja marcada para revisión" if requiere_revision_manual else "Hoja marcada como OK"
+
     }
