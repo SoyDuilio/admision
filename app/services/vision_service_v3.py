@@ -438,8 +438,8 @@ async def extraer_parte1_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        # Usar gemini-2.5-flash-exp (más disponible)
-        model = genai.GenerativeModel("gemini-2.5-flash-exp")
+        # Usar gemini-2.5-flash (más disponible)
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         response = model.generate_content([
             uploaded_file,
@@ -508,7 +508,7 @@ async def extraer_parte2_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        model = genai.GenerativeModel("gemini-2.5-flash-exp")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         response = model.generate_content([
             uploaded_file,
@@ -923,8 +923,10 @@ async def procesar_y_guardar_respuestas(
         Dict con estadísticas del procesamiento
     """
     
-    # Extraer datos
-    datos = resultado_api.get("datos", {})
+    # Extraer datos - soportar ambos formatos
+    # Formato nuevo: {"datos": {"respuestas": [...]}}
+    # Formato directo: {"respuestas": [...]}
+    datos = resultado_api.get("datos", resultado_api)
     respuestas_array = datos.get("respuestas", [])
     
     if not respuestas_array:

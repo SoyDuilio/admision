@@ -171,10 +171,10 @@ async def extract_data_from_image_structured(imagen_path: str) -> Dict:
         # PASO 3: Configurar modelo con schema
         # ====================================================================
         
-        print("🔧 Configurando modelo gemini-2.0-flash-exp...")
+        print("🔧 Configurando modelo gemini-2.5-flash...")
         
         model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp",
+            model_name="gemini-2.5-flash",
             generation_config=GenerationConfig(
                 response_mime_type="application/json",
                 response_schema=RESPONSE_SCHEMA
@@ -357,7 +357,7 @@ async def extract_data_compatible(imagen_path: str) -> Dict:
             "respuestas": respuestas
         },
         "api": "gemini-structured",
-        "modelo": "gemini-2.0-flash-exp"
+        "modelo": "gemini-2.5-flash"
     }
 
 
