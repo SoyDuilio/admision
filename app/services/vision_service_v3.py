@@ -429,8 +429,8 @@ async def extraer_parte1_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        # Usar gemini-1.5-flash-latest (más disponible)
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        # Usar gemini-2.5-flash (más disponible)
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         response = model.generate_content([
             uploaded_file,
@@ -499,7 +499,7 @@ async def extraer_parte2_con_gemini(imagen_path: str) -> Dict:
         # Subir imagen a Gemini
         uploaded_file = genai.upload_file(imagen_path)
         
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         
         response = model.generate_content([
             uploaded_file,
