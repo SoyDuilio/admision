@@ -1,13 +1,21 @@
 """
 Vision Service V3 - Procesamiento Dividido en 2 Partes
-app/services/vision_service_v3.py
 
-ESTRATEGIA:
-- Pre-procesamiento OpenCV V2 (mejorado)
+ESTRATEGIA V5:
+- Pre-procesamiento OpenCV V2 + ZOOM 2X (sin corrección de perspectiva)
 - Prompt V6 (ultra-específico para estructura de 5 columnas)
-- Request 1 (GPT-4O): Metadatos + Respuestas 1-50
-- Request 2 (GPT-4O-MINI): Respuestas 51-100
+- Request 1 (CLAUDE): Metadatos + Respuestas 1-50
+- Request 2 (CLAUDE): Respuestas 51-100
+- Fallback (GEMINI): Si Claude falla
 - Merge de resultados en paralelo
+
+MEJORAS:
+✅ Zoom 2X con interpolación bicúbica
+✅ CLAHE agresivo para mejor contraste
+✅ Nitidez aumentada
+✅ Sin corrección de perspectiva (evita reducción de imagen)
+✅ Claude primario (sin restricciones de contenido)
+✅ Gemini como fallback confiable
 """
 
 import os
@@ -409,6 +417,149 @@ async def extraer_parte2_con_claude(imagen_path: str) -> Dict:
 
 
 # ============================================================================
+# EXTRACCIÓN CON GEMINI (FALLBACK SECUNDARIO)
+# ============================================================================
+
+async def extraer_parte1_con_gemini(imagen_path: str) -> Dict:
+    """
+    Extrae metadatos + respuestas 1-50 con Gemini.
+    Usado como fallback si Claude falla.
+    """
+    try:
+        # Subir imagen a Gemini
+        uploaded_file = genai.upload_file(imagen_path)
+        
+        # Usar gemini-1.5-flash-latest (más disponible)
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        
+        response = model.generate_content([
+            uploaded_file,
+            PROMPT_PARTE_1_V6 + SUFFIX_GEMINI
+        ])
+        
+        texto_raw = response.text.strip()
+        
+        print(f"📄 [PARTE 1 - GEMINI] Respuesta (primeros 200 chars):")
+        print(texto_raw[:200])
+        
+        datos = parsear_respuesta_vision_api(texto_raw)
+        
+        print(f"✅ [PARTE 1 GEMINI] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        if num_respuestas > 50:
+            datos["respuestas"] = datos["respuestas"][:50]
+        if num_respuestas < 50:
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 1 GEMINI] Validación OK - {len(datos['respuestas'])} respuestas")
+        
+        # Limpiar archivo
+        try:
+            genai.delete_file(uploaded_file.name)
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "api": "gemini",
+            "parte": 1,
+            "datos": datos
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en extraer_parte1_con_gemini: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "api": "gemini",
+            "parte": 1,
+            "error": str(e)
+        }
+
+
+async def extraer_parte2_con_gemini(imagen_path: str) -> Dict:
+    """
+    Extrae respuestas 51-100 con Gemini.
+    Usado como fallback si Claude falla.
+    """
+    try:
+        # Subir imagen a Gemini
+        uploaded_file = genai.upload_file(imagen_path)
+        
+        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        
+        response = model.generate_content([
+            uploaded_file,
+            PROMPT_PARTE_2_V6 + SUFFIX_GEMINI
+        ])
+        
+        texto_raw = response.text.strip()
+        
+        print(f"📄 [PARTE 2 - GEMINI] Respuesta (primeros 200 chars):")
+        print(texto_raw[:200])
+        
+        datos = parsear_respuesta_vision_api(texto_raw)
+        
+        print(f"✅ [PARTE 2 GEMINI] JSON parseado correctamente")
+        print(f"   Campos: {list(datos.keys())}")
+        print(f"   Respuestas detectadas: {len(datos.get('respuestas', []))}")
+        
+        if "respuestas" not in datos:
+            return {"success": False, "error": "JSON sin campo 'respuestas'"}
+        
+        num_respuestas = len(datos["respuestas"])
+        if num_respuestas < 40 or num_respuestas > 60:
+            return {
+                "success": False,
+                "error": f"Se esperaban ~50 respuestas, se recibieron {num_respuestas}"
+            }
+        
+        if num_respuestas > 50:
+            datos["respuestas"] = datos["respuestas"][:50]
+        if num_respuestas < 50:
+            datos["respuestas"].extend([None] * (50 - num_respuestas))
+        
+        print(f"✅ [PARTE 2 GEMINI] Validación OK - {len(datos['respuestas'])} respuestas")
+        
+        # Limpiar archivo
+        try:
+            genai.delete_file(uploaded_file.name)
+        except:
+            pass
+        
+        return {
+            "success": True,
+            "api": "gemini",
+            "parte": 2,
+            "datos": datos
+        }
+        
+    except Exception as e:
+        print(f"❌ Error en extraer_parte2_con_gemini: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return {
+            "success": False,
+            "api": "gemini",
+            "parte": 2,
+            "error": str(e)
+        }
+
+
+# ============================================================================
 # EXTRACCIÓN PARTE 2: SEGUNDA MITAD CON GPT-4O-MINI (MANTENER POR COMPATIBILIDAD)
 # ============================================================================
 
@@ -599,32 +750,32 @@ async def procesar_hoja_dividida(imagen_path: str) -> Dict:
     # ========================================================================
     
     try:
-        # Ejecutar ambos requests EN PARALELO con GPT-4O
-        print("\n🔄 Iniciando requests paralelos con GPT-4O...")
-        print("   📍 Parte 1: GPT-4O (Metadatos + Resp 1-50)")
-        print("   📍 Parte 2: GPT-4O (Resp 51-100)")
+        # Ejecutar ambos requests EN PARALELO con CLAUDE
+        print("\n🔄 Iniciando requests paralelos con CLAUDE...")
+        print("   📍 Parte 1: CLAUDE (Metadatos + Resp 1-50)")
+        print("   📍 Parte 2: CLAUDE (Resp 51-100)")
         
         resultado1, resultado2 = await asyncio.gather(
-            extraer_parte1_con_gpt4o(imagen_procesada),
-            extraer_parte2_con_gpt4o(imagen_procesada)
+            extraer_parte1_con_claude(imagen_procesada),
+            extraer_parte2_con_claude(imagen_procesada)
         )
         
-        print(f"\n✅ Parte 1 (GPT-4O): {'OK' if resultado1['success'] else 'FALLÓ'}")
-        print(f"✅ Parte 2 (GPT-4O): {'OK' if resultado2['success'] else 'FALLÓ'}")
+        print(f"\n✅ Parte 1 (CLAUDE): {'OK' if resultado1['success'] else 'FALLÓ'}")
+        print(f"✅ Parte 2 (CLAUDE): {'OK' if resultado2['success'] else 'FALLÓ'}")
         
         # ====================================================================
-        # FALLBACK: Si alguna parte falló, intentar con CLAUDE
+        # FALLBACK: Si alguna parte falló, intentar con GEMINI
         # ====================================================================
         
         if not resultado1['success']:
-            print("\n⚠️  Parte 1 falló con GPT-4O, intentando con CLAUDE...")
-            resultado1 = await extraer_parte1_con_claude(imagen_procesada)
-            print(f"   Claude Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
+            print("\n⚠️  Parte 1 falló con CLAUDE, intentando con GEMINI...")
+            resultado1 = await extraer_parte1_con_gemini(imagen_procesada)
+            print(f"   Gemini Parte 1: {'OK' if resultado1['success'] else 'FALLÓ'}")
         
         if not resultado2['success']:
-            print("\n⚠️  Parte 2 falló con GPT-4O, intentando con CLAUDE...")
-            resultado2 = await extraer_parte2_con_claude(imagen_procesada)
-            print(f"   Claude Parte 2: {'OK' if resultado2['success'] else 'FALLÓ'}")
+            print("\n⚠️  Parte 2 falló con CLAUDE, intentando con GEMINI...")
+            resultado2 = await extraer_parte2_con_gemini(imagen_procesada)
+            print(f"   Gemini Parte 2: {'OK' if resultado2['success'] else 'FALLÓ'}")
         
         # Verificar que al menos una combinación funcionó
         if not resultado1['success'] or not resultado2['success']:

@@ -256,11 +256,13 @@ class ImagePreprocessorV2:
             print("✅ Sombras reducidas")
             
             # ================================================================
-            # PASO 2: Corregir perspectiva
+            # PASO 2: Corregir perspectiva - DESACTIVADO
             # ================================================================
-            imagen = self.corregir_perspectiva(imagen)
-            metadata["pasos_aplicados"].append("correccion_perspectiva")
-            print("✅ Perspectiva corregida")
+            # NOTA: La corrección automática de perspectiva estaba reduciendo
+            # la imagen drásticamente (de 2880x3840 a 139x89). Desactivado.
+            # imagen = self.corregir_perspectiva(imagen)
+            # metadata["pasos_aplicados"].append("correccion_perspectiva")
+            print("⏭️  Perspectiva: omitida (evita reducción de imagen)")
             
             # ================================================================
             # PASO 3: Mejorar contraste con CLAHE (más agresivo)
