@@ -1,0 +1,831 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - POSTULANDO{% endblock %}
+
+{% block extra_css %}
+<style>
+    :root {
+        --primary: #1976d2;
+        --success: #4caf50;
+        --warning: #ff9800;
+        --danger: #f44336;
+        --dark: #0f172a;
+        --light: #f8fafc;
+    }
+
+    body {
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+        color: white;
+        min-height: 100vh;
+    }
+
+    .dashboard-container {
+        max-width: 1400px;
+        margin: 0 auto;
+        padding: 40px 20px;
+    }
+
+    /* Header del Dashboard */
+    .dashboard-header {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 32px;
+        margin-bottom: 40px;
+    }
+
+    .dashboard-title {
+        font-size: 36px;
+        font-weight: bold;
+        margin-bottom: 8px;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+
+    .dashboard-subtitle {
+        color: #94a3b8;
+        font-size: 16px;
+    }
+
+    .proceso-actual {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 16px;
+        background: var(--primary);
+        border-radius: 20px;
+        font-size: 14px;
+        font-weight: 600;
+        margin-top: 16px;
+    }
+
+    /* Estadísticas Rápidas */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+        gap: 20px;
+        margin-bottom: 40px;
+    }
+
+    .stat-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 24px;
+        transition: all 0.3s;
+    }
+
+    .stat-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--primary);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
+    }
+
+    .stat-icon {
+        font-size: 40px;
+        margin-bottom: 12px;
+    }
+
+    .stat-value {
+        font-size: 32px;
+        font-weight: bold;
+        color: white;
+        margin-bottom: 8px;
+    }
+
+    .stat-label {
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .stat-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
+        border-radius: 12px;
+        font-size: 12px;
+        margin-top: 8px;
+    }
+
+    .stat-badge.warning {
+        background: rgba(255, 152, 0, 0.2);
+        color: #ff9800;
+    }
+
+    .stat-badge.danger {
+        background: rgba(244, 67, 54, 0.2);
+        color: #f44336;
+    }
+
+    /* Módulos Grid */
+    .modules-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+        gap: 24px;
+        margin-bottom: 40px;
+    }
+
+    .module-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 32px;
+        transition: all 0.3s;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .module-card::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--primary), var(--success));
+        opacity: 0;
+        transition: opacity 0.3s;
+    }
+
+    .module-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--primary);
+        box-shadow: 0 12px 32px rgba(59, 130, 246, 0.3);
+    }
+
+    .module-card:hover::before {
+        opacity: 1;
+    }
+
+    .module-header {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .module-icon {
+        font-size: 48px;
+        width: 72px;
+        height: 72px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(59, 130, 246, 0.1);
+        border-radius: 16px;
+        border: 2px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .module-info {
+        flex: 1;
+    }
+
+    .module-title {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 4px;
+    }
+
+    .module-description {
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .module-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+        margin-bottom: 20px;
+    }
+
+    .module-status.pending {
+        background: rgba(255, 152, 0, 0.2);
+        color: #ff9800;
+    }
+
+    .module-status.disabled {
+        background: rgba(148, 163, 184, 0.2);
+        color: #94a3b8;
+    }
+
+    .module-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .module-btn {
+        padding: 14px 20px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-radius: 12px;
+        color: white;
+        font-weight: 600;
+        text-decoration: none;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        cursor: pointer;
+    }
+
+    .module-btn:hover {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: var(--primary);
+        transform: translateX(4px);
+    }
+
+    .module-btn.primary {
+        background: var(--primary);
+        border-color: var(--primary);
+    }
+
+    .module-btn.primary:hover {
+        background: #1565c0;
+    }
+
+    .module-btn.disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+        pointer-events: none;
+    }
+
+    /* Alertas / Notificaciones */
+    .alerts-section {
+        margin-bottom: 40px;
+    }
+
+    .alert {
+        background: rgba(255, 152, 0, 0.1);
+        border: 2px solid #ff9800;
+        border-radius: 16px;
+        padding: 20px 24px;
+        margin-bottom: 16px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+    }
+
+    .alert.critical {
+        background: rgba(244, 67, 54, 0.1);
+        border-color: #f44336;
+    }
+
+    .alert.success {
+        background: rgba(76, 175, 80, 0.1);
+        border-color: #4caf50;
+    }
+
+    .alert-icon {
+        font-size: 28px;
+        min-width: 28px;
+    }
+
+    .alert-content {
+        flex: 1;
+    }
+
+    .alert-title {
+        font-weight: bold;
+        margin-bottom: 4px;
+        font-size: 16px;
+    }
+
+    .alert-message {
+        color: #cbd5e1;
+        font-size: 14px;
+        line-height: 1.6;
+    }
+
+    .alert-action {
+        padding: 8px 16px;
+        background: white;
+        color: #0f172a;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 14px;
+    }
+
+    /* Sección de Acciones Rápidas */
+    .quick-actions {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        padding: 32px;
+        margin-bottom: 40px;
+    }
+
+    .quick-actions h3 {
+        margin-bottom: 20px;
+        font-size: 20px;
+    }
+
+    .quick-actions-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 16px;
+    }
+
+    .quick-action-btn {
+        padding: 20px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px solid rgba(59, 130, 246, 0.3);
+        border-radius: 12px;
+        color: white;
+        text-decoration: none;
+        transition: all 0.3s;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        text-align: center;
+    }
+
+    .quick-action-btn:hover {
+        background: rgba(59, 130, 246, 0.2);
+        border-color: var(--primary);
+        transform: translateY(-2px);
+    }
+
+    .quick-action-icon {
+        font-size: 36px;
+    }
+
+    .quick-action-label {
+        font-weight: 600;
+        font-size: 14px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="dashboard-container">
+    
+    <!-- Header del Dashboard -->
+    <div class="dashboard-header">
+        <h1 class="dashboard-title">🎓 POSTULANDO</h1>
+        <p class="dashboard-subtitle">
+            Sistema Integral de Admisión - Instituto Superior Tecnológico SANTANA
+        </p>
+        <div class="proceso-actual">
+            📅 Proceso Actual: ADMISIÓN 2025-2
+        </div>
+    </div>
+
+    <!-- Alertas Críticas -->
+    <div class="alerts-section">
+        
+        <!-- Alerta de certificados no registrados -->
+        <div class="alert critical" id="alert-certificados" style="display: none;">
+            <div class="alert-icon">⚠️</div>
+            <div class="alert-content">
+                <div class="alert-title">Postulantes con Certificado no registrado en MINEDU</div>
+                <div class="alert-message">
+                    Hay <strong id="count-sin-certificado">0</strong> postulantes con certificado oficial 
+                    pero no registrado en sistemas MINEDU. Estos NO podrán ser ingresados a REGISTRA.
+                </div>
+            </div>
+            <button class="alert-action" onclick="window.location.href='/postulantes/sin-certificado'">
+                Ver Lista
+            </button>
+        </div>
+
+        <!-- Alerta de hojas pendientes de revisión -->
+        <div class="alert" id="alert-revision" style="display: none;">
+            <div class="alert-icon">✏️</div>
+            <div class="alert-content">
+                <div class="alert-title">Hojas requieren revisión manual</div>
+                <div class="alert-message">
+                    <strong id="count-revision">0</strong> hojas tienen respuestas con 
+                    confianza < 95%. Se recomienda revisión antes de publicar resultados.
+                </div>
+            </div>
+            <button class="alert-action" onclick="window.location.href='/revision-manual'">
+                Revisar Ahora
+            </button>
+        </div>
+
+        <!-- Alerta de exito -->
+        <div class="alert success" id="alert-success" style="display: none;">
+            <div class="alert-icon">✅</div>
+            <div class="alert-content">
+                <div class="alert-title">Calificación completada</div>
+                <div class="alert-message">
+                    Todas las hojas han sido calificadas exitosamente. 
+                    Resultados listos para publicación.
+                </div>
+            </div>
+            <button class="alert-action" onclick="window.location.href='/publicar-resultados'">
+                Publicar
+            </button>
+        </div>
+    </div>
+
+    <!-- Estadísticas Rápidas -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon">👥</div>
+            <div class="stat-value" id="stat-postulantes">0</div>
+            <div class="stat-label">Postulantes Registrados</div>
+            <span class="stat-badge" id="badge-nuevos">+0 nuevos</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">💰</div>
+            <div class="stat-value" id="stat-ventas">S/ 0</div>
+            <div class="stat-label">Ventas de Carpetas</div>
+            <span class="stat-badge">Hoy</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">📋</div>
+            <div class="stat-value" id="stat-hojas-procesadas">0</div>
+            <div class="stat-label">Hojas Procesadas</div>
+            <span class="stat-badge warning" id="badge-pendientes">0 pendientes</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">🎯</div>
+            <div class="stat-value" id="stat-calificadas">0</div>
+            <div class="stat-label">Hojas Calificadas</div>
+            <span class="stat-badge" id="badge-promedio">Promedio: 0</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">⚠️</div>
+            <div class="stat-value" id="stat-sin-certificado">0</div>
+            <div class="stat-label">Sin Certificado MINEDU</div>
+            <span class="stat-badge danger">Requiere atención</span>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">📝</div>
+            <div class="stat-value" id="stat-revision">0</div>
+            <div class="stat-label">Requieren Revisión</div>
+            <span class="stat-badge warning">< 95% confianza</span>
+        </div>
+    </div>
+
+    <!-- Módulos Principales -->
+    <div class="modules-grid">
+        
+        <!-- Módulo 1: Registro de Postulantes -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">📝</div>
+                <div class="module-info">
+                    <div class="module-title">Registro de Postulantes</div>
+                    <div class="module-description">Inscripción y venta de carpetas</div>
+                </div>
+            </div>
+            <span class="module-status">✅ Activo</span>
+            <div class="module-actions">
+                <a href="/postulantes/registrar" class="module-btn primary">
+                    <span>Registrar Nuevo Postulante</span>
+                    <span>→</span>
+                </a>
+                <a href="/postulantes/lista" class="module-btn">
+                    <span>Ver Lista Completa</span>
+                    <span>→</span>
+                </a>
+                <a href="/ventas/carpetas" class="module-btn">
+                    <span>Gestionar Ventas</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 2: Verificación MINEDU -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">🔍</div>
+                <div class="module-info">
+                    <div class="module-title">Verificación MINEDU</div>
+                    <div class="module-description">Validación de certificados</div>
+                </div>
+            </div>
+            <span class="module-status pending">⏳ Pendiente</span>
+            <div class="module-actions">
+                <a href="/verificacion/certificados" class="module-btn primary">
+                    <span>Verificar Certificados</span>
+                    <span>→</span>
+                </a>
+                <a href="/postulantes/sin-certificado" class="module-btn">
+                    <span>Ver Sin Certificado</span>
+                    <span>→</span>
+                </a>
+                <a href="/reportes/trazabilidad" class="module-btn">
+                    <span>Reporte de Trazabilidad</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 3: Asignación de Aulas -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">🏫</div>
+                <div class="module-info">
+                    <div class="module-title">Asignación de Aulas</div>
+                    <div class="module-description">Distribución automática</div>
+                </div>
+            </div>
+            <span class="module-status">✅ Activo</span>
+            <div class="module-actions">
+                <a href="/asignar-postulantes" class="module-btn primary">
+                    <span>Asignar Automáticamente</span>
+                    <span>→</span>
+                </a>
+                <a href="/aulas/gestion" class="module-btn">
+                    <span>Gestionar Aulas</span>
+                    <span>→</span>
+                </a>
+                <a href="/profesores/gestion" class="module-btn">
+                    <span>Gestionar Profesores</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 4: Generación de Hojas -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">📄</div>
+                <div class="module-info">
+                    <div class="module-title">Hojas de Respuesta</div>
+                    <div class="module-description">Generación y descarga</div>
+                </div>
+            </div>
+            <span class="module-status">✅ Activo</span>
+            <div class="module-actions">
+                <a href="/generar-hojas" class="module-btn primary">
+                    <span>Generar Hojas PDF</span>
+                    <span>→</span>
+                </a>
+                <a href="/documento-oficial-gabarito?preview=false" class="module-btn">
+                    <span>Documento Oficial Gabarito</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 5: Captura y Procesamiento -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">📸</div>
+                <div class="module-info">
+                    <div class="module-title">Captura de Exámenes</div>
+                    <div class="module-description">Con IA de visión</div>
+                </div>
+            </div>
+            <span class="module-status">✅ Activo</span>
+            <div class="module-actions">
+                <a href="/capturar-hojas" class="module-btn primary">
+                    <span>Capturar Hojas</span>
+                    <span>→</span>
+                </a>
+                <a href="/hojas/estado" class="module-btn">
+                    <span>Ver Estado de Hojas</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 6: Registro de Gabarito -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">✅</div>
+                <div class="module-info">
+                    <div class="module-title">Gabarito Oficial</div>
+                    <div class="module-description">Respuestas correctas</div>
+                </div>
+            </div>
+            <span class="module-status pending">⏳ Pendiente</span>
+            <div class="module-actions">
+                <a href="/registrar-gabarito" class="module-btn primary">
+                    <span>Registrar Gabarito</span>
+                    <span>→</span>
+                </a>
+                <a href="/gabarito/ver" class="module-btn" id="btn-ver-gabarito" style="display: none;">
+                    <span>Ver Gabarito Actual</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 7: Corrección Manual -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">✏️</div>
+                <div class="module-info">
+                    <div class="module-title">Corrección Manual</div>
+                    <div class="module-description">Revisión de baja confianza</div>
+                </div>
+            </div>
+            <span class="module-status pending">⏳ Pendiente</span>
+            <div class="module-actions">
+                <a href="/revision-manual" class="module-btn primary">
+                    <span>Revisar Respuestas</span>
+                    <span>→</span>
+                </a>
+                <a href="/respuestas/problematicas" class="module-btn">
+                    <span>Ver Problemáticas</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 8: Calificación -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">🎯</div>
+                <div class="module-info">
+                    <div class="module-title">Calificación</div>
+                    <div class="module-description">Proceso automático</div>
+                </div>
+            </div>
+            <span class="module-status disabled" id="status-calificacion">🔒 Requiere gabarito</span>
+            <div class="module-actions">
+                <button class="module-btn primary" id="btn-calificar" disabled onclick="iniciarCalificacion()">
+                    <span>Iniciar Calificación</span>
+                    <span>→</span>
+                </button>
+                <a href="/estadisticas" class="module-btn">
+                    <span>Ver Estadísticas</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 9: Publicación -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">📢</div>
+                <div class="module-info">
+                    <div class="module-title">Publicación de Resultados</div>
+                    <div class="module-description">Ranking y consultas</div>
+                </div>
+            </div>
+            <span class="module-status disabled" id="status-publicacion">🔒 Requiere calificación</span>
+            <div class="module-actions">
+                <a href="/resultados" class="module-btn primary" id="btn-ver-resultados">
+                    <span>Ver Ranking</span>
+                    <span>→</span>
+                </a>
+                <a href="/publicar-resultados" class="module-btn" id="btn-publicar">
+                    <span>Publicar Resultados</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Módulo 10: REGISTRA (MINEDU) -->
+        <div class="module-card">
+            <div class="module-header">
+                <div class="module-icon">🤖</div>
+                <div class="module-info">
+                    <div class="module-title">Automatización REGISTRA</div>
+                    <div class="module-description">Registro masivo MINEDU</div>
+                </div>
+            </div>
+            <span class="module-status pending">🚧 En desarrollo</span>
+            <div class="module-actions">
+                <button class="module-btn primary" disabled>
+                    <span>Iniciar Registro Masivo</span>
+                    <span>→</span>
+                </button>
+                <a href="/registra/preparar" class="module-btn">
+                    <span>Preparar Datos</span>
+                    <span>→</span>
+                </a>
+                <a href="/registra/reporte" class="module-btn">
+                    <span>Reporte de Registro</span>
+                    <span>→</span>
+                </a>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Acciones Rápidas -->
+    <div class="quick-actions">
+        <h3>⚡ Acciones Rápidas</h3>
+        <div class="quick-actions-grid">
+            <a href="/postulantes/registrar" class="quick-action-btn">
+                <div class="quick-action-icon">➕</div>
+                <div class="quick-action-label">Nuevo Postulante</div>
+            </a>
+            
+            <a href="/capturar-hojas" class="quick-action-btn">
+                <div class="quick-action-icon">📸</div>
+                <div class="quick-action-label">Capturar Hoja</div>
+            </a>
+            
+            <a href="/estadisticas" class="quick-action-btn">
+                <div class="quick-action-icon">📊</div>
+                <div class="quick-action-label">Estadísticas</div>
+            </a>
+            
+            <a href="/reportes" class="quick-action-btn">
+                <div class="quick-action-icon">📑</div>
+                <div class="quick-action-label">Reportes</div>
+            </a>
+            
+            <a href="/ayuda" class="quick-action-btn">
+                <div class="quick-action-icon">❓</div>
+                <div class="quick-action-label">Ayuda</div>
+            </a>
+            
+            <a href="/configuracion" class="quick-action-btn">
+                <div class="quick-action-icon">⚙️</div>
+                <div class="quick-action-label">Configuración</div>
+            </a>
+        </div>
+    </div>
+
+</div>
+
+<script>
+// ============================================================================
+// DASHBOARD - Carga de datos y actualización en tiempo real
+// ============================================================================
+
+async function cargarEstadisticas() {
+    try {
+        const response = await fetch('/api/dashboard/estadisticas');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Actualizar estadísticas
+            document.getElementById('stat-postulantes').textContent = data.total_postulantes || 0;
+            document.getElementById('stat-ventas').textContent = 'S/ ' + (data.ventas_hoy || 0).toFixed(2);
+            document.getElementById('stat-hojas-procesadas').textContent = data.hojas_procesadas || 0;
+            document.getElementById('stat-calificadas').textContent = data.hojas_calificadas || 0;
+            document.getElementById('stat-sin-certificado').textContent = data.sin_certificado_minedu || 0;
+            document.getElementById('stat-revision').textContent = data.requieren_revision || 0;
+            
+            // Badges
+            document.getElementById('badge-nuevos').textContent = '+' + (data.postulantes_nuevos_hoy || 0) + ' nuevos';
+            document.getElementById('badge-pendientes').textContent = (data.hojas_pendientes || 0) + ' pendientes';
+            document.getElementById('badge-promedio').textContent = 'Promedio: ' + (data.nota_promedio || 0).toFixed(1);
+            
+            // Alertas
+            if (data.sin_certificado_minedu > 0) {
+                document.getElementById('alert-certificados').style.display = 'flex';
+                document.getElementById('count-sin-certificado').textContent = data.sin_certificado_minedu;
+            }
+            
+            if (data.requieren_revision > 0) {
+                document.getElementById('alert-revision').style.display = 'flex';
+                document.getElementById('count-revision').textContent = data.requieren_revision;
+            }
+            
+            // Estados de módulos
+            if (data.gabarito_registrado) {
+                document.getElementById('status-calificacion').textContent = '✅ Listo';
+                document.getElementById('status-calificacion').classList.remove('disabled');
+                document.getElementById('btn-calificar').disabled = false;
+                document.getElementById('btn-ver-gabarito').style.display = 'flex';
+            }
+            
+            if (data.calificacion_completada) {
+                document.getElementById('status-publicacion').textContent = '✅ Listo';
+                document.getElementById('status-publicacion').classList.remove('disabled');
+                document.getElementById('alert-success').style.display = 'flex';
+            }
+        }
+    } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+    }
+}
+
+async function iniciarCalificacion() {
+    if (confirm('¿Desea iniciar la calificación de todas las hojas pendientes?')) {
+        window.location.href = '/calificar-hojas';
+    }
+}
+
+// Cargar al inicio
+window.addEventListener('load', () => {
+    cargarEstadisticas();
+    
+    // Actualizar cada 30 segundos
+    setInterval(cargarEstadisticas, 30000);
+});
+</script>
+{% endblock %}

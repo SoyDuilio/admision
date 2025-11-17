@@ -39,49 +39,51 @@
         margin-bottom: 20px;
     }
 
+    /* Estilos para el selector de 3 métodos */
     .method-selector {
-        display: flex;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
         gap: 16px;
-        margin-bottom: 30px;
-        justify-content: center;
+        margin-bottom: 32px;
     }
 
     .method-card {
-        flex: 1;
-        max-width: 300px;
+        background: rgba(255, 255, 255, 0.05);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
         padding: 24px;
-        background: var(--bg-card);
-        border: 2px solid var(--border-color);
-        border-radius: 12px;
+        text-align: center;
         cursor: pointer;
         transition: all 0.3s;
-        text-align: center;
     }
 
     .method-card:hover {
-        border-color: var(--primary-blue);
-        background: rgba(37, 99, 235, 0.05);
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(59, 130, 246, 0.5);
+        transform: translateY(-4px);
     }
 
     .method-card.active {
-        border-color: var(--primary-blue);
-        background: rgba(37, 99, 235, 0.1);
+        background: rgba(59, 130, 246, 0.2);
+        border-color: #3b82f6;
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
     }
 
     .method-icon {
-        font-size: 3rem;
+        font-size: 48px;
         margin-bottom: 12px;
     }
 
     .method-title {
-        font-size: 1.125rem;
-        font-weight: 600;
+        font-size: 18px;
+        font-weight: bold;
         margin-bottom: 8px;
+        color: white;
     }
 
     .method-description {
-        font-size: 0.875rem;
-        color: var(--text-muted);
+        font-size: 14px;
+        color: #94a3b8;
     }
 
     .section-content {
@@ -89,6 +91,18 @@
         border: 1px solid var(--border-color);
         border-radius: 12px;
         padding: 30px;
+        animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
     }
 
     .manual-grid {
@@ -180,6 +194,9 @@
         #cameraContainer .photo-preview {
             max-height: 420px !important;
         }
+        .method-selector {
+            grid-template-columns: 1fr;
+        }
         
         #cameraContainer video,
         #cameraContainer canvas,
@@ -216,6 +233,12 @@
             <div class="method-icon">⌨️</div>
             <div class="method-title">Ingreso Manual</div>
             <div class="method-description">Ingresa las respuestas manualmente</div>
+        </div>
+        
+        <div class="method-card" id="methodVoz" onclick="selectMethod('voz')">
+            <div class="method-icon">🎤</div>
+            <div class="method-title">Captura por Voz</div>
+            <div class="method-description">Dicta las respuestas con tu voz</div>
         </div>
     </div>
 
@@ -255,6 +278,12 @@
             Guardar Gabarito
         </button>
     </div>
+
+    <!-- SECCIÓN VOZ (NUEVA) -->
+    <div id="vozSection" class="section-content" style="display: none;">
+        {% include "components/captura_voz_gabarito.html" %}
+    </div>
+
 </div>
 {% endblock %}
 
@@ -271,6 +300,8 @@ let currentMethod = 'camera';
 
 window.addEventListener('load', () => {
     console.log('Página de gabarito cargada');
+    // Iniciar con método cámara por defecto
+    //selectMethod('camera');
     
     if (typeof CameraCapture !== 'undefined') {
         console.log('✅ CameraCapture disponible');
@@ -287,26 +318,45 @@ function selectMethod(method) {
     currentMethod = method;
     console.log('Método seleccionado:', method);
     
+    // Referencias a elementos
     const methodCamera = document.getElementById('methodCamera');
     const methodManual = document.getElementById('methodManual');
+    const methodVoz = document.getElementById('methodVoz');
+    
     const cameraSection = document.getElementById('cameraSection');
     const manualSection = document.getElementById('manualSection');
+    const vozSection = document.getElementById('vozSection');
     
-    // Actualizar UI
+    // Remover clase active de todas las cards
     methodCamera.classList.remove('active');
     methodManual.classList.remove('active');
+    methodVoz.classList.remove('active');
     
+    // Ocultar todas las secciones
+    cameraSection.style.display = 'none';
+    manualSection.style.display = 'none';
+    vozSection.style.display = 'none';
+    
+    // Detener cámara si estaba activa
+    if (camera && method !== 'camera') {
+        camera.stopCamera();
+    }
+    
+    // ========================================================================
+    // MÉTODO 1: CÁMARA
+    // ========================================================================
     if (method === 'camera') {
         methodCamera.classList.add('active');
         cameraSection.style.display = 'block';
-        manualSection.style.display = 'none';
         
+        // Verificar si CameraCapture está disponible
         if (typeof CameraCapture === 'undefined') {
             alert('Error: Sistema de cámara no disponible');
             selectMethod('manual');
             return;
         }
         
+        // Inicializar o reiniciar cámara
         if (!camera) {
             setTimeout(() => {
                 inicializarCamara();
@@ -314,14 +364,31 @@ function selectMethod(method) {
         } else {
             camera.startCamera();
         }
-    } else {
+    }
+    
+    // ========================================================================
+    // MÉTODO 2: MANUAL
+    // ========================================================================
+    else if (method === 'manual') {
         methodManual.classList.add('active');
-        cameraSection.style.display = 'none';
         manualSection.style.display = 'block';
+    }
+    
+    // ========================================================================
+    // MÉTODO 3: VOZ
+    // ========================================================================
+    else if (method === 'voz') {
+        methodVoz.classList.add('active');
+        vozSection.style.display = 'block';
         
-        if (camera) {
-            camera.stopCamera();
+        // Verificar soporte de Web Speech API
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            alert('❌ Tu navegador no soporta reconocimiento de voz.\n\nPor favor usa:\n- Chrome\n- Edge\n- Safari\n\nCambiando a ingreso manual...');
+            selectMethod('manual');
+            return;
         }
+        
+        console.log('✅ Captura por voz lista');
     }
 }
 

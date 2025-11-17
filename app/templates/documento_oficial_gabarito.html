@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Documento Oficial - Respuestas Correctas</title>
+    <style>
+        /* Reset */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        /* Estilos de impresión */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            
+            body {
+                background: white !important;
+            }
+            
+            .page {
+                page-break-after: always;
+                margin: 0;
+                padding: 20mm;
+            }
+            
+            .footer-page {
+                position: fixed;
+                bottom: 10mm;
+                width: 100%;
+            }
+        }
+
+        /* Estilos generales */
+        body {
+            font-family: 'Times New Roman', Times, serif;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 210mm;
+            margin: 0 auto;
+            background: white;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
+        }
+
+        .page {
+            padding: 25mm 20mm;
+            min-height: 297mm;
+            position: relative;
+        }
+
+        /* Header oficial */
+        .header-oficial {
+            text-align: center;
+            border-bottom: 3px double #000;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+
+        .header-oficial .escudo {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .header-oficial h1 {
+            font-size: 20px;
+            font-weight: bold;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+            letter-spacing: 1px;
+        }
+
+        .header-oficial .subtitulo {
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .header-oficial .documento-tipo {
+            font-size: 18px;
+            font-weight: bold;
+            text-transform: uppercase;
+            background: #000;
+            color: white;
+            padding: 8px 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        /* Información del documento */
+        .info-documento {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+            font-size: 11px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            background: #f9f9f9;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .info-item strong {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+
+        .info-item span {
+            font-size: 12px;
+            font-weight: bold;
+        }
+
+        /* Advertencia */
+        .advertencia {
+            border: 3px solid #d32f2f;
+            background: #ffebee;
+            padding: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .advertencia h2 {
+            color: #d32f2f;
+            font-size: 16px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .advertencia p {
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        .advertencia strong {
+            font-size: 13px;
+            color: #b71c1c;
+        }
+
+        /* Instrucciones */
+        .instrucciones {
+            border: 2px solid #1976d2;
+            background: #e3f2fd;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+
+        .instrucciones h3 {
+            color: #1976d2;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+
+        .instrucciones ol {
+            padding-left: 20px;
+            font-size: 11px;
+            line-height: 1.8;
+        }
+
+        /* Tabla de respuestas */
+        .tabla-respuestas {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+
+        .tabla-respuestas th {
+            background: #000;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-size: 13px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .tabla-respuestas td {
+            border: 1px solid #ddd;
+            padding: 12px;
+            font-size: 12px;
+        }
+
+        .tabla-respuestas tr:nth-child(even) {
+            background: #f9f9f9;
+        }
+
+        .letra-columna {
+            width: 80px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 18px;
+            background: #f5f5f5;
+        }
+
+        .preguntas-columna {
+            font-family: 'Courier New', monospace;
+            line-height: 1.8;
+        }
+        
+        .preguntas-columna.editable {
+            /* Espacio para escribir a mano */
+            min-height: 60px;
+            background: repeating-linear-gradient(
+                transparent,
+                transparent 24px,
+                #ddd 24px,
+                #ddd 25px
+            );
+        }
+
+        .total-columna {
+            width: 100px;
+            text-align: center;
+            font-weight: bold;
+            font-size: 16px;
+        }
+
+        /* Resumen */
+        .resumen {
+            border: 2px solid #000;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+
+        .resumen h3 {
+            font-size: 14px;
+            margin-bottom: 15px;
+            text-transform: uppercase;
+        }
+
+        .resumen-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+        }
+
+        .resumen-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ddd;
+            background: #f9f9f9;
+        }
+
+        .resumen-item strong {
+            font-size: 13px;
+        }
+
+        .resumen-total {
+            grid-column: 1 / -1;
+            background: #000;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 15px;
+            text-align: center;
+        }
+
+        /* Firmas */
+        .firmas {
+            margin-top: 50px;
+            page-break-inside: avoid;
+        }
+
+        .firmas-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 40px;
+            margin-top: 30px;
+        }
+
+        .firma-box {
+            border-top: 2px solid #000;
+            padding-top: 10px;
+            text-align: center;
+        }
+
+        .firma-box .nombre {
+            font-size: 12px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .firma-box .cargo {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 3px;
+        }
+
+        .firma-box .dni {
+            font-size: 10px;
+            color: #999;
+        }
+
+        /* Pie de página */
+        .footer-page {
+            text-align: center;
+            font-size: 9px;
+            color: #999;
+            margin-top: 30px;
+            padding-top: 15px;
+            border-top: 1px solid #ddd;
+        }
+
+        /* Botón de impresión */
+        .btn-imprimir {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: #1976d2;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+
+        .btn-imprimir:hover {
+            background: #1565c0;
+        }
+
+        /* Preview indicator */
+        .preview-indicator {
+            position: fixed;
+            top: 80px;
+            right: 20px;
+            background: #ff9800;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: bold;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <!-- Botón de impresión -->
+    <button class="btn-imprimir no-print" onclick="window.print()">
+        🖨️ IMPRIMIR DOCUMENTO
+    </button>
+
+    {% if es_preview %}
+    <div class="preview-indicator no-print">
+        📋 MODO PREVIEW - EJEMPLO
+    </div>
+    {% endif %}
+
+    <!-- Contenedor del documento -->
+    <div class="container">
+        <div class="page">
+            <!-- Header oficial -->
+            <div class="header-oficial">
+                <div class="escudo">🎓</div>
+                <h1>{{ institucion }}</h1>
+                <div class="subtitulo">Dirección Académica</div>
+                <div class="documento-tipo">
+                    🔒 DOCUMENTO CONFIDENCIAL 🔒
+                </div>
+            </div>
+
+            <!-- Información del documento -->
+            <div class="info-documento">
+                <div class="info-item">
+                    <strong>Proceso:</strong>
+                    <span>{{ proceso_nombre }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Fecha de Generación:</strong>
+                    <span>{{ fecha_generacion }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Hora:</strong>
+                    <span>{{ hora_generacion }}</span>
+                </div>
+                <div class="info-item">
+                    <strong>Código:</strong>
+                    <span>{{ proceso }}</span>
+                </div>
+            </div>
+
+            <!-- Advertencia -->
+            <div class="advertencia">
+                <h2>⚠️ ADVERTENCIA IMPORTANTE</h2>
+                <p>
+                    Este documento contiene las <strong>RESPUESTAS CORRECTAS OFICIALES</strong> 
+                    del examen de admisión.
+                </p>
+                <p>
+                    <strong>DEBE SER LACRADO EN SOBRE CERRADO Y FIRMADO</strong> 
+                    por las autoridades designadas.
+                </p>
+                <p>
+                    <strong>SOLO PUEDE SER ABIERTO</strong> una vez concluido el examen 
+                    y recolectadas todas las hojas de respuestas de los postulantes.
+                </p>
+            </div>
+
+            <!-- Instrucciones -->
+            {% if not es_preview %}
+            <div class="instrucciones">
+                <h3>📝 INSTRUCCIONES PARA LLENAR</h3>
+                <ol>
+                    <li>Complete a mano, con tinta azul o negra, los números de pregunta para cada respuesta.</li>
+                    <li>Verifique que el total de preguntas por letra sume exactamente 100.</li>
+                    <li>Firme y coloque su DNI en los espacios designados.</li>
+                    <li>Introduzca este documento en un sobre.</li>
+                    <li>Lacre el sobre con cinta adhesiva o sello oficial.</li>
+                    <li>Firme sobre el lacre para garantizar la integridad.</li>
+                    <li>Entregue al Director/Decano/Rector para custodia.</li>
+                </ol>
+            </div>
+            {% endif %}
+
+            <!-- Tabla de respuestas -->
+            <table class="tabla-respuestas">
+                <thead>
+                    <tr>
+                        <th>RESPUESTA</th>
+                        <th>PREGUNTAS CON ESTA RESPUESTA</th>
+                        <th>TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for letra in ['A', 'B', 'C', 'D', 'E'] %}
+                    <tr>
+                        <td class="letra-columna">{{ letra }}</td>
+                        <td class="preguntas-columna{% if not es_preview %} editable{% endif %}">
+                            {% if es_preview and respuestas_por_letra[letra].preguntas %}
+                                {{ respuestas_por_letra[letra].preguntas|join(', ') }}
+                            {% endif %}
+                        </td>
+                        <td class="total-columna">
+                            {% if es_preview %}
+                                {{ respuestas_por_letra[letra].total }}
+                            {% else %}
+                                _____
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Resumen -->
+            <div class="resumen">
+                <h3>📊 RESUMEN DE VALIDACIÓN</h3>
+                <div class="resumen-grid">
+                    {% for letra in ['A', 'B', 'C', 'D', 'E'] %}
+                    <div class="resumen-item">
+                        <strong>Respuestas con {{ letra }}:</strong>
+                        <span>
+                            {% if es_preview %}
+                                {{ respuestas_por_letra[letra].total }}
+                            {% else %}
+                                _____
+                            {% endif %}
+                        </span>
+                    </div>
+                    {% endfor %}
+                    
+                    <div class="resumen-total">
+                        TOTAL DE PREGUNTAS: 
+                        {% if es_preview %}
+                            {{ total_general }}
+                        {% else %}
+                            _____
+                        {% endif %}
+                        (DEBE SER 100)
+                    </div>
+                </div>
+            </div>
+
+            <!-- Firmas -->
+            <div class="firmas">
+                <h3 style="text-align: center; margin-bottom: 20px; text-transform: uppercase;">
+                    Firmas de Responsables
+                </h3>
+                
+                <div class="firmas-grid">
+                    <div class="firma-box">
+                        <div style="height: 60px;"></div>
+                        <div class="nombre">_________________________________</div>
+                        <div class="cargo">Coordinador de Admisión</div>
+                        <div class="dni">DNI: __________________</div>
+                    </div>
+                    
+                    <div class="firma-box">
+                        <div style="height: 60px;"></div>
+                        <div class="nombre">_________________________________</div>
+                        <div class="cargo">Director Académico</div>
+                        <div class="dni">DNI: __________________</div>
+                    </div>
+                    
+                    <div class="firma-box">
+                        <div style="height: 60px;"></div>
+                        <div class="nombre">_________________________________</div>
+                        <div class="cargo">Veedor / Testigo 1</div>
+                        <div class="dni">DNI: __________________</div>
+                    </div>
+                    
+                    <div class="firma-box">
+                        <div style="height: 60px;"></div>
+                        <div class="nombre">_________________________________</div>
+                        <div class="cargo">Veedor / Testigo 2</div>
+                        <div class="dni">DNI: __________________</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer-page">
+                <p>{{ institucion }} - {{ proceso_nombre }}</p>
+                <p>Documento generado el {{ fecha_generacion }} a las {{ hora_generacion }}</p>
+                <p style="margin-top: 10px; font-weight: bold;">
+                    ESTE DOCUMENTO ES CONFIDENCIAL Y DE USO EXCLUSIVO PARA EL PROCESO DE ADMISIÓN
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Validación antes de imprimir (solo en modo edición)
+        var esPreview = {{ 'true' if es_preview else 'false' }};
+        
+        if (!esPreview) {
+            window.addEventListener('beforeprint', function() {
+                var confirmacion = confirm(
+                    '⚠️ IMPORTANTE:\n\n' +
+                    '¿Ha verificado que:\n' +
+                    '✓ Todas las respuestas estén completas?\n' +
+                    '✓ El total de preguntas sume 100?\n' +
+                    '✓ Las firmas y DNIs estén listos para completar?\n\n' +
+                    'Esta acción imprimirá el documento oficial.'
+                );
+                
+                if (!confirmacion) {
+                    window.stop();
+                }
+            });
+        }
+    </script>
+</body>
+</html>

@@ -1,215 +1,158 @@
 {% extends "base.html" %}
 
-{% block title %}POSTULANDO - Sistema de Admisión{% endblock %}
+{% block title %}Dashboard - POSTULANDO{% endblock %}
 
 {% block extra_css %}
 <style>
     :root {
-        --primary-blue: #3b82f6;
-        --secondary-purple: #8b5cf6;
-        --accent-green: #10b981;
-        --accent-orange: #f59e0b;
-        --bg-dark: #0f172a;
-        --bg-darker: #020617;
-        --text-light: #f8fafc;
-        --text-muted: #94a3b8;
+        --primary: #1976d2;
+        --success: #4caf50;
+        --warning: #ff9800;
+        --danger: #f44336;
     }
 
     body {
-        background: linear-gradient(135deg, #020617 0%, #0f172a 50%, #1e1b4b 100%);
+        background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
         min-height: 100vh;
-        color: var(--text-light);
+        margin: 0;
+        padding: 0;
+        color: white;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     }
 
     .dashboard-container {
-        max-width: 1200px;
+        max-width: 1400px;
         margin: 0 auto;
-        padding: 40px 20px;
+        padding: 20px;
     }
 
-    /* Header simplificado */
-    .page-header {
-        text-align: center;
-        margin-bottom: 30px;
-        padding: 24px 20px;
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-        border-radius: 20px;
-        border: 1px solid rgba(59, 130, 246, 0.2);
-    }
-
-    .page-header .institution {
-        font-size: 0.75rem;
-        color: var(--accent-orange);
-        text-transform: uppercase;
-        letter-spacing: 0.15em;
-        font-weight: 700;
-        margin-bottom: 8px;
-    }
-
-    .page-header .subtitle {
-        font-size: 0.9375rem;
-        color: var(--text-muted);
-    }
-
-    /* Navegación visible */
+    /* Top Navigation */
     .top-nav {
         display: flex;
-        justify-content: center;
-        gap: 16px;
-        margin-bottom: 30px;
+        gap: 12px;
+        margin-bottom: 24px;
         flex-wrap: wrap;
     }
 
     .nav-button {
         padding: 12px 24px;
-        background: rgba(59, 130, 246, 0.1);
-        border: 2px solid var(--primary-blue);
-        border-radius: 12px;
-        color: var(--primary-blue);
-        font-weight: 700;
-        font-size: 0.875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        cursor: pointer;
-        transition: all 0.3s ease;
+        background: rgba(255, 255, 255, 0.1);
+        border: 2px solid rgba(255, 255, 255, 0.2);
+        border-radius: 8px;
+        color: white;
         text-decoration: none;
-        display: inline-block;
+        font-weight: 600;
+        transition: all 0.3s;
     }
 
     .nav-button:hover {
-        background: var(--primary-blue);
-        color: white;
+        background: rgba(255, 255, 255, 0.2);
+        border-color: var(--primary);
         transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
     }
 
     .nav-button.secondary {
-        border-color: var(--secondary-purple);
-        color: var(--secondary-purple);
-        background: rgba(139, 92, 246, 0.1);
+        background: linear-gradient(135deg, var(--primary), #1565c0);
+        border-color: var(--primary);
     }
 
-    .nav-button.secondary:hover {
-        background: var(--secondary-purple);
-        color: white;
-        box-shadow: 0 8px 20px rgba(139, 92, 246, 0.3);
+    /* Header */
+    .page-header {
+        text-align: center;
+        margin-bottom: 32px;
+        padding: 32px;
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
     }
 
-    /* Stats Grid 2x2 SIEMPRE */
+    .institution {
+        font-size: 32px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        margin-bottom: 8px;
+    }
+
+    .subtitle {
+        color: #94a3b8;
+        font-size: 16px;
+    }
+
+    /* Stats Grid 2x2 */
     .stats-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
         gap: 16px;
-        margin-bottom: 40px;
+        margin-bottom: 32px;
+    }
+
+    @media (min-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(4, 1fr);
+        }
     }
 
     .stat-card {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 16px;
-        padding: 24px 20px;
-        position: relative;
-        overflow: hidden;
-        border: 2px solid transparent;
-        transition: all 0.3s ease;
-        min-height: 120px;
-    }
-
-    .stat-card::before {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: var(--gradient);
-        opacity: 0.1;
-        z-index: 0;
-    }
-
-    .stat-card::after {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        background: var(--gradient);
-        border-radius: 16px;
-        z-index: -1;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .stat-card:hover::after {
-        opacity: 1;
+        padding: 24px;
+        transition: all 0.3s;
     }
 
     .stat-card:hover {
         transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
     }
 
-    .stat-card-1 { --gradient: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); }
-    .stat-card-2 { --gradient: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); }
-    .stat-card-3 { --gradient: linear-gradient(135deg, #10b981 0%, #059669 100%); }
-    .stat-card-4 { --gradient: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+    .stat-card-1 { border-top: 4px solid #3b82f6; }
+    .stat-card-2 { border-top: 4px solid #8b5cf6; }
+    .stat-card-3 { border-top: 4px solid #10b981; }
+    .stat-card-4 { border-top: 4px solid #f59e0b; }
 
     .stat-content {
-        position: relative;
-        z-index: 1;
-        text-align: center;
+        display: flex;
+        align-items: center;
+        gap: 16px;
     }
 
     .stat-icon {
-        font-size: 2rem;
-        margin-bottom: 8px;
+        font-size: 40px;
+    }
+
+    .stat-info {
+        display: flex;
+        flex-direction: column;
     }
 
     .stat-info .value {
-        font-size: 2.5rem;
-        font-weight: 800;
-        color: var(--text-light);
+        font-size: 32px;
+        font-weight: bold;
         line-height: 1;
-        display: block;
         margin-bottom: 4px;
     }
 
     .stat-info .label {
-        font-size: 0.75rem;
-        color: var(--text-muted);
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+        font-size: 14px;
+        color: #94a3b8;
     }
 
-    /* Proceso principal */
-    .process-section {
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        border-radius: 20px;
-        padding: 40px 24px;
-        margin-bottom: 40px;
-    }
-
+    /* Section Title */
     .section-title {
-        font-size: 1.5rem;
-        font-weight: 700;
-        color: var(--text-light);
-        margin-bottom: 30px;
-        text-align: center;
-        position: relative;
-        padding-bottom: 16px;
+        font-size: 24px;
+        font-weight: bold;
+        margin-bottom: 20px;
+        color: white;
     }
 
-    .section-title::after {
-        content: '';
-        position: absolute;
-        bottom: 0;
-        left: 50%;
-        transform: translateX(-50%);
-        width: 80px;
-        height: 4px;
-        background: linear-gradient(90deg, var(--primary-blue), var(--secondary-purple));
-        border-radius: 2px;
+    /* Process Grid 2x2 */
+    .process-section {
+        margin-bottom: 32px;
     }
 
     .process-grid {
@@ -219,17 +162,16 @@
     }
 
     .process-card {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
         border: 2px solid rgba(255, 255, 255, 0.1);
         border-radius: 16px;
-        padding: 20px 16px;
-        transition: all 0.3s ease;
-        cursor: pointer;
+        padding: 24px;
+        text-decoration: none;
+        color: white;
+        transition: all 0.3s;
         position: relative;
         overflow: hidden;
-        display: flex;
-        flex-direction: column;
-        min-height: 180px;
     }
 
     .process-card::before {
@@ -239,218 +181,235 @@
         left: 0;
         right: 0;
         height: 4px;
-        background: var(--card-gradient);
-        transform: scaleX(0);
-        transform-origin: left;
-        transition: transform 0.3s ease;
+        background: linear-gradient(90deg, var(--primary), var(--success));
+        opacity: 0;
+        transition: opacity 0.3s;
     }
 
     .process-card:hover {
-        border-color: var(--card-color);
-        background: rgba(255, 255, 255, 0.05);
         transform: translateY(-4px);
+        border-color: var(--primary);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
     }
 
     .process-card:hover::before {
-        transform: scaleX(1);
+        opacity: 1;
     }
 
-    .card-1 { --card-gradient: linear-gradient(90deg, #3b82f6, #2563eb); --card-color: #3b82f6; }
-    .card-2 { --card-gradient: linear-gradient(90deg, #8b5cf6, #7c3aed); --card-color: #8b5cf6; }
-    .card-3 { --card-gradient: linear-gradient(90deg, #10b981, #059669); --card-color: #10b981; }
-    .card-4 { --card-gradient: linear-gradient(90deg, #f59e0b, #d97706); --card-color: #f59e0b; }
-
     .process-number {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
         width: 40px;
         height: 40px;
-        background: var(--card-gradient);
+        background: linear-gradient(135deg, var(--primary), #1565c0);
         border-radius: 50%;
-        font-size: 1.125rem;
-        font-weight: 800;
-        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        font-size: 18px;
         margin-bottom: 12px;
     }
 
     .process-card h3 {
-        font-size: 1rem;
-        font-weight: 700;
-        color: var(--text-light);
-        margin-bottom: 8px;
+        margin: 0 0 8px 0;
+        font-size: 18px;
     }
 
     .process-card p {
-        color: var(--text-muted);
-        line-height: 1.4;
-        font-size: 0.8125rem;
-        margin-bottom: 12px;
-        flex-grow: 1;
+        margin: 0 0 12px 0;
+        color: #94a3b8;
+        font-size: 14px;
     }
 
     .process-status {
-        display: inline-block;
-        padding: 5px 10px;
-        border-radius: 6px;
-        font-size: 0.625rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        align-self: flex-start;
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
     }
 
     .status-ready {
-        background: rgba(16, 185, 129, 0.15);
-        color: #10b981;
-        border: 1px solid rgba(16, 185, 129, 0.3);
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
     }
 
     .status-pending {
-        background: rgba(245, 158, 11, 0.15);
-        color: #f59e0b;
-        border: 1px solid rgba(245, 158, 11, 0.3);
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
     }
 
-    /* Videos Grid - 4 videos en 2x2 en desktop, 1 columna en móvil */
+    /* Videos Grid 2x2 */
     .videos-section {
-        margin-top: 40px;
+        margin-bottom: 32px;
     }
 
     .videos-grid {
         display: grid;
         grid-template-columns: repeat(2, 1fr);
-        gap: 20px;
+        gap: 16px;
     }
 
     .video-card {
-        background: rgba(255, 255, 255, 0.03);
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
         border-radius: 16px;
         overflow: hidden;
-        position: relative;
-        border: 2px solid transparent;
-        transition: all 0.3s ease;
-    }
-
-    .video-card::before {
-        content: '';
-        position: absolute;
-        top: -2px;
-        left: -2px;
-        right: -2px;
-        bottom: -2px;
-        background: var(--video-gradient);
-        border-radius: 16px;
-        z-index: -1;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-    }
-
-    .video-card:hover::before {
-        opacity: 1;
+        transition: all 0.3s;
     }
 
     .video-card:hover {
         transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.2);
     }
-
-    .video-1 { --video-gradient: linear-gradient(135deg, #3b82f6, #8b5cf6); }
-    .video-2 { --video-gradient: linear-gradient(135deg, #10b981, #06b6d4); }
-    .video-3 { --video-gradient: linear-gradient(135deg, #f59e0b, #ef4444); }
-    .video-4 { --video-gradient: linear-gradient(135deg, #ec4899, #8b5cf6); }
 
     .video-player {
         width: 100%;
-        aspect-ratio: 16/9;
-        background: #000;
-        border-radius: 12px 12px 0 0;
+        display: block;
+        background: black;
     }
 
     .video-info {
         padding: 16px;
-        background: rgba(0, 0, 0, 0.3);
     }
 
     .video-info h4 {
-        font-size: 0.9375rem;
-        font-weight: 700;
-        color: var(--text-light);
-        margin-bottom: 6px;
+        margin: 0 0 8px 0;
+        font-size: 16px;
     }
 
     .video-info p {
-        font-size: 0.8125rem;
-        color: var(--text-muted);
-        line-height: 1.4;
+        margin: 0 0 8px 0;
+        color: #94a3b8;
+        font-size: 14px;
     }
 
     .video-duration {
         display: inline-block;
-        margin-top: 8px;
         padding: 4px 8px;
-        background: rgba(255, 255, 255, 0.1);
-        border-radius: 6px;
-        font-size: 0.6875rem;
+        background: rgba(59, 130, 246, 0.2);
+        color: #3b82f6;
+        border-radius: 8px;
+        font-size: 12px;
         font-weight: 600;
-        color: var(--text-light);
     }
 
-    /* Modal en desarrollo */
+    /* NUEVAS SECCIONES - Gestión Administrativa */
+    .admin-section {
+        margin-bottom: 32px;
+    }
+
+    .admin-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 16px;
+    }
+
+    .admin-card {
+        background: rgba(255, 255, 255, 0.05);
+        backdrop-filter: blur(10px);
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        padding: 24px;
+        text-decoration: none;
+        color: white;
+        transition: all 0.3s;
+    }
+
+    .admin-card:hover {
+        transform: translateY(-4px);
+        border-color: var(--primary);
+        box-shadow: 0 8px 24px rgba(59, 130, 246, 0.3);
+    }
+
+    .admin-card-header {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .admin-icon {
+        font-size: 32px;
+    }
+
+    .admin-card h3 {
+        margin: 0;
+        font-size: 18px;
+    }
+
+    .admin-card p {
+        color: #94a3b8;
+        font-size: 14px;
+        margin: 0 0 16px 0;
+    }
+
+    .admin-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        background: rgba(255, 152, 0, 0.2);
+        color: #ff9800;
+        border-radius: 12px;
+        font-size: 12px;
+        font-weight: 600;
+    }
+
+    .admin-badge.success {
+        background: rgba(76, 175, 80, 0.2);
+        color: #4caf50;
+    }
+
+    /* Modal */
     .modal-overlay {
-        display: none;
         position: fixed;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
         background: rgba(0, 0, 0, 0.8);
-        z-index: 9999;
+        backdrop-filter: blur(4px);
+        display: none;
         align-items: center;
         justify-content: center;
+        z-index: 9999;
     }
 
-    .modal-overlay.active {
+    .modal-overlay.show {
         display: flex;
     }
 
     .modal-content {
-        background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(139, 92, 246, 0.1));
-        border: 2px solid var(--primary-blue);
-        border-radius: 20px;
-        padding: 40px;
+        background: white;
+        color: #0f172a;
+        padding: 48px;
+        border-radius: 16px;
         text-align: center;
         max-width: 400px;
     }
 
     .modal-content h3 {
-        font-size: 1.5rem;
         margin-bottom: 16px;
-        color: var(--text-light);
-    }
-
-    .modal-content p {
-        color: var(--text-muted);
-        margin-bottom: 24px;
     }
 
     .modal-close {
-        padding: 12px 32px;
-        background: var(--primary-blue);
-        border: none;
-        border-radius: 10px;
+        padding: 12px 24px;
+        background: var(--primary);
         color: white;
-        font-weight: 700;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s ease;
+        margin-top: 16px;
     }
 
-    .modal-close:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
-    }
-
+    /* Responsive */
     @media (max-width: 768px) {
-        .videos-grid {
+        .videos-grid,
+        .process-grid {
             grid-template-columns: 1fr;
         }
     }
@@ -459,9 +418,10 @@
 
 {% block content %}
 <div class="dashboard-container">
+    
     <!-- Navegación visible -->
     <div class="top-nav">
-        <a href="/" class="nav-button">🎬 Demo Interactiva</a>
+        <a href="/" class="nav-button">🏠 Inicio</a>
         <a href="/resultados" target="_blank" class="nav-button secondary">📊 Ver Resultados</a>
         <a href="/estadisticas" class="nav-button">📊 Estadísticas</a>
     </div>
@@ -472,13 +432,13 @@
         <p class="subtitle">Sistema de Admisión con IA de Visión Artificial</p>
     </div>
 
-    <!-- Stats Grid 2x2 -->
+    <!-- Stats Grid 2x2 (Original) -->
     <div class="stats-grid">
         <div class="stat-card stat-card-1">
             <div class="stat-content">
                 <div class="stat-icon">👥</div>
                 <div class="stat-info">
-                    <span class="value">{{ stats.total_postulantes }}</span>
+                    <span class="value" id="stat-postulantes">{{ stats.total_postulantes or 0 }}</span>
                     <span class="label">Postulantes</span>
                 </div>
             </div>
@@ -488,7 +448,7 @@
             <div class="stat-content">
                 <div class="stat-icon">📄</div>
                 <div class="stat-info">
-                    <span class="value">{{ stats.hojas_procesadas }}</span>
+                    <span class="value" id="stat-procesadas">{{ stats.hojas_procesadas or 0 }}</span>
                     <span class="label">Procesadas</span>
                 </div>
             </div>
@@ -498,7 +458,7 @@
             <div class="stat-content">
                 <div class="stat-icon">✅</div>
                 <div class="stat-info">
-                    <span class="value">{{ stats.respuestas_correctas }}</span>
+                    <span class="value" id="stat-gabarito">{{ stats.respuestas_correctas or 0 }}</span>
                     <span class="label">Gabarito</span>
                 </div>
             </div>
@@ -508,16 +468,63 @@
             <div class="stat-content">
                 <div class="stat-icon">🎯</div>
                 <div class="stat-info">
-                    <span class="value">{{ stats.calificados }}</span>
+                    <span class="value" id="stat-calificados">{{ stats.calificados or 0 }}</span>
                     <span class="label">Calificados</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Proceso Grid 2x2 -->
+    <!-- NUEVA SECCIÓN: Gestión Administrativa -->
+    <div class="admin-section">
+        <h2 class="section-title">⚙️ Gestión Administrativa</h2>
+        
+        <div class="admin-grid">
+            <!-- Registro de Postulantes -->
+            <a href="/postulantes/registrar" class="admin-card">
+                <div class="admin-card-header">
+                    <div class="admin-icon">📝</div>
+                    <h3>Registrar Postulante</h3>
+                </div>
+                <p>Inscripción y venta de carpetas</p>
+                <span class="admin-badge success">✓ Disponible</span>
+            </a>
+
+            <!-- Lista de Postulantes -->
+            <a href="/postulantes/lista" class="admin-card">
+                <div class="admin-card-header">
+                    <div class="admin-icon">📋</div>
+                    <h3>Lista de Postulantes</h3>
+                </div>
+                <p>Ver y gestionar postulantes</p>
+                <span class="admin-badge success">✓ Disponible</span>
+            </a>
+
+            <!-- Verificación MINEDU -->
+            <a href="/verificacion/certificados" class="admin-card">
+                <div class="admin-card-header">
+                    <div class="admin-icon">🔍</div>
+                    <h3>Verificación MINEDU</h3>
+                </div>
+                <p>Validar certificados de estudios</p>
+                <span class="admin-badge">⚠️ Pendiente</span>
+            </a>
+
+            <!-- Asignación de Aulas -->
+            <a href="/asignar-postulantes" class="admin-card">
+                <div class="admin-card-header">
+                    <div class="admin-icon">🏫</div>
+                    <h3>Asignar Aulas</h3>
+                </div>
+                <p>Distribución automática</p>
+                <span class="admin-badge success">✓ Disponible</span>
+            </a>
+        </div>
+    </div>
+
+    <!-- Proceso Grid 2x2 (Original) -->
     <div class="process-section">
-        <h2 class="section-title">Proceso de Evaluación</h2>
+        <h2 class="section-title">🎯 Proceso de Evaluación</h2>
         
         <div class="process-grid">
             <a href="/generar-hojas" class="process-card card-1">
@@ -550,7 +557,7 @@
         </div>
     </div>
 
-    <!-- 4 Videos Grid 2x2 -->
+    <!-- 4 Videos Grid 2x2 (Original) -->
     <div class="videos-section">
         <h2 class="section-title">🎬 Tutoriales del Sistema</h2>
         
@@ -562,7 +569,7 @@
                     Tu navegador no soporta el elemento de video.
                 </video>
                 <div class="video-info">
-                    <h4>Testimonio Instiucional</h4>
+                    <h4>Testimonio Institucional</h4>
                     <p>Presentación</p>
                     <span class="video-duration">⏱ 8s</span>
                 </div>
@@ -620,19 +627,31 @@
 </div>
 
 <script>
-function mostrarEnDesarrollo() {
-    document.getElementById('modalDesarrollo').classList.add('active');
-}
-
 function cerrarModal() {
-    document.getElementById('modalDesarrollo').classList.remove('active');
+    document.getElementById('modalDesarrollo').classList.remove('show');
 }
 
-// Cerrar modal al hacer clic fuera
-document.getElementById('modalDesarrollo').addEventListener('click', function(e) {
-    if (e.target === this) {
-        cerrarModal();
+// Actualizar estadísticas cada 30 segundos
+async function actualizarEstadisticas() {
+    try {
+        const response = await fetch('/api/dashboard/estadisticas');
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('stat-postulantes').textContent = data.total_postulantes || 0;
+            document.getElementById('stat-procesadas').textContent = data.hojas_procesadas || 0;
+            document.getElementById('stat-gabarito').textContent = data.gabarito_registrado ? 100 : 0;
+            document.getElementById('stat-calificados').textContent = data.hojas_calificadas || 0;
+        }
+    } catch (error) {
+        console.error('Error al actualizar estadísticas:', error);
     }
+}
+
+// Cargar estadísticas al inicio
+window.addEventListener('load', () => {
+    actualizarEstadisticas();
+    setInterval(actualizarEstadisticas, 30000); // Cada 30 segundos
 });
 </script>
 {% endblock %}
