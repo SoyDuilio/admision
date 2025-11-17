@@ -17,6 +17,8 @@ from pathlib import Path
 from app.database import engine, Base
 from app.config import settings
 
+from app.api.documento_oficial import router as documento_router
+
 # ============================================================================
 # CREAR CARPETAS NECESARIAS
 # ============================================================================
@@ -107,6 +109,7 @@ app.include_router(calificacion_router, prefix="/api", tags=["Calificación"])
 app.include_router(resultados_router, prefix="/api", tags=["Resultados"])
 app.include_router(revision_router, prefix="/api", tags=["Revisión"])
 app.include_router(asignacion_router, prefix="/api", tags=["Asignación"])
+app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
 
 # ============================================================================
 # HEALTH CHECK
