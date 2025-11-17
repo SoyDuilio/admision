@@ -1,0 +1,891 @@
+<!--
+    COMPONENTE: Captura por Voz de Gabarito
+    app/templates/components/captura_voz_gabarito.html
+    
+    Sistema de dictado por voz con:
+    - Web Speech API
+    - Feedback visual en tiempo real
+    - Confirmaciones de voz
+    - Validación automática
+-->
+
+<div id="captura-voz-container" class="voz-container">
+    
+    <!-- Header con instrucciones -->
+    <div class="instrucciones-voz">
+        <h3>🎤 Captura por Voz - Respuestas Correctas</h3>
+        <p>
+            Siga las instrucciones de voz para dictar las respuestas correctas.
+            El sistema le guiará paso a paso.
+        </p>
+    </div>
+
+    <!-- Botón de inicio -->
+    <div class="inicio-dictado" id="inicio-dictado">
+        <button class="btn-iniciar-voz" id="btn-iniciar-voz" onclick="iniciarDictado()">
+            🎤 INICIAR DICTADO
+        </button>
+        <p class="info-microfono">
+            Asegúrese de permitir el acceso al micrófono cuando se lo solicite.
+        </p>
+    </div>
+
+    <!-- Panel de dictado activo -->
+    <div class="panel-dictado" id="panel-dictado" style="display: none;">
+        
+        <!-- Estado del micrófono -->
+        <div class="estado-microfono">
+            <div class="mic-indicator" id="mic-indicator">
+                <div class="mic-icon">🎤</div>
+                <div class="mic-status" id="mic-status">Escuchando...</div>
+            </div>
+            <div class="instruccion-actual" id="instruccion-actual">
+                Preparando...
+            </div>
+        </div>
+
+        <!-- Visualización en tiempo real -->
+        <div class="visualizacion-respuestas">
+            
+            <!-- Letra actual siendo dictada -->
+            <div class="letra-actual-box">
+                <div class="letra-actual-label">Dictando respuesta:</div>
+                <div class="letra-actual" id="letra-actual">—</div>
+                <div class="contador-actual" id="contador-actual">0 preguntas</div>
+            </div>
+
+            <!-- Grid de respuestas -->
+            <div class="respuestas-grid">
+                <div class="respuesta-card" data-letra="A">
+                    <div class="respuesta-header">
+                        <span class="respuesta-letra">A</span>
+                        <span class="respuesta-count" id="count-A">0</span>
+                    </div>
+                    <div class="respuesta-numeros" id="numeros-A"></div>
+                </div>
+                
+                <div class="respuesta-card" data-letra="B">
+                    <div class="respuesta-header">
+                        <span class="respuesta-letra">B</span>
+                        <span class="respuesta-count" id="count-B">0</span>
+                    </div>
+                    <div class="respuesta-numeros" id="numeros-B"></div>
+                </div>
+                
+                <div class="respuesta-card" data-letra="C">
+                    <div class="respuesta-header">
+                        <span class="respuesta-letra">C</span>
+                        <span class="respuesta-count" id="count-C">0</span>
+                    </div>
+                    <div class="respuesta-numeros" id="numeros-C"></div>
+                </div>
+                
+                <div class="respuesta-card" data-letra="D">
+                    <div class="respuesta-header">
+                        <span class="respuesta-letra">D</span>
+                        <span class="respuesta-count" id="count-D">0</span>
+                    </div>
+                    <div class="respuesta-numeros" id="numeros-D"></div>
+                </div>
+                
+                <div class="respuesta-card" data-letra="E">
+                    <div class="respuesta-header">
+                        <span class="respuesta-letra">E</span>
+                        <span class="respuesta-count" id="count-E">0</span>
+                    </div>
+                    <div class="respuesta-numeros" id="numeros-E"></div>
+                </div>
+            </div>
+
+            <!-- Total general -->
+            <div class="total-voz" id="total-voz">
+                TOTAL: <span id="total-voz-numero">0</span> / 100
+            </div>
+        </div>
+
+        <!-- Controles -->
+        <div class="controles-voz">
+            <button class="btn-voz-control btn-pausa" id="btn-pausa" onclick="pausarDictado()">
+                ⏸️ Pausar
+            </button>
+            <button class="btn-voz-control btn-reanudar" id="btn-reanudar" onclick="reanudarDictado()" style="display: none;">
+                ▶️ Reanudar
+            </button>
+            <button class="btn-voz-control btn-cancelar" onclick="cancelarDictado()">
+                ❌ Cancelar
+            </button>
+            <button class="btn-voz-control btn-finalizar" id="btn-finalizar" onclick="finalizarDictado()" disabled>
+                ✅ Finalizar
+            </button>
+        </div>
+
+        <!-- Transcripción en vivo -->
+        <div class="transcripcion-vivo">
+            <div class="transcripcion-header">📝 Últimas capturas:</div>
+            <div class="transcripcion-texto" id="transcripcion-texto"></div>
+        </div>
+    </div>
+
+</div>
+
+<style>
+    .voz-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+
+    .instrucciones-voz {
+        background: linear-gradient(135deg, #f3e5f5, #e1bee7);
+        border-left: 4px solid #9c27b0;
+        padding: 20px;
+        border-radius: 8px;
+        margin-bottom: 30px;
+    }
+
+    .instrucciones-voz h3 {
+        color: #9c27b0;
+        margin-bottom: 10px;
+    }
+
+    .instrucciones-voz p{
+        color:#0f172a ;
+    }
+
+    .inicio-dictado {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .btn-iniciar-voz {
+        padding: 24px 48px;
+        font-size: 24px;
+        font-weight: bold;
+        background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+        color: white;
+        border: none;
+        border-radius: 16px;
+        cursor: pointer;
+        box-shadow: 0 8px 24px rgba(156, 39, 176, 0.3);
+        transition: all 0.3s;
+    }
+
+    .btn-iniciar-voz:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 12px 32px rgba(156, 39, 176, 0.4);
+    }
+
+    .info-microfono {
+        margin-top: 20px;
+        color: #666;
+        font-size: 14px;
+    }
+
+    .panel-dictado {
+        animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+
+    .estado-microfono {
+        background: white;
+        border: 2px solid #9c27b0;
+        border-radius: 12px;
+        padding: 24px;
+        margin-bottom: 30px;
+        text-align: center;
+    }
+
+    .mic-indicator {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .mic-icon {
+        font-size: 48px;
+        animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { transform: scale(1); opacity: 1; }
+        50% { transform: scale(1.1); opacity: 0.8; }
+    }
+
+    .mic-status {
+        font-size: 18px;
+        font-weight: bold;
+        color: #9c27b0;
+    }
+
+    .mic-status.pausado {
+        color: #ff9800;
+    }
+
+    .mic-status.error {
+        color: #f44336;
+    }
+
+    .instruccion-actual {
+        margin-top: 16px;
+        padding: 16px;
+        background: #f3e5f5;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        color: #4a148c;
+    }
+
+    .visualizacion-respuestas {
+        margin-bottom: 30px;
+    }
+
+    .letra-actual-box {
+        background: linear-gradient(135deg, #9c27b0, #7b1fa2);
+        color: white;
+        padding: 24px;
+        border-radius: 12px;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    .letra-actual-label {
+        font-size: 14px;
+        opacity: 0.9;
+        margin-bottom: 8px;
+    }
+
+    .letra-actual {
+        font-size: 64px;
+        font-weight: bold;
+        margin: 12px 0;
+    }
+
+    .contador-actual {
+        font-size: 18px;
+        opacity: 0.9;
+    }
+
+    .respuestas-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .respuesta-card {
+        background: white;
+        border: 2px solid #e0e0e0;
+        border-radius: 12px;
+        padding: 16px;
+        transition: all 0.3s;
+    }
+
+    .respuesta-card.active {
+        border-color: #9c27b0;
+        background: #f3e5f5;
+        box-shadow: 0 4px 12px rgba(156, 39, 176, 0.2);
+    }
+
+    .respuesta-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+    }
+
+    .respuesta-letra {
+        font-size: 32px;
+        font-weight: bold;
+        color: #9c27b0;
+    }
+
+    .respuesta-count {
+        font-size: 24px;
+        font-weight: bold;
+        color: #666;
+    }
+
+    .respuesta-numeros {
+        font-family: 'Courier New', monospace;
+        font-size: 12px;
+        color: #666;
+        max-height: 100px;
+        overflow-y: auto;
+        line-height: 1.6;
+    }
+
+    .total-voz {
+        background: linear-gradient(135deg, #1976d2, #1565c0);
+        color: white;
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+        font-size: 24px;
+        font-weight: bold;
+    }
+
+    .total-voz.completo {
+        background: linear-gradient(135deg, #4caf50, #388e3c);
+    }
+
+    .total-voz.incompleto {
+        background: linear-gradient(135deg, #ff9800, #f57c00);
+    }
+
+    .controles-voz {
+        display: flex;
+        gap: 12px;
+        justify-content: center;
+        margin-bottom: 24px;
+        flex-wrap: wrap;
+    }
+
+    .btn-voz-control {
+        padding: 14px 28px;
+        font-size: 16px;
+        font-weight: bold;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-pausa {
+        background: #ff9800;
+        color: white;
+    }
+
+    .btn-reanudar {
+        background: #4caf50;
+        color: white;
+    }
+
+    .btn-cancelar {
+        background: #f44336;
+        color: white;
+    }
+
+    .btn-finalizar {
+        background: #4caf50;
+        color: white;
+    }
+
+    .btn-finalizar:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
+    .btn-voz-control:hover:not(:disabled) {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+    }
+
+    .transcripcion-vivo {
+        background: #f5f5f5;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 16px;
+    }
+
+    .transcripcion-header {
+        font-weight: bold;
+        margin-bottom: 8px;
+        color: #666;
+    }
+
+    .transcripcion-texto {
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        max-height: 150px;
+        overflow-y: auto;
+        color: #333;
+    }
+
+    .transcripcion-item {
+        padding: 8px;
+        margin-bottom: 4px;
+        background: white;
+        border-radius: 4px;
+        border-left: 3px solid #9c27b0;
+    }
+</style>
+
+<script>
+// ============================================================================
+// SISTEMA DE CAPTURA POR VOZ
+// ============================================================================
+
+let recognition = null;
+let synthesizer = null;
+let estadoDictado = {
+    activo: false,
+    pausado: false,
+    letraActual: null,
+    respuestas: {
+        A: [],
+        B: [],
+        C: [],
+        D: [],
+        E: []
+    },
+    totalEsperado: {},
+    etapa: 'inicio', // inicio, validacion, dictado, finalizado
+    ultimaTranscripcion: Date.now(),
+    timeoutSilencio: null
+};
+
+// ============================================================================
+// INICIALIZACIÓN
+// ============================================================================
+
+function iniciarDictado() {
+    // Verificar soporte
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('❌ Su navegador no soporta reconocimiento de voz.\nPor favor use Chrome, Edge o Safari.');
+        return;
+    }
+
+    if (!('speechSynthesis' in window)) {
+        alert('❌ Su navegador no soporta síntesis de voz.');
+        return;
+    }
+
+    // Ocultar botón de inicio
+    document.getElementById('inicio-dictado').style.display = 'none';
+    document.getElementById('panel-dictado').style.display = 'block';
+
+    // Inicializar reconocimiento
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    
+    recognition.lang = 'es-ES';
+    recognition.continuous = true;
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+
+    synthesizer = window.speechSynthesis;
+
+    // Event listeners
+    recognition.onstart = () => {
+        console.log('🎤 Reconocimiento iniciado');
+        estadoDictado.activo = true;
+        actualizarEstadoMicrofono('Escuchando...', false);
+    };
+
+    recognition.onresult = manejarResultado;
+    
+    recognition.onerror = (event) => {
+        console.error('❌ Error:', event.error);
+        if (event.error === 'no-speech') {
+            // Reiniciar si no hay voz
+            if (estadoDictado.activo && !estadoDictado.pausado) {
+                setTimeout(() => recognition.start(), 100);
+            }
+        }
+    };
+
+    recognition.onend = () => {
+        // Reiniciar automáticamente si está activo
+        if (estadoDictado.activo && !estadoDictado.pausado) {
+            setTimeout(() => recognition.start(), 100);
+        }
+    };
+
+    // Iniciar flujo
+    iniciarFlujoValidacion();
+}
+
+// ============================================================================
+// FLUJO DE VALIDACIÓN (Confirmar totales esperados)
+// ============================================================================
+
+function iniciarFlujoValidacion() {
+    hablar(
+        'Bienvenido al sistema de dictado de respuestas correctas. ' +
+        'Antes de comenzar, voy a preguntarle cuántas respuestas de cada letra ' +
+        'aparecen en el documento oficial.',
+        () => {
+            setTimeout(() => preguntarTotal('A'), 1000);
+        }
+    );
+
+    estadoDictado.etapa = 'validacion';
+    estadoDictado.letraActualValidacion = 'A';
+    
+    recognition.start();
+}
+
+function preguntarTotal(letra) {
+    actualizarInstruccion(`Diga cuántas preguntas con respuesta ${letra} hay en el documento`);
+    hablar(`¿Cuántas preguntas tienen como respuesta correcta la letra ${letra}?`);
+}
+
+function manejarResultado(event) {
+    const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase().trim();
+    
+    console.log('📝 Transcrito:', transcript);
+    
+    // Actualizar timestamp
+    estadoDictado.ultimaTranscripcion = Date.now();
+    resetearTimeoutSilencio();
+    
+    // Agregar a transcripción visual
+    agregarTranscripcion(transcript);
+    
+    if (estadoDictado.etapa === 'validacion') {
+        manejarValidacion(transcript);
+    } else if (estadoDictado.etapa === 'dictado') {
+        manejarDictado(transcript);
+    }
+}
+
+function manejarValidacion(transcript) {
+    // Extraer número
+    const numeros = transcript.match(/\d+/g);
+    
+    if (numeros && numeros.length > 0) {
+        const cantidad = parseInt(numeros[0]);
+        const letraActual = estadoDictado.letraActualValidacion;
+        
+        estadoDictado.totalEsperado[letraActual] = cantidad;
+        
+        console.log(`✅ Cantidad para ${letraActual}: ${cantidad}`);
+        
+        hablar(`Entendido. ${cantidad} respuestas con ${letraActual}.`, () => {
+            // Siguiente letra
+            const letras = ['A', 'B', 'C', 'D', 'E'];
+            const indiceActual = letras.indexOf(letraActual);
+            
+            if (indiceActual < letras.length - 1) {
+                const siguienteLetra = letras[indiceActual + 1];
+                estadoDictado.letraActualValidacion = siguienteLetra;
+                setTimeout(() => preguntarTotal(siguienteLetra), 1500);
+            } else {
+                // Validación completada
+                const totalValidacion = Object.values(estadoDictado.totalEsperado).reduce((a, b) => a + b, 0);
+                
+                console.log('📊 Totales esperados:', estadoDictado.totalEsperado);
+                console.log('📊 Total general:', totalValidacion);
+                
+                setTimeout(() => {
+                    if (totalValidacion === 100) {
+                        estadoDictado.etapa = 'dictado';
+                        hablar(
+                            `Perfecto. El total es de 100 preguntas. Ahora comenzaremos con el dictado. ` +
+                            `Diga los números de pregunta para cada letra cuando se lo indique.`,
+                            () => {
+                                setTimeout(() => iniciarDictadoLetra('A'), 2000);
+                            }
+                        );
+                    } else {
+                        hablar(
+                            `Atención. El total suma ${totalValidacion} preguntas, pero debería ser 100. ` +
+                            `Continuaré de todos modos.`,
+                            () => {
+                                estadoDictado.etapa = 'dictado';
+                                setTimeout(() => iniciarDictadoLetra('A'), 2000);
+                            }
+                        );
+                    }
+                }, 1500);
+            }
+        });
+    } else {
+        console.log('⚠️ No se detectó número en:', transcript);
+        hablar(`No entendí el número. Por favor, diga cuántas respuestas ${estadoDictado.letraActualValidacion} hay.`);
+    }
+}
+
+// ============================================================================
+// FLUJO DE DICTADO
+// ============================================================================
+
+function iniciarDictadoLetra(letra) {
+    estadoDictado.etapa = 'dictado';
+    estadoDictado.letraActual = letra;
+    
+    document.getElementById('letra-actual').textContent = letra;
+    
+    // Marcar card como activa
+    document.querySelectorAll('.respuesta-card').forEach(card => {
+        card.classList.remove('active');
+    });
+    document.querySelector(`[data-letra="${letra}"]`).classList.add('active');
+    
+    const totalEsperado = estadoDictado.totalEsperado[letra] || '?';
+    
+    actualizarInstruccion(`Dictando números de pregunta para la letra ${letra}`);
+    
+    hablar(
+        `Respuesta ${letra}. Debe dictar ${totalEsperado} números de pregunta. ` +
+        `Comience cuando esté listo.`
+    );
+}
+
+function manejarDictado(transcript) {
+    const letra = estadoDictado.letraActual;
+    
+    // Detectar comandos
+    if (transcript.includes('siguiente') || transcript.includes('continuar')) {
+        avanzarSiguienteLetra();
+        return;
+    }
+    
+    if (transcript.includes('repetir') || transcript.includes('corregir')) {
+        hablar(`Los números actuales para ${letra} son: ${estadoDictado.respuestas[letra].join(', ')}`);
+        return;
+    }
+    
+    // Extraer números
+    const numeros = extraerNumeros(transcript);
+    
+    if (numeros.length > 0) {
+        // Agregar a respuestas
+        numeros.forEach(num => {
+            if (num >= 1 && num <= 100 && !estadoDictado.respuestas[letra].includes(num)) {
+                estadoDictado.respuestas[letra].push(num);
+            }
+        });
+        
+        // Ordenar
+        estadoDictado.respuestas[letra].sort((a, b) => a - b);
+        
+        // Actualizar UI
+        actualizarVisualizacion();
+        
+        // Feedback de voz
+        const totalActual = estadoDictado.respuestas[letra].length;
+        const totalEsperado = estadoDictado.totalEsperado[letra];
+        
+        if (totalActual === totalEsperado) {
+            hablar(
+                `Completado. ${totalActual} números registrados para ${letra}. ` +
+                `¿Desea continuar con la siguiente letra? Diga sí o siguiente.`
+            );
+        }
+    }
+}
+
+function extraerNumeros(texto) {
+    // Normalizar texto
+    texto = texto.toLowerCase()
+        .replace(/coma/g, ',')
+        .replace(/punto/g, '.')
+        .replace(/y/g, ',');
+    
+    // Extraer números
+    const matches = texto.match(/\d+/g);
+    return matches ? matches.map(n => parseInt(n)) : [];
+}
+
+function avanzarSiguienteLetra() {
+    const letras = ['A', 'B', 'C', 'D', 'E'];
+    const indiceActual = letras.indexOf(estadoDictado.letraActual);
+    
+    if (indiceActual < letras.length - 1) {
+        const siguienteLetra = letras[indiceActual + 1];
+        setTimeout(() => iniciarDictadoLetra(siguienteLetra), 1000);
+    } else {
+        // Dictado completado
+        estadoDictado.etapa = 'finalizado';
+        hablar(
+            'Dictado completado. Por favor, revise los números antes de finalizar.',
+            () => {
+                document.getElementById('btn-finalizar').disabled = false;
+            }
+        );
+    }
+}
+
+// ============================================================================
+// UTILIDADES
+// ============================================================================
+
+function hablar(texto, callback) {
+    const utterance = new SpeechSynthesisUtterance(texto);
+    utterance.lang = 'es-ES';
+    utterance.rate = 1.2; // Velocidad aumentada
+    utterance.pitch = 1.0;
+    
+    if (callback) {
+        utterance.onend = callback;
+    }
+    
+    synthesizer.speak(utterance);
+}
+
+function actualizarInstruccion(texto) {
+    document.getElementById('instruccion-actual').textContent = texto;
+}
+
+function actualizarEstadoMicrofono(texto, error = false) {
+    const statusElement = document.getElementById('mic-status');
+    statusElement.textContent = texto;
+    statusElement.className = 'mic-status' + (error ? ' error' : '');
+}
+
+function actualizarVisualizacion() {
+    for (let letra of ['A', 'B', 'C', 'D', 'E']) {
+        const numeros = estadoDictado.respuestas[letra];
+        document.getElementById(`count-${letra}`).textContent = numeros.length;
+        document.getElementById(`numeros-${letra}`).textContent = numeros.join(', ');
+    }
+    
+    document.getElementById('contador-actual').textContent = 
+        `${estadoDictado.respuestas[estadoDictado.letraActual]?.length || 0} preguntas`;
+    
+    const total = Object.values(estadoDictado.respuestas).reduce((sum, arr) => sum + arr.length, 0);
+    document.getElementById('total-voz-numero').textContent = total;
+    
+    const totalElement = document.getElementById('total-voz');
+    if (total === 100) {
+        totalElement.className = 'total-voz completo';
+    } else if (total > 0) {
+        totalElement.className = 'total-voz incompleto';
+    }
+}
+
+function agregarTranscripcion(texto) {
+    const container = document.getElementById('transcripcion-texto');
+    const item = document.createElement('div');
+    item.className = 'transcripcion-item';
+    item.textContent = texto;
+    container.insertBefore(item, container.firstChild);
+    
+    // Limitar a últimas 10
+    while (container.children.length > 10) {
+        container.removeChild(container.lastChild);
+    }
+}
+
+function resetearTimeoutSilencio() {
+    if (estadoDictado.timeoutSilencio) {
+        clearTimeout(estadoDictado.timeoutSilencio);
+    }
+    
+    // Si pasan 8 segundos sin hablar, preguntar
+    estadoDictado.timeoutSilencio = setTimeout(() => {
+        if (estadoDictado.etapa === 'dictado' && !estadoDictado.pausado) {
+            hablar('¿Seguimos en la misma alternativa?');
+        }
+    }, 8000);
+}
+
+// ============================================================================
+// CONTROLES
+// ============================================================================
+
+function pausarDictado() {
+    estadoDictado.pausado = true;
+    recognition.stop();
+    document.getElementById('btn-pausa').style.display = 'none';
+    document.getElementById('btn-reanudar').style.display = 'inline-block';
+    actualizarEstadoMicrofono('Pausado', false);
+    document.getElementById('mic-status').classList.add('pausado');
+}
+
+function reanudarDictado() {
+    estadoDictado.pausado = false;
+    recognition.start();
+    document.getElementById('btn-pausa').style.display = 'inline-block';
+    document.getElementById('btn-reanudar').style.display = 'none';
+    actualizarEstadoMicrofono('Escuchando...', false);
+    document.getElementById('mic-status').classList.remove('pausado');
+}
+
+function cancelarDictado() {
+    const confirmacion = confirm('¿Está seguro de cancelar el dictado?');
+    if (confirmacion) {
+        estadoDictado.activo = false;
+        recognition.stop();
+        synthesizer.cancel();
+        
+        document.getElementById('inicio-dictado').style.display = 'block';
+        document.getElementById('panel-dictado').style.display = 'none';
+        
+        // Reset
+        estadoDictado = {
+            activo: false,
+            pausado: false,
+            letraActual: null,
+            respuestas: { A: [], B: [], C: [], D: [], E: [] },
+            totalEsperado: {},
+            etapa: 'inicio',
+            ultimaTranscripcion: Date.now(),
+            timeoutSilencio: null
+        };
+    }
+}
+
+async function finalizarDictado() {
+    const total = Object.values(estadoDictado.respuestas).reduce((sum, arr) => sum + arr.length, 0);
+    
+    if (total !== 100) {
+        hablar(
+            `Atención. Solo se han registrado ${total} respuestas de 100. ` +
+            `Por favor complete todas las respuestas antes de finalizar.`
+        );
+        return;
+    }
+    
+    // Detener reconocimiento
+    estadoDictado.activo = false;
+    recognition.stop();
+    synthesizer.cancel();
+    
+    hablar('Procesando respuestas. Por favor espere.', async () => {
+        // Convertir a formato esperado por el backend
+        const respuestas = {};
+        
+        for (let i = 1; i <= 100; i++) {
+            for (let letra of ['A', 'B', 'C', 'D', 'E']) {
+                if (estadoDictado.respuestas[letra].includes(i)) {
+                    respuestas[i.toString()] = letra;
+                    break;
+                }
+            }
+        }
+        
+        try {
+            const response = await fetch('/api/gabarito/procesar-manual', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    respuestas: respuestas,
+                    proceso: 'ADMISION_2025_2'
+                })
+            });
+            
+            if (!response.ok) {
+                throw new Error('Error al procesar');
+            }
+            
+            const data = await response.json();
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Error desconocido');
+            }
+            
+            // Guardar y redirigir
+            sessionStorage.setItem('gabarito_temp', JSON.stringify(data));
+            hablar('Respuestas procesadas correctamente. Redirigiendo a confirmación.', () => {
+                setTimeout(() => {
+                    window.location.href = '/gabarito/confirmar';
+                }, 1000);
+            });
+            
+        } catch (error) {
+            console.error('Error:', error);
+            hablar('Ocurrió un error al procesar las respuestas. Por favor intente nuevamente.');
+            alert('❌ Error: ' + error.message);
+        }
+    });
+}
+</script>

@@ -1,0 +1,622 @@
+<!--
+    COMPONENTE: Modal Post-Confirmación de Gabarito
+    app/templates/components/modal_post_gabarito.html
+    
+    Modal que aparece después de confirmar el gabarito para preguntar:
+    ¿Desea calificar las hojas ahora o después?
+-->
+
+<div class="modal-overlay" id="modal-post-gabarito" style="display: none;">
+    <div class="modal-content-gabarito">
+        
+        <!-- Icon de éxito -->
+        <div class="modal-icon-exito">
+            ✅
+        </div>
+
+        <!-- Título -->
+        <h2 class="modal-titulo">
+            Gabarito Guardado Exitosamente
+        </h2>
+
+        <!-- Mensaje -->
+        <p class="modal-mensaje">
+            Las respuestas correctas han sido registradas en el sistema.
+        </p>
+
+        <!-- Información de hojas pendientes -->
+        <div class="info-hojas-pendientes" id="info-hojas-pendientes">
+            <div class="info-icon">📋</div>
+            <div class="info-texto">
+                <strong id="count-hojas-pendientes">0</strong> hojas de examen capturadas
+                <br>
+                <span class="info-subtexto">Esperando calificación</span>
+            </div>
+        </div>
+
+        <!-- Pregunta principal -->
+        <div class="modal-pregunta">
+            ¿Desea calificar las hojas de examen ahora?
+        </div>
+
+        <!-- Opciones -->
+        <div class="modal-opciones">
+            
+            <!-- Opción 1: Calificar ahora -->
+            <button class="btn-modal btn-calificar-ahora" onclick="iniciarCalificacionAhora()">
+                <div class="btn-icon">🎯</div>
+                <div class="btn-texto">
+                    <div class="btn-titulo">Calificar Ahora</div>
+                    <div class="btn-subtitulo">Iniciar proceso de calificación automática</div>
+                </div>
+            </button>
+
+            <!-- Opción 2: Calificar después -->
+            <button class="btn-modal btn-calificar-despues" onclick="calificarDespues()">
+                <div class="btn-icon">⏰</div>
+                <div class="btn-texto">
+                    <div class="btn-titulo">Calificar Después</div>
+                    <div class="btn-subtitulo">Volver al menú principal</div>
+                </div>
+            </button>
+
+        </div>
+
+        <!-- Información adicional -->
+        <div class="modal-info-adicional">
+            <p>
+                💡 <strong>Nota:</strong> Puede iniciar la calificación en cualquier momento 
+                desde el menú principal.
+            </p>
+        </div>
+
+    </div>
+</div>
+
+<style>
+    .modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        backdrop-filter: blur(4px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        animation: fadeIn 0.3s;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+        }
+        to {
+            opacity: 1;
+        }
+    }
+
+    .modal-content-gabarito {
+        background: white;
+        border-radius: 24px;
+        padding: 48px 40px;
+        max-width: 600px;
+        width: 90%;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+        animation: slideUp 0.4s;
+        text-align: center;
+    }
+
+    @keyframes slideUp {
+        from {
+            opacity: 0;
+            transform: translateY(50px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    .modal-icon-exito {
+        font-size: 80px;
+        margin-bottom: 24px;
+        animation: bounce 0.6s;
+    }
+
+    @keyframes bounce {
+        0%, 100% { transform: scale(1); }
+        50% { transform: scale(1.2); }
+    }
+
+    .modal-titulo {
+        font-size: 28px;
+        font-weight: bold;
+        color: #1976d2;
+        margin-bottom: 16px;
+    }
+
+    .modal-mensaje {
+        font-size: 16px;
+        color: #666;
+        margin-bottom: 32px;
+    }
+
+    .info-hojas-pendientes {
+        background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+        border: 2px solid #1976d2;
+        border-radius: 16px;
+        padding: 24px;
+        margin-bottom: 32px;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .info-icon {
+        font-size: 48px;
+    }
+
+    .info-texto {
+        text-align: left;
+        flex: 1;
+    }
+
+    .info-texto strong {
+        font-size: 32px;
+        color: #1976d2;
+        font-weight: bold;
+    }
+
+    .info-subtexto {
+        color: #666;
+        font-size: 14px;
+    }
+
+    .modal-pregunta {
+        font-size: 20px;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 32px;
+    }
+
+    .modal-opciones {
+        display: grid;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .btn-modal {
+        background: white;
+        border: 2px solid #ddd;
+        border-radius: 16px;
+        padding: 24px;
+        cursor: pointer;
+        transition: all 0.3s;
+        display: flex;
+        align-items: center;
+        gap: 20px;
+        text-align: left;
+    }
+
+    .btn-modal:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .btn-calificar-ahora {
+        border-color: #4caf50;
+        background: linear-gradient(135deg, #f1f8f4, #e8f5e9);
+    }
+
+    .btn-calificar-ahora:hover {
+        border-color: #4caf50;
+        background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+    }
+
+    .btn-calificar-despues {
+        border-color: #ff9800;
+        background: linear-gradient(135deg, #fff8f0, #ffe0b2);
+    }
+
+    .btn-calificar-despues:hover {
+        border-color: #ff9800;
+        background: linear-gradient(135deg, #ffe0b2, #ffcc80);
+    }
+
+    .btn-icon {
+        font-size: 48px;
+        min-width: 60px;
+        text-align: center;
+    }
+
+    .btn-texto {
+        flex: 1;
+    }
+
+    .btn-titulo {
+        font-size: 20px;
+        font-weight: bold;
+        margin-bottom: 4px;
+        color: #333;
+    }
+
+    .btn-subtitulo {
+        font-size: 14px;
+        color: #666;
+    }
+
+    .modal-info-adicional {
+        background: #f5f5f5;
+        border-radius: 12px;
+        padding: 16px;
+        font-size: 14px;
+        color: #666;
+        text-align: center;
+    }
+
+    .modal-info-adicional strong {
+        color: #333;
+    }
+</style>
+
+<script>
+// ============================================================================
+// MODAL POST-GABARITO
+// ============================================================================
+
+async function mostrarModalPostGabarito() {
+    // Obtener cantidad de hojas pendientes
+    try {
+        const response = await fetch('/api/estadisticas-calificacion');
+        const data = await response.json();
+        
+        if (response.ok && data.success) {
+            const hojasPendientes = data.hojas_pendientes || 0;
+            document.getElementById('count-hojas-pendientes').textContent = hojasPendientes;
+            
+            // Mostrar modal
+            document.getElementById('modal-post-gabarito').style.display = 'flex';
+        }
+    } catch (error) {
+        console.error('Error al cargar estadísticas:', error);
+        // Mostrar modal de todos modos
+        document.getElementById('modal-post-gabarito').style.display = 'flex';
+    }
+}
+
+async function iniciarCalificacionAhora() {
+    // Cerrar modal
+    document.getElementById('modal-post-gabarito').style.display = 'none';
+    
+    // Mostrar loading
+    mostrarLoadingCalificacion();
+    
+    try {
+        const response = await fetch('/api/calificar-hojas-pendientes', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proceso_admision: 'ADMISION_2025_2'
+            })
+        });
+        
+        const result = await response.json();
+        
+        ocultarLoadingCalificacion();
+        
+        if (response.ok && result.success) {
+            // Mostrar resultados
+            mostrarResultadosCalificacion(result);
+        } else {
+            throw new Error(result.detail || result.mensaje || 'Error en calificación');
+        }
+        
+    } catch (error) {
+        console.error('Error en calificación:', error);
+        ocultarLoadingCalificacion();
+        alert('❌ Error al calificar:\n' + error.message);
+    }
+}
+
+function calificarDespues() {
+    // Cerrar modal y redirigir
+    document.getElementById('modal-post-gabarito').style.display = 'none';
+    
+    // Mostrar mensaje de éxito
+    mostrarNotificacion(
+        'Gabarito guardado correctamente. Puede calificar las hojas en cualquier momento.',
+        'success'
+    );
+    
+    // Redirigir al inicio después de 2 segundos
+    setTimeout(() => {
+        window.location.href = '/';
+    }, 2000);
+}
+
+// ============================================================================
+// LOADING DE CALIFICACIÓN
+// ============================================================================
+
+function mostrarLoadingCalificacion() {
+    // Crear overlay de loading si no existe
+    let overlay = document.getElementById('loading-calificacion-overlay');
+    
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'loading-calificacion-overlay';
+        overlay.innerHTML = `
+            <div class="loading-calificacion-content">
+                <div class="loading-spinner"></div>
+                <h2>Calificando Exámenes...</h2>
+                <p>Por favor espere mientras el sistema califica automáticamente todas las hojas.</p>
+                <div class="loading-progress">
+                    <div class="loading-progress-bar" id="loading-progress-bar"></div>
+                </div>
+                <div class="loading-stats" id="loading-stats">
+                    Procesando...
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+        
+        // Agregar estilos
+        const style = document.createElement('style');
+        style.textContent = `
+            #loading-calificacion-overlay {
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0, 0, 0, 0.85);
+                backdrop-filter: blur(8px);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 99999;
+            }
+            
+            .loading-calificacion-content {
+                background: white;
+                border-radius: 24px;
+                padding: 48px;
+                max-width: 500px;
+                text-align: center;
+            }
+            
+            .loading-spinner {
+                width: 80px;
+                height: 80px;
+                border: 8px solid #e3f2fd;
+                border-top-color: #1976d2;
+                border-radius: 50%;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 24px;
+            }
+            
+            @keyframes spin {
+                to { transform: rotate(360deg); }
+            }
+            
+            .loading-calificacion-content h2 {
+                color: #1976d2;
+                margin-bottom: 12px;
+            }
+            
+            .loading-calificacion-content p {
+                color: #666;
+                margin-bottom: 24px;
+            }
+            
+            .loading-progress {
+                background: #e0e0e0;
+                height: 8px;
+                border-radius: 4px;
+                overflow: hidden;
+                margin-bottom: 16px;
+            }
+            
+            .loading-progress-bar {
+                height: 100%;
+                background: linear-gradient(90deg, #1976d2, #42a5f5);
+                width: 0%;
+                transition: width 0.3s;
+                animation: progressPulse 1.5s infinite;
+            }
+            
+            @keyframes progressPulse {
+                0%, 100% { opacity: 1; }
+                50% { opacity: 0.7; }
+            }
+            
+            .loading-stats {
+                font-size: 14px;
+                color: #999;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    overlay.style.display = 'flex';
+    
+    // Simular progreso (opcional)
+    let progreso = 0;
+    const intervalo = setInterval(() => {
+        progreso += Math.random() * 15;
+        if (progreso > 90) progreso = 90;
+        document.getElementById('loading-progress-bar').style.width = progreso + '%';
+    }, 500);
+    
+    overlay.dataset.intervalo = intervalo;
+}
+
+function ocultarLoadingCalificacion() {
+    const overlay = document.getElementById('loading-calificacion-overlay');
+    if (overlay) {
+        // Completar barra
+        document.getElementById('loading-progress-bar').style.width = '100%';
+        
+        // Limpiar intervalo
+        if (overlay.dataset.intervalo) {
+            clearInterval(parseInt(overlay.dataset.intervalo));
+        }
+        
+        // Ocultar después de animación
+        setTimeout(() => {
+            overlay.style.display = 'none';
+        }, 500);
+    }
+}
+
+// ============================================================================
+// RESULTADOS DE CALIFICACIÓN
+// ============================================================================
+
+function mostrarResultadosCalificacion(resultado) {
+    // Crear modal de resultados
+    const modal = document.createElement('div');
+    modal.className = 'modal-overlay';
+    modal.innerHTML = `
+        <div class="modal-content-gabarito">
+            <div class="modal-icon-exito">🎉</div>
+            <h2 class="modal-titulo">Calificación Completada</h2>
+            
+            <div class="resultados-grid">
+                <div class="resultado-item">
+                    <div class="resultado-numero">${resultado.calificadas || 0}</div>
+                    <div class="resultado-label">Hojas Calificadas</div>
+                </div>
+                
+                <div class="resultado-item">
+                    <div class="resultado-numero">${resultado.nota_promedio || 0}</div>
+                    <div class="resultado-label">Nota Promedio</div>
+                </div>
+                
+                <div class="resultado-item">
+                    <div class="resultado-numero">${resultado.aprobados || 0}</div>
+                    <div class="resultado-label">Aprobados</div>
+                </div>
+            </div>
+            
+            <button class="btn-modal btn-calificar-ahora" onclick="window.location.href='/resultados'">
+                <div class="btn-icon">📊</div>
+                <div class="btn-texto">
+                    <div class="btn-titulo">Ver Resultados Completos</div>
+                    <div class="btn-subtitulo">Ir a ranking y estadísticas</div>
+                </div>
+            </button>
+        </div>
+    `;
+    
+    // Agregar estilos adicionales
+    const style = document.createElement('style');
+    style.textContent = `
+        .resultados-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin: 32px 0;
+        }
+        
+        .resultado-item {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            padding: 24px;
+            border-radius: 12px;
+            border: 2px solid #1976d2;
+        }
+        
+        .resultado-numero {
+            font-size: 36px;
+            font-weight: bold;
+            color: #1976d2;
+            margin-bottom: 8px;
+        }
+        
+        .resultado-label {
+            font-size: 14px;
+            color: #666;
+        }
+    `;
+    document.head.appendChild(style);
+    
+    document.body.appendChild(modal);
+}
+
+// ============================================================================
+// NOTIFICACIONES
+// ============================================================================
+
+function mostrarNotificacion(mensaje, tipo = 'info') {
+    const colores = {
+        success: { bg: '#4caf50', icon: '✅' },
+        error: { bg: '#f44336', icon: '❌' },
+        warning: { bg: '#ff9800', icon: '⚠️' },
+        info: { bg: '#2196f3', icon: 'ℹ️' }
+    };
+    
+    const config = colores[tipo] || colores.info;
+    
+    const notif = document.createElement('div');
+    notif.style.cssText = `
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        background: ${config.bg};
+        color: white;
+        padding: 20px 24px;
+        border-radius: 12px;
+        box-shadow: 0 8px 24px rgba(0,0,0,0.2);
+        z-index: 100000;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        max-width: 400px;
+        animation: slideInRight 0.3s;
+    `;
+    
+    notif.innerHTML = `
+        <span style="font-size: 24px;">${config.icon}</span>
+        <span>${mensaje}</span>
+    `;
+    
+    document.body.appendChild(notif);
+    
+    setTimeout(() => {
+        notif.style.animation = 'slideOutRight 0.3s';
+        setTimeout(() => notif.remove(), 300);
+    }, 5000);
+}
+
+// Agregar animaciones
+const animationStyle = document.createElement('style');
+animationStyle.textContent = `
+    @keyframes slideInRight {
+        from {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+    
+    @keyframes slideOutRight {
+        from {
+            opacity: 1;
+            transform: translateX(0);
+        }
+        to {
+            opacity: 0;
+            transform: translateX(100px);
+        }
+    }
+`;
+document.head.appendChild(animationStyle);
+</script>
