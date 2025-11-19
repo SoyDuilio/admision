@@ -18,7 +18,7 @@ class Aula(Base):
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
 
     # Relaciones
-    asignaciones = relationship("AsignacionExamen", back_populates="aula")
+    asignaciones = relationship("PostulanteAsignacion", back_populates="aula")
     
     def __repr__(self):
         return f"<Aula {self.codigo} - {self.nombre}>"
