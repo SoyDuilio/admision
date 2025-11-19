@@ -1,0 +1,375 @@
+<!-- 
+    Modal de Confirmación para Regenerar Hojas por Aula
+    Agregar a: app/templates/components/modal_confirmar_regeneracion.html
+-->
+
+<div id="modalConfirmarRegeneracion" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 600px;">
+        <div class="modal-header" style="background: linear-gradient(135deg, #f59e0b, #dc2626);">
+            <h2>⚠️ ADVERTENCIA: Regenerar Hojas</h2>
+            <button class="modal-close" onclick="cerrarModalRegeneracion()">✕</button>
+        </div>
+
+        <div class="modal-body">
+            
+            <!-- Información del Aula -->
+            <div class="info-alert warning">
+                <h3>📋 Aula Seleccionada</h3>
+                <div class="info-row">
+                    <strong>Código:</strong>
+                    <span id="confirmarAulaCodigo">-</span>
+                </div>
+                <div class="info-row">
+                    <strong>Nombre:</strong>
+                    <span id="confirmarAulaNombre">-</span>
+                </div>
+                <div class="info-row">
+                    <strong>Postulantes:</strong>
+                    <span id="confirmarAulaPostulantes">-</span>
+                </div>
+            </div>
+
+            <!-- Alerta de Hojas Existentes -->
+            <div class="info-alert danger">
+                <h3>🚨 Hojas Ya Generadas</h3>
+                <p style="margin: 10px 0;">
+                    <strong>Se generaron hojas para esta aula el:</strong><br>
+                    <span id="fechaGeneracionAnterior" style="font-size: 1.1rem; color: #dc2626;">-</span>
+                </p>
+                <p style="margin: 10px 0;">
+                    <strong>Total de hojas generadas:</strong>
+                    <span id="totalHojasAnteriores">-</span>
+                </p>
+            </div>
+
+            <!-- Advertencia Principal -->
+            <div class="warning-box">
+                <h3>⚠️ IMPORTANTE:</h3>
+                <ul style="margin: 15px 0; padding-left: 25px; line-height: 1.8;">
+                    <li>Si vuelve a generar hojas, <strong>TODAS las hojas anteriores serán ANULADAS</strong></li>
+                    <li>Las hojas anteriores <strong>NO tendrán validez</strong> para el examen</li>
+                    <li>Deberá <strong>reimprimir y redistribuir</strong> todas las hojas nuevas</li>
+                    <li>Esta acción quedará <strong>registrada en el sistema</strong></li>
+                </ul>
+            </div>
+
+            <!-- Formulario de Confirmación -->
+            <div class="confirmation-form">
+                <h3>✍️ Para continuar, complete los siguientes datos:</h3>
+                
+                <div class="form-group">
+                    <label>Motivo de la regeneración: *</label>
+                    <select id="motivoRegeneracion" required>
+                        <option value="">Seleccione un motivo</option>
+                        <option value="error_impresion">Error en impresión</option>
+                        <option value="hojas_danadas">Hojas dañadas/manchadas</option>
+                        <option value="cambio_aula">Cambio de aula</option>
+                        <option value="perdida">Pérdida de hojas</option>
+                        <option value="error_sistema">Error del sistema</option>
+                        <option value="otro">Otro motivo</option>
+                    </select>
+                </div>
+
+                <div class="form-group" id="groupOtroMotivoRegeneracion" style="display: none;">
+                    <label>Especifique el motivo: *</label>
+                    <textarea id="otroMotivoRegeneracion" rows="3" placeholder="Describa el motivo..."></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Autorizado por (nombre completo): *</label>
+                    <input type="text" id="autorizadoPor" placeholder="Nombre de quien autoriza" required>
+                </div>
+
+                <div class="form-group">
+                    <label>Cargo: *</label>
+                    <input type="text" id="cargoAutoriza" placeholder="Ej: Director Académico" required>
+                </div>
+
+                <!-- Confirmación con texto -->
+                <div class="text-confirmation">
+                    <p style="font-weight: 700; margin-bottom: 10px;">
+                        Para confirmar, escriba exactamente la siguiente frase:
+                    </p>
+                    <div class="phrase-box">
+                        <code>anular hojas anteriores</code>
+                    </div>
+                    <input 
+                        type="text" 
+                        id="fraseConfirmacion" 
+                        placeholder="Escriba la frase aquí..."
+                        autocomplete="off"
+                        style="margin-top: 10px;"
+                    >
+                    <div id="errorFrase" class="error-message" style="display: none;">
+                        ❌ La frase no coincide. Debe escribir exactamente: "anular hojas anteriores"
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botones -->
+            <div class="button-group" style="margin-top: 30px;">
+                <button class="btn-cancel" onclick="cerrarModalRegeneracion()">
+                    Cancelar
+                </button>
+                <button class="btn-danger" onclick="confirmarRegeneracion()">
+                    🔄 VOLVER A GENERAR HOJAS
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.info-alert {
+    padding: 20px;
+    border-radius: 12px;
+    margin-bottom: 20px;
+}
+
+.info-alert.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 2px solid rgba(245, 158, 11, 0.4);
+}
+
+.info-alert.danger {
+    background: rgba(220, 38, 38, 0.1);
+    border: 2px solid rgba(220, 38, 38, 0.4);
+}
+
+.info-alert h3 {
+    margin: 0 0 15px 0;
+    color: #f59e0b;
+}
+
+.info-alert.danger h3 {
+    color: #dc2626;
+}
+
+.info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.info-row:last-child {
+    border-bottom: none;
+}
+
+.warning-box {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(220, 38, 38, 0.15));
+    border: 2px solid #f59e0b;
+    border-radius: 12px;
+    padding: 20px;
+    margin: 20px 0;
+}
+
+.warning-box h3 {
+    color: #f59e0b;
+    margin: 0 0 10px 0;
+}
+
+.warning-box ul li {
+    color: #fbbf24;
+    margin: 5px 0;
+}
+
+.warning-box ul li strong {
+    color: #fef3c7;
+}
+
+.confirmation-form {
+    margin-top: 30px;
+}
+
+.confirmation-form h3 {
+    color: #94a3b8;
+    margin-bottom: 20px;
+}
+
+.text-confirmation {
+    background: rgba(220, 38, 38, 0.1);
+    border: 2px dashed #dc2626;
+    border-radius: 12px;
+    padding: 20px;
+    margin-top: 20px;
+}
+
+.phrase-box {
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid #dc2626;
+    border-radius: 8px;
+    padding: 15px;
+    text-align: center;
+    margin: 10px 0;
+}
+
+.phrase-box code {
+    color: #fca5a5;
+    font-size: 1.2rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+
+.error-message {
+    background: rgba(220, 38, 38, 0.2);
+    border: 1px solid #dc2626;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 10px;
+    color: #fca5a5;
+    font-weight: 600;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #dc2626, #991b1b);
+    color: white;
+    font-weight: 700;
+    padding: 14px 24px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #991b1b, #7f1d1d);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.4);
+}
+
+.btn-danger:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-weight: 600;
+    padding: 14px 24px;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex: 1;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+</style>
+
+<script>
+let aulaParaRegenerar = null;
+
+function abrirModalConfirmarRegeneracion(aula, datosGeneracion) {
+    aulaParaRegenerar = aula;
+    
+    // Llenar datos del aula
+    document.getElementById('confirmarAulaCodigo').textContent = aula.codigo_aula;
+    document.getElementById('confirmarAulaNombre').textContent = aula.nombre;
+    document.getElementById('confirmarAulaPostulantes').textContent = aula.postulantes_asignados;
+    
+    // Llenar datos de generación anterior
+    document.getElementById('fechaGeneracionAnterior').textContent = datosGeneracion.primera_generacion;
+    document.getElementById('totalHojasAnteriores').textContent = datosGeneracion.total_hojas;
+    
+    // Mostrar modal
+    document.getElementById('modalConfirmarRegeneracion').style.display = 'flex';
+    
+    // Reset form
+    document.getElementById('motivoRegeneracion').value = '';
+    document.getElementById('autorizadoPor').value = '';
+    document.getElementById('cargoAutoriza').value = '';
+    document.getElementById('fraseConfirmacion').value = '';
+    document.getElementById('errorFrase').style.display = 'none';
+}
+
+function cerrarModalRegeneracion() {
+    document.getElementById('modalConfirmarRegeneracion').style.display = 'none';
+    aulaParaRegenerar = null;
+}
+
+// Toggle otro motivo
+document.addEventListener('DOMContentLoaded', function() {
+    const selectMotivo = document.getElementById('motivoRegeneracion');
+    if (selectMotivo) {
+        selectMotivo.addEventListener('change', function() {
+            const grupo = document.getElementById('groupOtroMotivoRegeneracion');
+            grupo.style.display = this.value === 'otro' ? 'block' : 'none';
+        });
+    }
+});
+
+async function confirmarRegeneracion() {
+    // Validar campos obligatorios
+    const motivo = document.getElementById('motivoRegeneracion').value;
+    const autorizadoPor = document.getElementById('autorizadoPor').value;
+    const cargo = document.getElementById('cargoAutoriza').value;
+    const frase = document.getElementById('fraseConfirmacion').value.trim().toLowerCase();
+    
+    if (!motivo || !autorizadoPor || !cargo) {
+        alert('Por favor complete todos los campos obligatorios');
+        return;
+    }
+    
+    if (motivo === 'otro' && !document.getElementById('otroMotivoRegeneracion').value) {
+        alert('Por favor especifique el motivo');
+        return;
+    }
+    
+    // Validar frase de confirmación
+    if (frase !== 'anular hojas anteriores') {
+        document.getElementById('errorFrase').style.display = 'block';
+        document.getElementById('fraseConfirmacion').focus();
+        return;
+    }
+    
+    document.getElementById('errorFrase').style.display = 'none';
+    
+    // Confirmar con el usuario
+    if (!confirm('¿Está completamente seguro de que desea regenerar las hojas? Esta acción NO se puede deshacer.')) {
+        return;
+    }
+    
+    // Proceder con la regeneración
+    try {
+        const motivoFinal = motivo === 'otro' 
+            ? document.getElementById('otroMotivoRegeneracion').value 
+            : motivo;
+        
+        const response = await fetch(`/api/regenerar-hojas-aula/${aulaParaRegenerar.aula_id}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                motivo: motivoFinal,
+                autorizado_por: autorizadoPor,
+                cargo: cargo
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Hojas regeneradas exitosamente\n\nNuevo código de lote: ${data.lote}\nTotal de hojas: ${data.total_hojas}`);
+            cerrarModalRegeneracion();
+            
+            // Recargar lista de aulas
+            if (typeof listarAulasConAsignaciones === 'function') {
+                listarAulasConAsignaciones();
+            }
+        } else {
+            alert('❌ Error: ' + data.message);
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al regenerar hojas');
+    }
+}
+</script>

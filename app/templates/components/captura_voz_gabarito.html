@@ -51,6 +51,17 @@
             <div class="letra-actual-box">
                 <div class="letra-actual-label">Dictando respuesta:</div>
                 <div class="letra-actual" id="letra-actual">—</div>
+                
+                <!-- CONTADOR EN REVERSA -->
+                <div style="margin: 20px 0; text-align: center;">
+                    <div style="font-size: 5rem; font-weight: bold; color: #9c27b0;" id="contador-reversa">
+                        0
+                    </div>
+                    <div style="font-size: 1rem; color: #666;">
+                        respuestas faltantes
+                    </div>
+                </div>
+
                 <div class="contador-actual" id="contador-actual">0 preguntas</div>
             </div>
 
@@ -545,18 +556,24 @@ function manejarResultado(event) {
 }
 
 function manejarValidacion(transcript) {
-    // Extraer número
-    const numeros = transcript.match(/\d+/g);
+    // Extraer número con mejor detección
+    const numeros = extraerNumerosMejorado(transcript);
     
-    if (numeros && numeros.length > 0) {
-        const cantidad = parseInt(numeros[0]);
+    if (numeros.length > 0) {
+        const cantidad = numeros[0];
         const letraActual = estadoDictado.letraActualValidacion;
+        
+        // Validar rango
+        if (cantidad < 0 || cantidad > 100) {
+            hablar(`Número inválido: ${cantidad}. Por favor diga un número entre 0 y 100.`);
+            return;
+        }
         
         estadoDictado.totalEsperado[letraActual] = cantidad;
         
-        console.log(`✅ Cantidad para ${letraActual}: ${cantidad}`);
+        console.log(`✅ ${letraActual}: ${cantidad} respuestas`);
         
-        hablar(`Entendido. ${cantidad} respuestas con ${letraActual}.`, () => {
+        hablar(`Entendido. ${cantidad} respuestas con letra ${letraActual}.`, () => {
             // Siguiente letra
             const letras = ['A', 'B', 'C', 'D', 'E'];
             const indiceActual = letras.indexOf(letraActual);
@@ -567,38 +584,76 @@ function manejarValidacion(transcript) {
                 setTimeout(() => preguntarTotal(siguienteLetra), 1500);
             } else {
                 // Validación completada
-                const totalValidacion = Object.values(estadoDictado.totalEsperado).reduce((a, b) => a + b, 0);
-                
-                console.log('📊 Totales esperados:', estadoDictado.totalEsperado);
-                console.log('📊 Total general:', totalValidacion);
-                
-                setTimeout(() => {
-                    if (totalValidacion === 100) {
-                        estadoDictado.etapa = 'dictado';
-                        hablar(
-                            `Perfecto. El total es de 100 preguntas. Ahora comenzaremos con el dictado. ` +
-                            `Diga los números de pregunta para cada letra cuando se lo indique.`,
-                            () => {
-                                setTimeout(() => iniciarDictadoLetra('A'), 2000);
-                            }
-                        );
-                    } else {
-                        hablar(
-                            `Atención. El total suma ${totalValidacion} preguntas, pero debería ser 100. ` +
-                            `Continuaré de todos modos.`,
-                            () => {
-                                estadoDictado.etapa = 'dictado';
-                                setTimeout(() => iniciarDictadoLetra('A'), 2000);
-                            }
-                        );
-                    }
-                }, 1500);
+                completarValidacion();
             }
         });
     } else {
         console.log('⚠️ No se detectó número en:', transcript);
-        hablar(`No entendí el número. Por favor, diga cuántas respuestas ${estadoDictado.letraActualValidacion} hay.`);
+        hablar(`No entendí. Por favor repita el número para la letra ${estadoDictado.letraActualValidacion}.`);
     }
+}
+
+// Nueva función para extraer números con palabras
+function extraerNumerosMejorado(texto) {
+    // Diccionario español
+    const palabrasNumeros = {
+        'cero': 0, 'uno': 1, 'dos': 2, 'tres': 3, 'cuatro': 4,
+        'cinco': 5, 'seis': 6, 'siete': 7, 'ocho': 8, 'nueve': 9,
+        'diez': 10, 'once': 11, 'doce': 12, 'trece': 13, 'catorce': 14,
+        'quince': 15, 'dieciséis': 16, 'diecisiete': 17, 'dieciocho': 18,
+        'diecinueve': 19, 'veinte': 20, 'veintiuno': 21, 'veintidós': 22,
+        'veintitrés': 23, 'veinticuatro': 24, 'veinticinco': 25,
+        'treinta': 30, 'cuarenta': 40, 'cincuenta': 50,
+        'sesenta': 60, 'setenta': 70, 'ochenta': 80, 'noventa': 90, 'cien': 100
+    };
+    
+    let textoNormalizado = texto.toLowerCase();
+    
+    // Convertir palabras a números
+    for (const [palabra, numero] of Object.entries(palabrasNumeros)) {
+        const regex = new RegExp(`\\b${palabra}\\b`, 'gi');
+        textoNormalizado = textoNormalizado.replace(regex, numero.toString());
+    }
+    
+    // Manejar compuestos como "treinta y cinco"
+    textoNormalizado = textoNormalizado.replace(/(\d+)\s+y\s+(\d+)/g, (match, a, b) => {
+        return (parseInt(a) + parseInt(b)).toString();
+    });
+    
+    // Extraer todos los números
+    const matches = textoNormalizado.match(/\d+/g);
+    return matches ? matches.map(n => parseInt(n)) : [];
+}
+
+// Nueva función para completar validación
+function completarValidacion() {
+    const totalValidacion = Object.values(estadoDictado.totalEsperado)
+        .reduce((a, b) => a + b, 0);
+    
+    console.log('📊 Totales esperados:', estadoDictado.totalEsperado);
+    console.log('📊 Total general:', totalValidacion);
+    
+    setTimeout(() => {
+        if (totalValidacion === 100) {
+            estadoDictado.etapa = 'dictado';
+            hablar(
+                `Perfecto. El total es 100 preguntas. Ahora comenzaremos con el dictado. ` +
+                `Diga los números de pregunta para cada letra cuando se lo indique.`,
+                () => {
+                    setTimeout(() => iniciarDictadoLetra('A'), 2000);
+                }
+            );
+        } else {
+            hablar(
+                `Atención. El total suma ${totalValidacion} preguntas, no 100. ` +
+                `Continuaré de todos modos. Si desea corregir, diga cancelar.`,
+                () => {
+                    estadoDictado.etapa = 'dictado';
+                    setTimeout(() => iniciarDictadoLetra('A'), 3000);
+                }
+            );
+        }
+    }, 1500);
 }
 
 // ============================================================================
@@ -736,10 +791,27 @@ function actualizarVisualizacion() {
         document.getElementById(`numeros-${letra}`).textContent = numeros.join(', ');
     }
     
-    document.getElementById('contador-actual').textContent = 
-        `${estadoDictado.respuestas[estadoDictado.letraActual]?.length || 0} preguntas`;
+    // CONTADOR ACTUAL
+    const letraActual = estadoDictado.letraActual;
+    if (letraActual) {
+        const completadas = estadoDictado.respuestas[letraActual].length;
+        const esperadas = estadoDictado.totalEsperado[letraActual] || 0;
+        const faltantes = Math.max(0, esperadas - completadas);
+        
+        document.getElementById('contador-actual').textContent = 
+            `${completadas} de ${esperadas} preguntas`;
+        
+        // CONTADOR EN REVERSA
+        const contadorReversa = document.getElementById('contador-reversa');
+        if (contadorReversa) {
+            contadorReversa.textContent = faltantes;
+            contadorReversa.style.color = faltantes === 0 ? '#4caf50' : '#9c27b0';
+        }
+    }
     
-    const total = Object.values(estadoDictado.respuestas).reduce((sum, arr) => sum + arr.length, 0);
+    // TOTAL GENERAL
+    const total = Object.values(estadoDictado.respuestas)
+        .reduce((sum, arr) => sum + arr.length, 0);
     document.getElementById('total-voz-numero').textContent = total;
     
     const totalElement = document.getElementById('total-voz');
