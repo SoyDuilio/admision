@@ -3,6 +3,7 @@
 {% block title %}Resultados - POSTULANDO{% endblock %}
 
 {% block extra_css %}
+<link rel="stylesheet" href="{{ url_for('static', path='/css/modal_detalle.css') }}">
 <style>
     :root {
         --primary-blue: #3b82f6;
@@ -411,6 +412,20 @@
             flex-direction: column;
         }
     }
+
+    /*para el botón DETALLE*/
+    .btn-action.btn-view {
+        background: none;
+        border: 1px solid #3b82f6;
+        color: #3b82f6;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-action.btn-view:hover {
+        background: rgba(59, 130, 246, 0.1);
+        transform: translateY(-2px);
+    }
 </style>
 {% endblock %}
 
@@ -539,11 +554,10 @@
                     <td style="color:#94a3b8;">{{ hoja.fecha_captura.strftime('%d/%m/%Y %H:%M') }}</td>
                     <td>
                         <div class="action-buttons">
-                            <a href="/hoja/{{ hoja.id }}/detalle" 
-                               class="btn-action btn-view"
-                               title="Ver detalle de las 100 respuestas">
+                            <button class="btn-action btn-view" 
+                                    data-hoja-id="{{ hoja.id }}">
                                 👁️ Ver Detalle
-                            </a>
+                            </button>
                             <a href="/hoja/{{ hoja.id }}/pdf" 
                                class="btn-action btn-download"
                                title="Descargar reporte en PDF">
@@ -568,29 +582,294 @@
     </div>
 </div>
 
+<!-- MODAL DE DETALLE -->
+<div id="modalDetalle" class="modal-detalle">
+    <div class="modal-overlay" onclick="cerrarModal()"></div>
+    
+    <div class="modal-content-detalle">
+        <!-- Header del modal -->
+        <div class="modal-header-detalle">
+            <div class="modal-title-section">
+                <h2>📋 Detalle de Respuestas</h2>
+                <div class="modal-subtitle" id="modalSubtitle">
+                    Cargando...
+                </div>
+            </div>
+            <button class="btn-close-modal" onclick="cerrarModal()">
+                ✕
+            </button>
+        </div>
+
+        <!-- Estadísticas rápidas -->
+        <div class="stats-header" id="statsHeader">
+            <!-- Se llenará dinámicamente -->
+        </div>
+
+        <!-- Body del modal con scroll -->
+        <div class="modal-body-detalle" id="modalBody">
+            <div class="loading-spinner">
+                <div class="spinner"></div>
+                <p>Cargando respuestas...</p>
+            </div>
+        </div>
+
+        <!-- Footer con acciones -->
+        <div class="modal-footer-detalle">
+            <button class="btn-modal btn-secondary" onclick="cerrarModal()">
+                Cerrar
+            </button>
+            <button class="btn-modal btn-primary" onclick="descargarReporte()">
+                📥 Descargar Reporte
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
 <script>
-function aplicarFiltros() {
-    const codigo = document.getElementById('searchCodigo').value;
-    const estado = document.getElementById('filterEstado').value;
-    const api = document.getElementById('filterAPI').value;
+(function() {
+    'use strict';
     
-    const params = new URLSearchParams();
-    if (codigo) params.append('codigo', codigo);
-    if (estado) params.append('estado', estado);
-    if (api) params.append('api', api);
+    console.log('🚀 Iniciando módulo de detalle de hojas');
     
-    window.location.href = '/resultados?' + params.toString();
-}
-
-function exportarExcel() {
-    window.location.href = '/api/exportar-resultados';
-}
-
-// Enter en búsqueda
-document.getElementById('searchCodigo').addEventListener('keypress', function(e) {
-    if (e.key === 'Enter') {
-        aplicarFiltros();
+    // Variables globales
+    window.hojaActualId = null;
+    
+    // Función principal
+    window.verDetalle = async function(hojaId) {
+        console.log('🔍 verDetalle() llamado con ID:', hojaId);
+        window.hojaActualId = hojaId;
+        
+        const modal = document.getElementById('modalDetalle');
+        if (!modal) {
+            console.error('❌ No se encontró el modal con id="modalDetalle"');
+            alert('Error: Modal no encontrado');
+            return;
+        }
+        
+        console.log('✅ Modal encontrado, mostrando...');
+        modal.classList.add('show');
+        document.body.style.overflow = 'hidden';
+        
+        try {
+            const url = `/api/hoja/${hojaId}/detalle`;
+            console.log('📡 Solicitando:', url);
+            
+            const response = await fetch(url);
+            console.log('📥 Respuesta recibida, status:', response.status);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error('❌ Error del servidor:', errorText);
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+            
+            const data = await response.json();
+            console.log('✅ JSON parseado:', data);
+            
+            if (!data.success) {
+                throw new Error(data.message || 'Error desconocido del servidor');
+            }
+            
+            renderizarDetalle(data);
+            
+        } catch (error) {
+            console.error('❌ Error capturado:', error);
+            const modalBody = document.getElementById('modalBody');
+            if (modalBody) {
+                modalBody.innerHTML = `
+                    <div style="text-align: center; padding: 40px; color: white;">
+                        <div style="font-size: 3rem; margin-bottom: 16px;">❌</div>
+                        <h3>Error al cargar el detalle</h3>
+                        <p style="color: #ef4444; margin-top: 12px;">${error.message}</p>
+                        <button onclick="cerrarModal()" style="margin-top: 20px; padding: 10px 20px; background: #ef4444; color: white; border: none; border-radius: 8px; cursor: pointer;">
+                            Cerrar
+                        </button>
+                    </div>
+                `;
+            }
+        }
+    };
+    
+    function renderizarDetalle(data) {
+        console.log('🎨 Renderizando detalle con:', data);
+        
+        const hoja = data.hoja;
+        const respuestas = data.respuestas;
+        const stats = data.estadisticas;
+        
+        // Actualizar subtítulo
+        let subtitulo = `Hoja: ${hoja.codigo}`;
+        if (hoja.postulante) {
+            subtitulo += ` | ${hoja.postulante.apellidos}, ${hoja.postulante.nombres}`;
+        }
+        if (hoja.dni) {
+            subtitulo += ` | DNI: ${hoja.dni}`;
+        }
+        
+        const subtitleEl = document.getElementById('modalSubtitle');
+        if (subtitleEl) {
+            subtitleEl.textContent = subtitulo;
+        }
+        
+        // Estadísticas
+        const statsEl = document.getElementById('statsHeader');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="stat-card-mini correcta">
+                    <div class="stat-value">${stats.correctas}</div>
+                    <div class="stat-label">Correctas</div>
+                </div>
+                <div class="stat-card-mini incorrecta">
+                    <div class="stat-value">${stats.incorrectas}</div>
+                    <div class="stat-label">Incorrectas</div>
+                </div>
+                <div class="stat-card-mini vacia">
+                    <div class="stat-value">${stats.vacias}</div>
+                    <div class="stat-label">Vacías</div>
+                </div>
+                <div class="stat-card-mini invalida">
+                    <div class="stat-value">${stats.invalidas}</div>
+                    <div class="stat-label">Inválidas</div>
+                </div>
+                ${hoja.calificacion ? `
+                    <div class="stat-card-mini" style="border-color: #8b5cf6;">
+                        <div class="stat-value" style="color: #8b5cf6;">${hoja.calificacion.puntaje}</div>
+                        <div class="stat-label">Puntaje</div>
+                    </div>
+                    <div class="stat-card-mini" style="border-color: #f59e0b;">
+                        <div class="stat-value" style="color: #f59e0b;">#${hoja.calificacion.puesto}</div>
+                        <div class="stat-label">Puesto</div>
+                    </div>
+                ` : ''}
+            `;
+        }
+        
+        // Grilla de respuestas
+        let htmlBody = `
+            <div class="leyenda-colores">
+                <div class="leyenda-item">
+                    <div class="leyenda-color correcta"></div>
+                    <span>Correcta</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color incorrecta"></div>
+                    <span>Incorrecta</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color vacia"></div>
+                    <span>Vacía</span>
+                </div>
+                <div class="leyenda-item">
+                    <div class="leyenda-color invalida"></div>
+                    <span>Inválida</span>
+                </div>
+            </div>
+            <div class="respuestas-grid">
+        `;
+        
+        respuestas.forEach(r => {
+            const tooltip = `P${r.numero}: ${r.marcada}${r.correcta ? ` (Correcta: ${r.correcta})` : ''} | ${(r.confianza * 100).toFixed(0)}%`;
+            
+            htmlBody += `
+                <div class="respuesta-cell ${r.resultado.toLowerCase()}" 
+                     data-tooltip="${tooltip}">
+                    <div class="numero">${r.numero}</div>
+                    <div class="letra">${r.marcada}</div>
+                    <div class="confianza">${(r.confianza * 100).toFixed(0)}%</div>
+                </div>
+            `;
+        });
+        
+        htmlBody += `</div>`;
+        
+        const bodyEl = document.getElementById('modalBody');
+        if (bodyEl) {
+            bodyEl.innerHTML = htmlBody;
+            console.log('✅ Contenido renderizado');
+        }
     }
-});
+    
+    window.cerrarModal = function() {
+        console.log('❌ Cerrando modal');
+        const modal = document.getElementById('modalDetalle');
+        if (modal) {
+            modal.classList.remove('show');
+        }
+        document.body.style.overflow = '';
+        window.hojaActualId = null;
+    };
+    
+    window.descargarReporte = function() {
+        if (window.hojaActualId) {
+            window.open(`/hoja/${window.hojaActualId}/pdf`, '_blank');
+        }
+    };
+    
+    window.aplicarFiltros = function() {
+        const codigo = document.getElementById('searchCodigo').value;
+        const estado = document.getElementById('filterEstado').value;
+        const api = document.getElementById('filterAPI').value;
+        
+        const params = new URLSearchParams();
+        if (codigo) params.append('codigo', codigo);
+        if (estado) params.append('estado', estado);
+        if (api) params.append('api', api);
+        
+        window.location.href = '/resultados?' + params.toString();
+    };
+    
+    window.exportarExcel = function() {
+        window.location.href = '/api/exportar-resultados';
+    };
+    
+    // Event listeners
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('📦 DOM cargado, configurando eventos...');
+        
+        // Enter en búsqueda
+        const searchInput = document.getElementById('searchCodigo');
+        if (searchInput) {
+            searchInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    window.aplicarFiltros();
+                }
+            });
+            console.log('✅ Event listener de búsqueda configurado');
+        }
+        
+        // Delegación de eventos para botones
+        document.addEventListener('click', function(e) {
+            const btnView = e.target.closest('.btn-view');
+            if (btnView) {
+                e.preventDefault();
+                const hojaId = parseInt(btnView.dataset.hojaId);
+                console.log('🖱️ Click detectado en botón Ver Detalle, ID:', hojaId);
+                
+                if (isNaN(hojaId)) {
+                    console.error('❌ ID de hoja inválido:', btnView.dataset.hojaId);
+                    alert('Error: ID de hoja inválido');
+                    return;
+                }
+                
+                window.verDetalle(hojaId);
+            }
+        });
+        console.log('✅ Event listener de botones configurado');
+        
+        // ESC para cerrar
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                window.cerrarModal();
+            }
+        });
+        console.log('✅ Event listener de ESC configurado');
+        
+        console.log('✅ Todos los eventos configurados correctamente');
+        console.log('✅ verDetalle disponible como:', typeof window.verDetalle);
+    });
+    
+})();
 </script>
 {% endblock %}

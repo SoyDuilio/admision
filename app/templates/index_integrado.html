@@ -172,7 +172,6 @@
         transition: all 0.3s;
         position: relative;
         overflow: hidden;
-        display: block;
     }
 
     .process-card::before {
@@ -364,7 +363,7 @@
         color: #4caf50;
     }
 
-    /* Modal Base */
+    /* Modal */
     .modal-overlay {
         position: fixed;
         top: 0;
@@ -511,13 +510,13 @@
                 <span class="admin-badge">⚠️ Pendiente</span>
             </a>
 
-            <!-- Gestión de Aulas y Profesores -->
-            <a href="/gestion-aulas-profesores" class="admin-card">
+            <!-- Asignación de Aulas -->
+            <a href="/asignar-postulantes" class="admin-card">
                 <div class="admin-card-header">
                     <div class="admin-icon">🏫</div>
-                    <h3>Aulas y Profesores</h3>
+                    <h3>Asignar Aulas</h3>
                 </div>
-                <p>Configurar aulas y vigilantes</p>
+                <p>Distribución automática</p>
                 <span class="admin-badge success">✓ Disponible</span>
             </a>
         </div>
@@ -528,25 +527,13 @@
         <h2 class="section-title">🎯 Proceso de Evaluación</h2>
         
         <div class="process-grid">
-            <!-- Card 1: Generar Hojas -->
-            <div class="process-card card-1" style="display: block;">
+            <a href="/generar-hojas" class="process-card card-1">
                 <div class="process-number">1</div>
                 <h3>Generar Hojas</h3>
-                <p>Por aula o individual</p>
-                
-                <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
-                    <button onclick="abrirModalHojasAula()" class="process-status status-ready" 
-                            style="cursor: pointer; border: none; font-size: 0.85rem;">
-                        📦 Por Aula
-                    </button>
-                    <button onclick="abrirModalHojaIndividual()" class="process-status status-pending" 
-                            style="cursor: pointer; border: none; font-size: 0.85rem;">
-                        📄 Individual
-                    </button>
-                </div>
-            </div>
+                <p>Crea hojas con códigos únicos</p>
+                <span class="process-status status-ready">✓ Listo</span>
+            </a>
 
-            <!-- Card 2: Capturar Exámenes -->
             <a href="/capturar-hojas" class="process-card card-2">
                 <div class="process-number">2</div>
                 <h3>Capturar Exámenes</h3>
@@ -554,7 +541,6 @@
                 <span class="process-status status-pending">⚡ Activo</span>
             </a>
 
-            <!-- Card 3: Registrar Gabarito -->
             <a href="/registrar-gabarito" class="process-card card-3">
                 <div class="process-number">3</div>
                 <h3>Registrar Gabarito</h3>
@@ -562,7 +548,6 @@
                 <span class="process-status status-pending">⚡ Activo</span>
             </a>
 
-            <!-- Card 4: Ver Resultados -->
             <a href="/resultados" target="_blank" class="process-card card-4">
                 <div class="process-number">4</div>
                 <h3>Ver Resultados</h3>
@@ -630,16 +615,10 @@
             </div>
         </div>
     </div>
-
-    <!-- Modal Generación de Hojas por Aula -->
-    {% include "components/modal_generar_hojas_aula.html" %}
-    {% include "components/modal_generar_hoja_individual.html" %}
-    {% include "components/modal_confirmar_regeneracion.html" %}
-
 </div>
 
 <!-- Modal En Desarrollo -->
-<div class="modal-overlay" id="modalDesarrollo" style="display: none !important;">
+<div class="modal-overlay" id="modalDesarrollo">
     <div class="modal-content">
         <h3>🚧 En Desarrollo</h3>
         <p>Esta funcionalidad estará disponible próximamente.</p>
