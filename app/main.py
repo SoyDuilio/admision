@@ -18,6 +18,9 @@ from app.database import engine, Base
 from app.config import settings
 
 from app.api.documento_oficial import router as documento_router
+from app.api.generar_hojas_aula import router as hojas_aula_router
+from app.api.dashboard import router as dashboard_router
+from app.api.generar_hoja_individual import router as hoja_individual_router
 
 # ============================================================================
 # CREAR CARPETAS NECESARIAS
@@ -110,6 +113,9 @@ app.include_router(resultados_router, prefix="/api", tags=["Resultados"])
 app.include_router(revision_router, prefix="/api", tags=["Revisión"])
 app.include_router(asignacion_router, prefix="/api", tags=["Asignación"])
 app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
+app.include_router(hojas_aula_router, prefix="/api", tags=["Generación Hojas"])
+app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
+app.include_router(hoja_individual_router, prefix="/api", tags=["Hojas Individual"])
 
 # ============================================================================
 # HEALTH CHECK
