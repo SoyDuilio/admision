@@ -13,6 +13,11 @@ from collections import Counter
 import json
 import shutil
 
+from sqlalchemy import text, func
+from pydantic import BaseModel
+from typing import Dict, List, Optional
+from datetime import datetime
+
 from app.database import get_db
 from app.models import ClaveRespuesta
 
@@ -183,7 +188,7 @@ async def procesar_gabarito_imagen(
             shutil.copyfileobj(file.file, buffer)
         
         # Pre-procesar con OpenCV
-        from app.services.image_preprocessor import ImagePreprocessor
+        from app.services.image_preprocessor_v2 import ImagePreprocessor
         preprocessor = ImagePreprocessor()
         processed_path = preprocessor.preprocess_image(str(temp_path))
         
@@ -356,3 +361,301 @@ async def editar_gabarito(
         "success": True,
         "message": "Gabarito actualizado correctamente"
     }
+
+
+
+# ==================================
+# API Gabarito - Endpoints Completos
+# ==================================
+
+
+# ============================================================================
+# MODELOS PYDANTIC
+# ============================================================================
+
+class GuardarGabaritoRequest(BaseModel):
+    proceso: str
+    respuestas: Dict[int, str]  # {1: 'A', 2: 'B', ..., 100: 'E'}
+
+
+class GuardarGabaritoAgrupadoRequest(BaseModel):
+    proceso: str
+    respuestas_por_letra: Dict[str, List[int]]  # {'A': [1,5,10], 'B': [2,3], ...}
+
+
+# ============================================================================
+# ENDPOINT: GUARDAR GABARITO (FORMATO DICCIONARIO)
+# ============================================================================
+
+@router.post("/guardar-gabarito")
+async def guardar_gabarito(
+    data: GuardarGabaritoRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Guarda el gabarito en la base de datos.
+    Llamado desde los 3 métodos: cámara, manual y voz.
+    """
+    try:
+        # Validar 100 respuestas
+        if len(data.respuestas) != 100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Esperadas 100 respuestas, recibidas: {len(data.respuestas)}"
+            )
+        
+        # Validar que estén del 1 al 100
+        preguntas = set(data.respuestas.keys())
+        esperadas = set(range(1, 101))
+        
+        if preguntas != esperadas:
+            faltantes = esperadas - preguntas
+            raise HTTPException(
+                status_code=400,
+                detail=f"Preguntas faltantes: {sorted(list(faltantes))[:10]}"
+            )
+        
+        # Validar letras A-E
+        letras_validas = {'A', 'B', 'C', 'D', 'E'}
+        letras_invalidas = set(data.respuestas.values()) - letras_validas
+        if letras_invalidas:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Letras inválidas: {letras_invalidas}"
+            )
+        
+        # Limpiar gabarito anterior
+        db.execute(
+            text("DELETE FROM clave_respuestas WHERE proceso_admision = :proceso"),
+            {"proceso": data.proceso}
+        )
+        
+        # Insertar nuevo gabarito
+        for numero, letra in data.respuestas.items():
+            db.execute(text("""
+                INSERT INTO clave_respuestas 
+                    (numero_pregunta, respuesta_correcta, proceso_admision, created_at)
+                VALUES 
+                    (:num, :letra, :proceso, NOW())
+            """), {
+                "num": int(numero),
+                "letra": letra.upper(),
+                "proceso": data.proceso
+            })
+        
+        db.commit()
+        
+        # Calificar automáticamente
+        hojas_calificadas = 0
+        try:
+            result = db.execute(
+                text("SELECT fn_calificar_todas_las_hojas(:proceso)"),
+                {"proceso": data.proceso}
+            )
+            hojas_calificadas = result.scalar() or 0
+            
+            db.execute(
+                text("SELECT fn_calcular_ranking(:proceso)"),
+                {"proceso": data.proceso}
+            )
+            db.commit()
+        except Exception as e:
+            print(f"Error en calificación automática: {e}")
+        
+        # Contar distribución
+        result = db.execute(text("""
+            SELECT respuesta_correcta, COUNT(*) as cantidad
+            FROM clave_respuestas
+            WHERE proceso_admision = :proceso
+            GROUP BY respuesta_correcta
+            ORDER BY respuesta_correcta
+        """), {"proceso": data.proceso})
+        
+        conteo = {row[0]: row[1] for row in result}
+        
+        return {
+            "success": True,
+            "message": "Gabarito guardado correctamente",
+            "total_registrado": len(data.respuestas),
+            "distribucion": conteo,
+            "hojas_calificadas": hojas_calificadas,
+            "proceso": data.proceso
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ Error al guardar gabarito: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ENDPOINT: GUARDAR GABARITO (FORMATO AGRUPADO)
+# ============================================================================
+
+@router.post("/guardar-gabarito-agrupado")
+async def guardar_gabarito_agrupado(
+    data: GuardarGabaritoAgrupadoRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    Guarda el gabarito en formato agrupado por letra.
+    
+    Formato esperado:
+    {
+        "proceso": "2025-2",
+        "respuestas_por_letra": {
+            "A": [4, 10, 15, 20, ...],
+            "B": [1, 6, 9, 14, ...],
+            "C": [2, 7, 11, 16, ...],
+            "D": [3, 8, 13, 18, ...],
+            "E": [5, 12, 19, 24, ...]
+        }
+    }
+    """
+    
+    try:
+        # Convertir a formato diccionario
+        respuestas_dict = {}
+        
+        for letra, preguntas in data.respuestas_por_letra.items():
+            for num_pregunta in preguntas:
+                if num_pregunta in respuestas_dict:
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Pregunta {num_pregunta} duplicada"
+                    )
+                respuestas_dict[num_pregunta] = letra
+        
+        # Reutilizar el endpoint anterior
+        request_data = GuardarGabaritoRequest(
+            proceso=data.proceso,
+            respuestas=respuestas_dict
+        )
+        
+        return await guardar_gabarito(request_data, db)
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ENDPOINT: OBTENER GABARITO
+# ============================================================================
+
+@router.get("/obtener-gabarito/{proceso}")
+async def obtener_gabarito(
+    proceso: str,
+    formato: str = "diccionario",  # "diccionario" o "agrupado"
+    db: Session = Depends(get_db)
+):
+    """
+    Obtiene el gabarito guardado.
+    
+    Parámetros:
+    - formato: "diccionario" retorna {1: 'A', 2: 'B', ...}
+    - formato: "agrupado" retorna {'A': [1,5,10], 'B': [2,3], ...}
+    """
+    
+    try:
+        query = text("""
+            SELECT numero_pregunta, respuesta_correcta
+            FROM clave_respuestas
+            WHERE proceso_admision = :proceso
+            ORDER BY numero_pregunta
+        """)
+        
+        result = db.execute(query, {"proceso": proceso})
+        rows = result.fetchall()
+        
+        if not rows:
+            return {
+                "success": False,
+                "message": f"No hay gabarito registrado para el proceso {proceso}",
+                "existe": False
+            }
+        
+        if formato == "agrupado":
+            # Formato agrupado por letra
+            respuestas_agrupadas = {
+                "A": [], "B": [], "C": [], "D": [], "E": []
+            }
+            
+            for row in rows:
+                letra = row.respuesta_correcta.upper()
+                if letra in respuestas_agrupadas:
+                    respuestas_agrupadas[letra].append(row.numero_pregunta)
+            
+            # Contar totales
+            totales = {letra: len(preg) for letra, preg in respuestas_agrupadas.items()}
+            
+            return {
+                "success": True,
+                "existe": True,
+                "proceso": proceso,
+                "formato": "agrupado",
+                "respuestas_por_letra": respuestas_agrupadas,
+                "totales": totales,
+                "total_general": len(rows)
+            }
+        
+        else:
+            # Formato diccionario
+            respuestas_dict = {
+                row.numero_pregunta: row.respuesta_correcta.upper()
+                for row in rows
+            }
+            
+            return {
+                "success": True,
+                "existe": True,
+                "proceso": proceso,
+                "formato": "diccionario",
+                "respuestas": respuestas_dict,
+                "total": len(respuestas_dict)
+            }
+        
+    except Exception as e:
+        print(f"Error al obtener gabarito: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ENDPOINT: VERIFICAR SI EXISTE GABARITO
+# ============================================================================
+
+@router.get("/verificar-gabarito/{proceso}")
+async def verificar_gabarito(
+    proceso: str,
+    db: Session = Depends(get_db)
+):
+    """
+    Verifica si existe gabarito para un proceso.
+    """
+    
+    try:
+        query = text("""
+            SELECT COUNT(*) as total
+            FROM clave_respuestas
+            WHERE proceso_admision = :proceso
+        """)
+        
+        result = db.execute(query, {"proceso": proceso})
+        total = result.scalar()
+        
+        return {
+            "success": True,
+            "existe": total > 0,
+            "total_preguntas": total,
+            "completo": total == 100,
+            "proceso": proceso
+        }
+        
+    except Exception as e:
+        print(f"Error al verificar gabarito: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
