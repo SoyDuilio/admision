@@ -36,6 +36,7 @@ class Postulante(Base):
     #email = Column(String(200), nullable=True)
     telefono = Column(String(15), nullable=True)
     programa_educativo = Column(String(200), nullable=True)  # Carrera a la que postula
+    proceso_admision = Column(String(10), default="2025-2", index=True)
     
     # Estado
     activo = Column(Boolean, default=True)
@@ -51,6 +52,8 @@ class Postulante(Base):
     hojas_respuestas = relationship("HojaRespuesta", back_populates="postulante")
     calificaciones = relationship("Calificacion", back_populates="postulante")
     asignacion = relationship("PostulanteAsignacion", back_populates="postulante", uselist=False)
+    asignacion_examen = relationship("AsignacionExamen", back_populates="postulante", uselist=False)
+    logs_anulacion_hojas = relationship("LogAnulacionHoja", back_populates="postulante", cascade="all, delete-orphan")
 
     @property
     def nombre_completo(self):

@@ -8,8 +8,10 @@ from app.models.respuesta import Respuesta
 
 # NUEVOS MODELOS:
 from app.models.postulante_asignacion import PostulanteAsignacion
+from app.models.asignacion_examen import AsignacionExamen
 from app.models.venta_carpeta import VentaCarpeta
 from app.models.verificacion_certificado import VerificacionCertificado
+from app.models.log_anulacion import LogAnulacionHoja
 
 __all__ = [
     "Aula",
@@ -20,6 +22,8 @@ __all__ = [
     "Profesor",
     "Respuesta",
     "PostulanteAsignacion",
+    "AsignacionExamen",  # ← AGREGAR
     "VentaCarpeta",
-    "VerificacionCertificado"
+    "VerificacionCertificado",
+    "LogAnulacionHoja"
 ]

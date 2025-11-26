@@ -13,12 +13,13 @@ import enum
 
 
 class EstadoProcesamiento(enum.Enum):
-    generada = "generada"  # ← NUEVO
+    generada = "generada"
     procesando = "procesando"
     completado = "completado"
     error = "error"
     observado = "observado"
-    pendiente_calificar = "pendiente_calificar"  # ← CONSISTENTE
+    pendiente_calificar = "pendiente_calificar"
+
 
 class APIVision(enum.Enum):
     """APIs de Vision disponibles"""
@@ -30,14 +31,6 @@ class APIVision(enum.Enum):
 class HojaRespuesta(Base):
     """
     Modelo de Hoja de Respuesta
-    
-    Almacena la información sobre cada foto capturada:
-    - Quién es el postulante
-    - Dónde está guardada la imagen
-    - Qué API se usó para procesarla
-    - Tiempo de procesamiento
-    - Estado del procesamiento
-    - Validación de códigos (DNI profesor, código aula)
     """
     
     __tablename__ = "hojas_respuestas"
@@ -45,19 +38,19 @@ class HojaRespuesta(Base):
     id = Column(Integer, primary_key=True, index=True)
     postulante_id = Column(Integer, ForeignKey('postulantes.id', ondelete='CASCADE'), nullable=False)
     
-    # Validación y códigos (NUEVO)
+    # Validación y códigos
     dni_profesor = Column(String(8), index=True)
     codigo_aula = Column(String(20), index=True)
     codigo_hoja = Column(String(20), unique=True, index=True)
-    proceso_admision = Column(String(10), default="2025-1", index=True)
+    proceso_admision = Column(String(10), default="2025-2", index=True)
     
     # Imagen
     imagen_url = Column(String(500))
     imagen_original_nombre = Column(String(200))
     
     # Procesamiento
-    api_utilizada = Column(String(20))  # 'google', 'openai', 'anthropic'
-    estado = Column(String(20), default='procesando')  # 'procesando', 'completado', 'error', 'observado'
+    api_utilizada = Column(String(20))
+    estado = Column(String(20), default='procesando')
     respuestas_detectadas = Column(Integer, default=0)
     tiempo_procesamiento = Column(Float)
     metadata_json = Column(Text)
@@ -66,7 +59,7 @@ class HojaRespuesta(Base):
     nota_final = Column(Float)
     respuestas_correctas_count = Column(Integer, default=0)
     
-    # Observaciones (NUEVO)
+    # Observaciones
     observaciones = Column(Text)
     
     # Timestamps
@@ -75,10 +68,15 @@ class HojaRespuesta(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
     
-    # Relaciones
+    # ========================================================================
+    # RELACIONES
+    # ========================================================================
     postulante = relationship("Postulante", back_populates="hojas_respuestas")
     respuestas = relationship("Respuesta", back_populates="hoja_respuesta", cascade="all, delete-orphan")
-        
+    
+    # ← AGREGAR ESTA LÍNEA:
+    logs_anulacion = relationship("LogAnulacionHoja", foreign_keys="[LogAnulacionHoja.hoja_respuesta_id]", back_populates="hoja_respuesta")
+    
     def __repr__(self):
         return f"<HojaRespuesta(id={self.id}, codigo_hoja='{self.codigo_hoja}', postulante_id={self.postulante_id}, estado='{self.estado}')>"
     

@@ -1,6 +1,7 @@
 from sqlalchemy import Column, Integer, String, Boolean, DateTime
 from app.database import Base
 from datetime import datetime, timezone
+from sqlalchemy.orm import relationship
 
 class Profesor(Base):
     __tablename__ = "profesores"
@@ -16,5 +17,7 @@ class Profesor(Base):
     created_at = Column(DateTime, default=datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=datetime.now(timezone.utc), onupdate=datetime.now(timezone.utc))
     
+    asignaciones_examen = relationship("AsignacionExamen", back_populates="profesor")
+
     def __repr__(self):
         return f"<Profesor {self.apellido_paterno} {self.apellido_materno}, {self.nombres}>"
