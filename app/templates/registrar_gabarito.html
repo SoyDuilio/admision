@@ -204,6 +204,22 @@
             max-height: 420px !important;
         }
     }
+
+    .btn-documento-oficial {
+        padding: 12px 24px;
+        background: linear-gradient(135deg, #1e40af, #1e3a8a);
+        color: white;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.3s;
+    }
+
+    .btn-documento-oficial:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 10px 20px rgba(30, 64, 175, 0.3);
+    }
 </style>
 {% endblock %}
 
@@ -223,23 +239,56 @@
 
     <!-- Selector de método -->
     <div class="method-selector">
+        <!-- Método 1: Cámara -->
         <div class="method-card active" id="methodCamera" onclick="selectMethod('camera')">
             <div class="method-icon">📸</div>
             <div class="method-title">Capturar con Cámara</div>
             <div class="method-description">Usa la cámara para escanear el gabarito</div>
         </div>
 
+        <!-- Método 2: Manual por Alternativas (Textareas) -->
         <div class="method-card" id="methodManual" onclick="selectMethod('manual')">
             <div class="method-icon">⌨️</div>
-            <div class="method-title">Ingreso Manual</div>
-            <div class="method-description">Ingresa las respuestas manualmente</div>
+            <div class="method-title">Por Alternativas</div>
+            <div class="method-description">Escribir números por cada letra (A, B, C, D, E)</div>
         </div>
         
+        <!-- Método 3: Manual por Matriz (NUEVO) -->
+        <div class="method-card" id="methodMatriz" onclick="abrirModalMatriz()">
+            <div class="method-icon">🔢</div>
+            <div class="method-title">Por Totales + Matriz</div>
+            <div class="method-description">Paso 1: Totales → Paso 2: Click en matriz</div>
+        </div>
+        
+        <!-- Método 4: Voz -->
         <div class="method-card" id="methodVoz" onclick="selectMethod('voz')">
             <div class="method-icon">🎤</div>
             <div class="method-title">Captura por Voz</div>
             <div class="method-description">Dicta las respuestas con tu voz</div>
         </div>
+    </div>
+
+    <!-- Separador visual -->
+    <div style="
+        display: flex; 
+        align-items: center; 
+        gap: 20px; 
+        margin: 30px 0;
+        color: #64748b;
+    ">
+        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+        <span>ó genera documento sin guardar</span>
+        <div style="flex: 1; height: 1px; background: rgba(255,255,255,0.1);"></div>
+    </div>
+
+    <!-- Botón para Documento Oficial (separado) -->
+    <div style="text-align: center; margin-bottom: 30px;">
+        <button onclick="abrirModalDocumentoOficial()" class="btn-documento-oficial">
+            📄 Generar Documento Oficial (PDF)
+        </button>
+        <p style="color: #64748b; font-size: 0.875rem; margin-top: 10px;">
+            Solo genera PDF para lacrar, no guarda en sistema
+        </p>
     </div>
 
     <!-- Sección de cámara -->
@@ -285,6 +334,9 @@
     </div>
 
 </div>
+<!-- Modal de Documento Oficial -->
+{% include "components/modal_documento_oficial_gabarito.html" %}
+{% include "components/modal_gabarito_matriz.html" %}
 {% endblock %}
 
 {% block extra_js %}
@@ -444,7 +496,7 @@ function inicializarCamara() {
 async function procesarGabaritoImagen(formData) {
     try {
         // Agregar proceso al FormData
-        formData.append('proceso', 'ADMISION_2025_2');
+        formData.append('proceso', '2025-2');
         formData.append('api', 'google'); // o 'openai' o 'anthropic'
         
         const response = await fetch('/api/gabarito/procesar-imagen', {
@@ -509,7 +561,7 @@ async function guardarGabarito() {
             },
             body: JSON.stringify({
                 respuestas: respuestas,
-                proceso: 'ADMISION_2025_2'
+                proceso: '2025-2'
             })
         });
         
