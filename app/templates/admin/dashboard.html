@@ -1,0 +1,622 @@
+<!--
+    POSTULANDO - Dashboard Principal
+    app/templates/admin/dashboard.html
+    
+    Vista principal del administrador con:
+    - Estadísticas generales
+    - Estado del proceso
+    - Acciones rápidas
+    - Actividad reciente
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block header_title %}Dashboard{% endblock %}
+{% block header_subtitle %}Vista general del proceso de admisión{% endblock %}
+
+{% block content %}
+<div class="dashboard-container fade-in">
+    
+    <!-- ============================================================ -->
+    <!-- ALERTA DE ESTADO DEL PROCESO -->
+    <!-- ============================================================ -->
+    {% if not gabarito_registrado %}
+    <div class="alert alert-warning">
+        <div class="alert-icon">⚠️</div>
+        <div class="alert-content">
+            <strong>Acción requerida:</strong> No se han registrado las respuestas correctas (gabarito) para el proceso actual.
+        </div>
+        <a href="/admin/gabarito" class="btn btn-warning">Registrar Gabarito</a>
+    </div>
+    {% elif not calificacion_ejecutada %}
+    <div class="alert alert-info">
+        <div class="alert-icon">📝</div>
+        <div class="alert-content">
+            <strong>Siguiente paso:</strong> El gabarito está registrado. Puede proceder con la calificación de las hojas.
+        </div>
+        <a href="/admin/calificacion" class="btn btn-primary">Iniciar Calificación</a>
+    </div>
+    {% elif not resultados_publicados %}
+    <div class="alert alert-success">
+        <div class="alert-icon">✅</div>
+        <div class="alert-content">
+            <strong>Calificación completada:</strong> Los resultados están listos para ser publicados.
+        </div>
+        <a href="/admin/resultados" class="btn btn-success">Publicar Resultados</a>
+    </div>
+    {% endif %}
+
+    <!-- ============================================================ -->
+    <!-- TARJETAS DE ESTADÍSTICAS -->
+    <!-- ============================================================ -->
+    <div class="stats-grid">
+        <!-- Total Postulantes -->
+        <div class="stat-card">
+            <div class="stat-icon blue">👥</div>
+            <div class="stat-content">
+                <div class="stat-label">Total Postulantes</div>
+                <div class="stat-value">{{ stats.total_postulantes | default(0) | format_number }}</div>
+                <div class="stat-change positive">Proceso {{ proceso_actual }}</div>
+            </div>
+        </div>
+
+        <!-- Hojas Procesadas -->
+        <div class="stat-card">
+            <div class="stat-icon green">📄</div>
+            <div class="stat-content">
+                <div class="stat-label">Hojas Procesadas</div>
+                <div class="stat-value">{{ stats.hojas_procesadas | default(0) | format_number }}</div>
+                <div class="stat-change positive">
+                    {{ ((stats.hojas_procesadas / stats.total_postulantes * 100) if stats.total_postulantes else 0) | round(1) }}% completado
+                </div>
+            </div>
+        </div>
+
+        <!-- Calificadas -->
+        <div class="stat-card">
+            <div class="stat-icon yellow">✅</div>
+            <div class="stat-content">
+                <div class="stat-label">Hojas Calificadas</div>
+                <div class="stat-value">{{ stats.hojas_calificadas | default(0) | format_number }}</div>
+                <div class="stat-change">
+                    {% if stats.promedio_nota %}
+                        Promedio: {{ stats.promedio_nota | round(2) }}
+                    {% else %}
+                        Pendiente
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Nota Máxima -->
+        <div class="stat-card">
+            <div class="stat-icon red">🏆</div>
+            <div class="stat-content">
+                <div class="stat-label">Nota Máxima</div>
+                <div class="stat-value">{{ stats.nota_maxima | default('-') }}</div>
+                <div class="stat-change">
+                    {% if stats.nota_minima %}
+                        Mínima: {{ stats.nota_minima }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- GRID PRINCIPAL -->
+    <!-- ============================================================ -->
+    <div class="dashboard-grid">
+        
+        <!-- Columna Izquierda -->
+        <div class="dashboard-main">
+            
+            <!-- Estado del Proceso -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📋 Estado del Proceso</h3>
+                    <span class="proceso-badge">{{ proceso_actual }}</span>
+                </div>
+                
+                <div class="proceso-timeline">
+                    <!-- Paso 1: Gabarito -->
+                    <div class="timeline-step {% if gabarito_registrado %}completed{% elif not gabarito_registrado %}current{% endif %}">
+                        <div class="timeline-marker">
+                            {% if gabarito_registrado %}✓{% else %}1{% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <h4>Registrar Gabarito</h4>
+                            <p>Cargar las 100 respuestas correctas</p>
+                            {% if gabarito_registrado %}
+                                <span class="badge badge-success">Completado</span>
+                                <small>{{ gabarito_fecha }}</small>
+                            {% else %}
+                                <a href="/admin/gabarito" class="btn btn-sm btn-primary">Registrar ahora</a>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Paso 2: Calificación -->
+                    <div class="timeline-step {% if calificacion_ejecutada %}completed{% elif gabarito_registrado and not calificacion_ejecutada %}current{% else %}pending{% endif %}">
+                        <div class="timeline-marker">
+                            {% if calificacion_ejecutada %}✓{% else %}2{% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <h4>Ejecutar Calificación</h4>
+                            <p>Calificar todas las hojas de respuesta</p>
+                            {% if calificacion_ejecutada %}
+                                <span class="badge badge-success">Completado</span>
+                                <small>{{ calificacion_fecha }}</small>
+                            {% elif gabarito_registrado %}
+                                <a href="/admin/calificacion" class="btn btn-sm btn-primary">Calificar ahora</a>
+                            {% else %}
+                                <span class="badge badge-warning">Pendiente</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Paso 3: Ranking -->
+                    <div class="timeline-step {% if ranking_generado %}completed{% elif calificacion_ejecutada and not ranking_generado %}current{% else %}pending{% endif %}">
+                        <div class="timeline-marker">
+                            {% if ranking_generado %}✓{% else %}3{% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <h4>Generar Ranking</h4>
+                            <p>Ordenar postulantes por puntaje</p>
+                            {% if ranking_generado %}
+                                <span class="badge badge-success">Completado</span>
+                            {% elif calificacion_ejecutada %}
+                                <span class="badge badge-info">Automático</span>
+                            {% else %}
+                                <span class="badge badge-warning">Pendiente</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Paso 4: Publicación -->
+                    <div class="timeline-step {% if resultados_publicados %}completed{% elif ranking_generado and not resultados_publicados %}current{% else %}pending{% endif %}">
+                        <div class="timeline-marker">
+                            {% if resultados_publicados %}✓{% else %}4{% endif %}
+                        </div>
+                        <div class="timeline-content">
+                            <h4>Publicar Resultados</h4>
+                            <p>Autorizar publicación oficial</p>
+                            {% if resultados_publicados %}
+                                <span class="badge badge-success">Publicado</span>
+                                <small>{{ publicacion_fecha }}</small>
+                            {% elif ranking_generado %}
+                                <a href="/admin/resultados" class="btn btn-sm btn-success">Publicar</a>
+                            {% else %}
+                                <span class="badge badge-warning">Pendiente</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Top 10 Postulantes -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🏆 Top 10 Postulantes</h3>
+                    <a href="/admin/ranking" class="btn btn-outline btn-sm">Ver ranking completo</a>
+                </div>
+                
+                <div class="table-container">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Postulante</th>
+                                <th>Programa</th>
+                                <th>Correctas</th>
+                                <th>Nota</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in top_postulantes %}
+                            <tr>
+                                <td>
+                                    <span class="ranking-badge {% if loop.index <= 3 %}top-3{% endif %}">
+                                        {{ loop.index }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <div class="postulante-info">
+                                        <strong>{{ p.nombre_completo }}</strong>
+                                        <small>DNI: {{ p.dni }}</small>
+                                    </div>
+                                </td>
+                                <td>{{ p.programa_educativo }}</td>
+                                <td>{{ p.respuestas_correctas }}/100</td>
+                                <td>
+                                    <span class="nota-badge">{{ p.nota_final }}</span>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted">
+                                    No hay datos de ranking disponibles
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Columna Derecha -->
+        <div class="dashboard-sidebar">
+            
+            <!-- Acciones Rápidas -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">⚡ Acciones Rápidas</h3>
+                </div>
+                
+                <div class="quick-actions">
+                    <a href="/admin/gabarito" class="quick-action-btn">
+                        <span class="quick-action-icon">✅</span>
+                        <span>Gestionar Gabarito</span>
+                    </a>
+                    
+                    <a href="/admin/calificacion" class="quick-action-btn">
+                        <span class="quick-action-icon">📝</span>
+                        <span>Calificar Hojas</span>
+                    </a>
+                    
+                    <a href="/admin/ranking" class="quick-action-btn">
+                        <span class="quick-action-icon">🏆</span>
+                        <span>Ver Ranking</span>
+                    </a>
+                    
+                    <a href="/admin/estadisticas" class="quick-action-btn">
+                        <span class="quick-action-icon">📊</span>
+                        <span>Estadísticas</span>
+                    </a>
+                    
+                    <a href="/admin/reportes" class="quick-action-btn">
+                        <span class="quick-action-icon">📄</span>
+                        <span>Generar Reportes</span>
+                    </a>
+                    
+                    <a href="/capturar-hoja" class="quick-action-btn" target="_blank">
+                        <span class="quick-action-icon">📸</span>
+                        <span>Capturar Hojas</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- Distribución por Programa -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">📚 Por Programa</h3>
+                </div>
+                
+                <div class="programa-list">
+                    {% for prog in programas_stats %}
+                    <div class="programa-item">
+                        <div class="programa-info">
+                            <span class="programa-nombre">{{ prog.nombre }}</span>
+                            <span class="programa-count">{{ prog.total }} postulantes</span>
+                        </div>
+                        <div class="programa-bar">
+                            <div class="programa-bar-fill" style="width: {{ prog.porcentaje }}%"></div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Sin datos</p>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Actividad Reciente -->
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">🕐 Actividad Reciente</h3>
+                </div>
+                
+                <div class="activity-list">
+                    {% for act in actividad_reciente %}
+                    <div class="activity-item">
+                        <div class="activity-icon {{ act.tipo }}">{{ act.icono }}</div>
+                        <div class="activity-content">
+                            <p>{{ act.mensaje }}</p>
+                            <small>{{ act.fecha }}</small>
+                        </div>
+                    </div>
+                    {% else %}
+                    <p class="text-muted text-center">Sin actividad reciente</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Dashboard Grid */
+    .dashboard-grid {
+        display: grid;
+        grid-template-columns: 1fr 380px;
+        gap: 24px;
+    }
+
+    @media (max-width: 1200px) {
+        .dashboard-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Alertas */
+    .alert {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 16px 24px;
+        border-radius: var(--radius);
+        margin-bottom: 24px;
+    }
+
+    .alert-warning {
+        background: rgba(245, 158, 11, 0.1);
+        border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    .alert-info {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+    }
+
+    .alert-success {
+        background: rgba(16, 185, 129, 0.1);
+        border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+
+    .alert-icon {
+        font-size: 1.5rem;
+    }
+
+    .alert-content {
+        flex: 1;
+    }
+
+    .btn-warning {
+        background: linear-gradient(135deg, var(--warning), #d97706);
+        color: white;
+    }
+
+    /* Timeline del proceso */
+    .proceso-timeline {
+        position: relative;
+        padding-left: 30px;
+    }
+
+    .proceso-timeline::before {
+        content: '';
+        position: absolute;
+        left: 15px;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--border-color);
+    }
+
+    .timeline-step {
+        position: relative;
+        padding-bottom: 24px;
+        padding-left: 30px;
+    }
+
+    .timeline-step:last-child {
+        padding-bottom: 0;
+    }
+
+    .timeline-marker {
+        position: absolute;
+        left: -23px;
+        top: 0;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        background: var(--bg-card);
+        border: 2px solid var(--border-color);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .timeline-step.completed .timeline-marker {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+    }
+
+    .timeline-step.current .timeline-marker {
+        background: var(--primary);
+        border-color: var(--primary);
+        color: white;
+        animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+        50% { box-shadow: 0 0 0 10px rgba(59, 130, 246, 0); }
+    }
+
+    .timeline-content h4 {
+        font-size: 1rem;
+        margin-bottom: 4px;
+    }
+
+    .timeline-content p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
+
+    .timeline-content small {
+        display: block;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .btn-sm {
+        padding: 6px 12px;
+        font-size: 0.8rem;
+    }
+
+    /* Ranking badge */
+    .ranking-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--bg-card-hover);
+        font-weight: 600;
+        font-size: 0.8rem;
+    }
+
+    .ranking-badge.top-3 {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #1e1b4b;
+    }
+
+    .postulante-info {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .postulante-info strong {
+        font-size: 0.875rem;
+    }
+
+    .postulante-info small {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .nota-badge {
+        background: linear-gradient(135deg, var(--success), #059669);
+        padding: 4px 12px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 0.875rem;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .quick-action-btn {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: var(--bg-card-hover);
+        border-radius: 10px;
+        transition: var(--transition);
+    }
+
+    .quick-action-btn:hover {
+        background: var(--primary);
+        transform: translateX(4px);
+    }
+
+    .quick-action-icon {
+        font-size: 1.25rem;
+    }
+
+    /* Programa stats */
+    .programa-list {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .programa-item {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .programa-info {
+        display: flex;
+        justify-content: space-between;
+        font-size: 0.8rem;
+    }
+
+    .programa-nombre {
+        font-weight: 500;
+    }
+
+    .programa-count {
+        color: var(--text-muted);
+    }
+
+    .programa-bar {
+        height: 6px;
+        background: var(--bg-card-hover);
+        border-radius: 3px;
+        overflow: hidden;
+    }
+
+    .programa-bar-fill {
+        height: 100%;
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        border-radius: 3px;
+    }
+
+    /* Activity */
+    .activity-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .activity-item {
+        display: flex;
+        gap: 12px;
+        padding: 12px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+    }
+
+    .activity-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1rem;
+    }
+
+    .activity-icon.success { background: rgba(16, 185, 129, 0.15); }
+    .activity-icon.info { background: rgba(59, 130, 246, 0.15); }
+    .activity-icon.warning { background: rgba(245, 158, 11, 0.15); }
+
+    .activity-content p {
+        font-size: 0.8rem;
+        margin-bottom: 2px;
+    }
+
+    .activity-content small {
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    .text-center { text-align: center; }
+    .text-muted { color: var(--text-muted); }
+</style>
+{% endblock %}

@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Comisión | I.S.T. Pedro A. del Águila H.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container { max-width: 550px; margin: 0 auto; }
+        
+        .card {
+            background: white;
+            border-radius: 20px;
+            padding: 24px;
+            margin-bottom: 16px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        
+        .header-card { text-align: center; }
+        .header-card h1 { font-size: 1.4rem; color: #1a202c; margin-bottom: 4px; }
+        .header-card .instituto { font-size: 0.8rem; color: #718096; }
+        
+        .user-info {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f7fafc;
+            border-radius: 12px;
+            margin-top: 16px;
+        }
+        
+        .user-avatar {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            color: white;
+        }
+        
+        .user-details h3 { font-size: 1rem; color: #1a202c; }
+        .user-details p { font-size: 0.85rem; color: #718096; }
+        
+        .status-card {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+        }
+        
+        .status-card h3 { font-size: 0.85rem; opacity: 0.9; margin-bottom: 12px; }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+        
+        .status-item {
+            background: rgba(255,255,255,0.15);
+            padding: 14px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .status-item .value { font-size: 1.75rem; font-weight: 700; }
+        .status-item .label { font-size: 0.75rem; opacity: 0.85; margin-top: 4px; }
+        
+        .verificacion {
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            margin-top: 16px;
+        }
+        
+        .verificacion.ok {
+            background: rgba(34, 197, 94, 0.2);
+            border: 2px solid rgba(34, 197, 94, 0.5);
+        }
+        
+        .verificacion.pendiente {
+            background: rgba(251, 191, 36, 0.2);
+            border: 2px solid rgba(251, 191, 36, 0.5);
+        }
+        
+        .verificacion .icon { font-size: 2rem; margin-bottom: 8px; }
+        .verificacion h4 { font-size: 1rem; }
+        .verificacion p { font-size: 0.85rem; opacity: 0.9; margin-top: 4px; }
+        
+        .alert {
+            padding: 16px;
+            border-radius: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        
+        .alert-warning {
+            background: #fef3c7;
+            border: 2px solid #fbbf24;
+        }
+        
+        .alert-warning h4 { color: #92400e; font-size: 0.9rem; }
+        .alert-warning p { color: #a16207; font-size: 0.8rem; margin-top: 4px; }
+        .alert .icon { font-size: 1.25rem; }
+        
+        .actions-card h3 { font-size: 1rem; color: #1a202c; margin-bottom: 16px; }
+        
+        .btn-action {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+            padding: 16px;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            margin-bottom: 12px;
+            transition: all 0.3s;
+        }
+        
+        .btn-action:hover:not(.disabled) { border-color: #f5576c; background: #fff0f3; }
+        .btn-action.disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-action .icon {
+            width: 44px;
+            height: 44px;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.25rem;
+        }
+        
+        .btn-action .text h4 { font-size: 0.95rem; color: #1a202c; margin-bottom: 2px; }
+        .btn-action .text p { font-size: 0.8rem; color: #718096; }
+        
+        .btn-action .badge {
+            margin-left: auto;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+        
+        .badge-success { background: #dcfce7; color: #166534; }
+        .badge-warning { background: #fef3c7; color: #92400e; }
+        
+        .footer-card { text-align: center; padding: 16px; }
+        .footer-card a { color: #f5576c; text-decoration: none; font-weight: 500; font-size: 0.9rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card header-card">
+            <h1>📋 Panel de Comisión</h1>
+            <div class="instituto">I.S.T. Pedro A. del Águila H.</div>
+            <div class="user-info">
+                <div class="user-avatar">👤</div>
+                <div class="user-details">
+                    <h3>{{ usuario.nombres }} {{ usuario.apellidos }}</h3>
+                    <p>{{ usuario.cargo }}</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card status-card">
+            <h3>📊 ESTADO DEL PROCESO: {{ proceso_actual }}</h3>
+            <div class="status-grid">
+                <div class="status-item">
+                    <div class="value">{{ stats.total_postulantes or 0 }}</div>
+                    <div class="label">Postulantes</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">{{ stats.hojas_procesadas or 0 }}</div>
+                    <div class="label">Hojas Procesadas</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">{{ stats.hojas_pendientes or 0 }}</div>
+                    <div class="label">Pendientes</div>
+                </div>
+                <div class="status-item">
+                    <div class="value">{{ stats.porcentaje_avance or 0 }}%</div>
+                    <div class="label">Avance</div>
+                </div>
+            </div>
+            
+            {% if stats.puede_cargar_gabarito %}
+            <div class="verificacion ok">
+                <div class="icon">✅</div>
+                <h4>Sistema Listo</h4>
+                <p>Puede cargar el gabarito.</p>
+            </div>
+            {% else %}
+            <div class="verificacion pendiente">
+                <div class="icon">⏳</div>
+                <h4>En Proceso</h4>
+                <p>Faltan {{ stats.hojas_pendientes or 0 }} hojas por procesar</p>
+            </div>
+            {% endif %}
+        </div>
+        
+        <div class="alert alert-warning">
+            <div class="icon">⚠️</div>
+            <div>
+                <h4>Importante</h4>
+                <p>El gabarito puede cargarse en cualquier momento usando los 4 métodos disponibles.</p>
+            </div>
+        </div>
+        
+        <div class="card actions-card">
+            <h3>🎯 Acciones</h3>
+            
+            {% if stats.gabarito_cargado %}
+            <a href="/registrar-gabarito" class="btn-action">
+                <div class="icon">✅</div>
+                <div class="text">
+                    <h4>Ver/Editar Gabarito</h4>
+                    <p>El gabarito ya fue cargado</p>
+                </div>
+                <span class="badge badge-success">Cargado</span>
+            </a>
+            {% else %}
+            <a href="/registrar-gabarito" class="btn-action">
+                <div class="icon">📝</div>
+                <div class="text">
+                    <h4>Cargar Gabarito</h4>
+                    <p>4 métodos: Foto, Formulario, Voz, Manual</p>
+                </div>
+                <span class="badge badge-warning">Pendiente</span>
+            </a>
+            {% endif %}
+            
+            <a href="/estadisticas" class="btn-action">
+                <div class="icon">📊</div>
+                <div class="text">
+                    <h4>Ver Estadísticas</h4>
+                    <p>Progreso general del proceso</p>
+                </div>
+            </a>
+            
+            <a href="/resultados" target="_blank" class="btn-action">
+                <div class="icon">🏆</div>
+                <div class="text">
+                    <h4>Ver Resultados</h4>
+                    <p>Ranking de postulantes</p>
+                </div>
+            </a>
+        </div>
+        
+        <div class="card footer-card">
+            <a href="/admin/logout">🚪 Cerrar Sesión</a>
+        </div>
+    </div>
+</body>
+</html>

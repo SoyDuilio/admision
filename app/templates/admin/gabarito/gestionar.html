@@ -1,0 +1,743 @@
+<!--
+    POSTULANDO - Gestión de Gabarito
+    app/templates/admin/gabarito/gestionar.html
+    
+    Permite:
+    - Cargar las 100 respuestas correctas
+    - Ver/editar gabarito existente
+    - Importar desde archivo
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Gabarito{% endblock %}
+{% block header_title %}Respuestas Correctas{% endblock %}
+{% block header_subtitle %}Gestionar gabarito del proceso de admisión{% endblock %}
+
+{% block content %}
+<div class="gabarito-container fade-in">
+
+    <!-- ============================================================ -->
+    <!-- ESTADO ACTUAL -->
+    <!-- ============================================================ -->
+    <div class="card estado-card">
+        <div class="estado-header">
+            <div class="estado-icon {% if gabarito_existe %}registrado{% else %}pendiente{% endif %}">
+                {% if gabarito_existe %}✅{% else %}⏳{% endif %}
+            </div>
+            <div class="estado-info">
+                <h3>
+                    {% if gabarito_existe %}
+                        Gabarito Registrado
+                    {% else %}
+                        Gabarito Pendiente
+                    {% endif %}
+                </h3>
+                <p>
+                    {% if gabarito_existe %}
+                        {{ total_respuestas }} respuestas correctas cargadas para el proceso {{ proceso_actual }}
+                    {% else %}
+                        No se han registrado las respuestas correctas para este proceso
+                    {% endif %}
+                </p>
+            </div>
+            <div class="proceso-badge">{{ proceso_actual }}</div>
+        </div>
+        
+        {% if gabarito_existe %}
+        <div class="estado-stats">
+            <div class="stat-item">
+                <span class="stat-value">{{ dist_a }}</span>
+                <span class="stat-label">Opción A</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ dist_b }}</span>
+                <span class="stat-label">Opción B</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ dist_c }}</span>
+                <span class="stat-label">Opción C</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ dist_d }}</span>
+                <span class="stat-label">Opción D</span>
+            </div>
+            <div class="stat-item">
+                <span class="stat-value">{{ dist_e }}</span>
+                <span class="stat-label">Opción E</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TABS DE OPCIONES -->
+    <!-- ============================================================ -->
+    <div class="tabs-container">
+        <div class="tabs">
+            <button class="tab active" onclick="cambiarTab('manual')">
+                ✏️ Ingreso Manual
+            </button>
+            <button class="tab" onclick="cambiarTab('archivo')">
+                📁 Importar Archivo
+            </button>
+            <button class="tab" onclick="cambiarTab('ver')">
+                👁️ Ver Gabarito
+            </button>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB: INGRESO MANUAL -->
+    <!-- ============================================================ -->
+    <div id="tabManual" class="tab-content active">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">✏️ Ingresar Respuestas Manualmente</h3>
+            </div>
+
+            <form id="formGabarito" onsubmit="guardarGabarito(event)">
+                <div class="instrucciones">
+                    <p>Ingrese la letra correcta (A, B, C, D, E) para cada una de las 100 preguntas.</p>
+                    <p>Las preguntas están organizadas en grupos de 10 para facilitar la revisión.</p>
+                </div>
+
+                <div class="gabarito-grid">
+                    {% for grupo in range(10) %}
+                    <div class="gabarito-grupo">
+                        <div class="grupo-header">
+                            Preguntas {{ grupo * 10 + 1 }} - {{ (grupo + 1) * 10 }}
+                        </div>
+                        {% for i in range(10) %}
+                        {% set num = grupo * 10 + i + 1 %}
+                        <div class="pregunta-row">
+                            <label class="pregunta-numero">{{ num }}</label>
+                            <div class="opciones-grupo">
+                                {% for letra in ['A', 'B', 'C', 'D', 'E'] %}
+                                <label class="opcion-radio">
+                                    <input 
+                                        type="radio" 
+                                        name="pregunta_{{ num }}" 
+                                        value="{{ letra }}"
+                                        {% if gabarito and gabarito[num-1] == letra %}checked{% endif %}
+                                        required
+                                    >
+                                    <span class="opcion-letra">{{ letra }}</span>
+                                </label>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="limpiarFormulario()">
+                        🗑️ Limpiar Todo
+                    </button>
+                    <button type="submit" class="btn btn-success btn-lg">
+                        💾 Guardar Gabarito
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB: IMPORTAR ARCHIVO -->
+    <!-- ============================================================ -->
+    <div id="tabArchivo" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📁 Importar desde Archivo</h3>
+            </div>
+
+            <div class="import-section">
+                <div class="formato-info">
+                    <h4>Formatos aceptados:</h4>
+                    <div class="formato-grid">
+                        <div class="formato-item">
+                            <span class="formato-icon">📄</span>
+                            <strong>TXT</strong>
+                            <p>Una letra por línea (100 líneas)</p>
+                        </div>
+                        <div class="formato-item">
+                            <span class="formato-icon">📊</span>
+                            <strong>CSV</strong>
+                            <p>Columnas: numero, respuesta</p>
+                        </div>
+                        <div class="formato-item">
+                            <span class="formato-icon">📗</span>
+                            <strong>Excel</strong>
+                            <p>Columnas: Pregunta, Respuesta</p>
+                        </div>
+                    </div>
+
+                    <div class="ejemplo-formato">
+                        <h4>Ejemplo TXT:</h4>
+                        <pre>A
+B
+C
+D
+A
+B
+...
+(100 líneas)</pre>
+                    </div>
+                </div>
+
+                <div class="upload-area" id="uploadArea">
+                    <input type="file" id="archivoInput" accept=".txt,.csv,.xlsx" onchange="procesarArchivo(event)" hidden>
+                    <div class="upload-content" onclick="document.getElementById('archivoInput').click()">
+                        <span class="upload-icon">📤</span>
+                        <h4>Arrastrar archivo aquí</h4>
+                        <p>o hacer clic para seleccionar</p>
+                        <span class="upload-formatos">TXT, CSV, XLSX</span>
+                    </div>
+                </div>
+
+                <div id="previewArchivo" style="display: none;">
+                    <h4>Vista previa:</h4>
+                    <div class="preview-grid" id="previewGrid"></div>
+                    <div class="preview-actions">
+                        <button class="btn btn-outline" onclick="cancelarImport()">Cancelar</button>
+                        <button class="btn btn-success" onclick="confirmarImport()">Confirmar e Importar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- TAB: VER GABARITO -->
+    <!-- ============================================================ -->
+    <div id="tabVer" class="tab-content" style="display: none;">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">👁️ Gabarito Actual</h3>
+                <button class="btn btn-outline" onclick="exportarGabarito()">
+                    📥 Descargar
+                </button>
+            </div>
+
+            {% if gabarito_existe %}
+            <div class="gabarito-view">
+                <div class="view-grid">
+                    {% for grupo in range(10) %}
+                    <div class="view-grupo">
+                        {% for i in range(10) %}
+                        {% set num = grupo * 10 + i + 1 %}
+                        <div class="view-item">
+                            <span class="view-numero">{{ num }}</span>
+                            <span class="view-respuesta">{{ gabarito[num-1] if gabarito else '-' }}</span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="gabarito-meta">
+                <p><strong>Proceso:</strong> {{ proceso_actual }}</p>
+                <p><strong>Registrado:</strong> {{ gabarito_fecha }}</p>
+                <p><strong>Registrado por:</strong> {{ gabarito_usuario }}</p>
+            </div>
+            {% else %}
+            <div class="empty-state">
+                <span class="empty-icon">📝</span>
+                <h4>No hay gabarito registrado</h4>
+                <p>Use las opciones anteriores para registrar las respuestas correctas</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .gabarito-container {
+        max-width: 1200px;
+        margin: 0 auto;
+    }
+
+    /* Estado card */
+    .estado-card {
+        margin-bottom: 24px;
+    }
+
+    .estado-header {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .estado-icon {
+        width: 60px;
+        height: 60px;
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2rem;
+    }
+
+    .estado-icon.registrado {
+        background: rgba(16, 185, 129, 0.15);
+    }
+
+    .estado-icon.pendiente {
+        background: rgba(245, 158, 11, 0.15);
+    }
+
+    .estado-info {
+        flex: 1;
+    }
+
+    .estado-info h3 {
+        font-size: 1.25rem;
+        margin-bottom: 4px;
+    }
+
+    .estado-info p {
+        color: var(--text-muted);
+        font-size: 0.9rem;
+    }
+
+    .estado-stats {
+        display: flex;
+        gap: 32px;
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .stat-item {
+        text-align: center;
+    }
+
+    .stat-item .stat-value {
+        display: block;
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .stat-item .stat-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Tabs */
+    .tabs-container {
+        margin-bottom: 24px;
+    }
+
+    .tabs {
+        display: flex;
+        gap: 8px;
+        background: var(--bg-card);
+        padding: 8px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color);
+    }
+
+    .tab {
+        flex: 1;
+        padding: 12px 24px;
+        background: none;
+        border: none;
+        border-radius: 8px;
+        color: var(--text-secondary);
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .tab:hover {
+        background: var(--bg-card-hover);
+    }
+
+    .tab.active {
+        background: var(--primary);
+        color: white;
+    }
+
+    .tab-content {
+        display: none;
+    }
+
+    .tab-content.active {
+        display: block;
+    }
+
+    /* Instrucciones */
+    .instrucciones {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 24px;
+    }
+
+    .instrucciones p {
+        font-size: 0.875rem;
+        color: var(--text-secondary);
+        margin: 4px 0;
+    }
+
+    /* Grid de gabarito */
+    .gabarito-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+        gap: 24px;
+    }
+
+    .gabarito-grupo {
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+        overflow: hidden;
+    }
+
+    .grupo-header {
+        background: var(--bg-dark);
+        padding: 12px 16px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--primary);
+    }
+
+    .pregunta-row {
+        display: flex;
+        align-items: center;
+        padding: 10px 16px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .pregunta-row:last-child {
+        border-bottom: none;
+    }
+
+    .pregunta-numero {
+        width: 30px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        color: var(--text-muted);
+    }
+
+    .opciones-grupo {
+        display: flex;
+        gap: 8px;
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    .opcion-radio {
+        cursor: pointer;
+    }
+
+    .opcion-radio input {
+        display: none;
+    }
+
+    .opcion-letra {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 36px;
+        height: 36px;
+        border-radius: 8px;
+        background: var(--bg-card);
+        border: 2px solid var(--border-color);
+        font-weight: 600;
+        font-size: 0.875rem;
+        transition: var(--transition);
+    }
+
+    .opcion-radio input:checked + .opcion-letra {
+        background: var(--success);
+        border-color: var(--success);
+        color: white;
+    }
+
+    .opcion-radio:hover .opcion-letra {
+        border-color: var(--primary);
+    }
+
+    /* Form actions */
+    .form-actions {
+        display: flex;
+        justify-content: center;
+        gap: 16px;
+        margin-top: 32px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    /* Import section */
+    .import-section {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 32px;
+    }
+
+    @media (max-width: 768px) {
+        .import-section {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .formato-info h4 {
+        font-size: 1rem;
+        margin-bottom: 16px;
+    }
+
+    .formato-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .formato-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+    }
+
+    .formato-icon {
+        font-size: 1.5rem;
+    }
+
+    .formato-item p {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .ejemplo-formato {
+        margin-top: 20px;
+    }
+
+    .ejemplo-formato pre {
+        background: var(--bg-dark);
+        padding: 12px;
+        border-radius: 8px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Upload area */
+    .upload-area {
+        border: 2px dashed var(--border-color);
+        border-radius: 12px;
+        padding: 40px;
+        text-align: center;
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .upload-area:hover {
+        border-color: var(--primary);
+        background: rgba(59, 130, 246, 0.05);
+    }
+
+    .upload-icon {
+        font-size: 3rem;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    .upload-content h4 {
+        margin-bottom: 8px;
+    }
+
+    .upload-content p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+    }
+
+    .upload-formatos {
+        display: inline-block;
+        margin-top: 12px;
+        padding: 4px 12px;
+        background: var(--bg-card-hover);
+        border-radius: 20px;
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    /* View grid */
+    .view-grid {
+        display: grid;
+        grid-template-columns: repeat(10, 1fr);
+        gap: 8px;
+    }
+
+    .view-grupo {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .view-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 12px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+    }
+
+    .view-numero {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+        min-width: 24px;
+    }
+
+    .view-respuesta {
+        font-weight: 700;
+        color: var(--success);
+    }
+
+    .gabarito-meta {
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+        display: flex;
+        gap: 32px;
+    }
+
+    .gabarito-meta p {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .empty-state {
+        text-align: center;
+        padding: 60px 20px;
+    }
+
+    .empty-icon {
+        font-size: 4rem;
+        display: block;
+        margin-bottom: 16px;
+    }
+
+    .empty-state h4 {
+        margin-bottom: 8px;
+    }
+
+    .empty-state p {
+        color: var(--text-muted);
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function cambiarTab(tab) {
+        // Desactivar todos
+        document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.style.display = 'none');
+        
+        // Activar seleccionado
+        event.target.classList.add('active');
+        const contenido = document.getElementById('tab' + tab.charAt(0).toUpperCase() + tab.slice(1));
+        contenido.classList.add('active');
+        contenido.style.display = 'block';
+    }
+    
+    async function guardarGabarito(event) {
+        event.preventDefault();
+        
+        const formData = new FormData(event.target);
+        const respuestas = [];
+        
+        for (let i = 1; i <= 100; i++) {
+            const valor = formData.get(`pregunta_${i}`);
+            if (!valor) {
+                alert(`Falta la respuesta de la pregunta ${i}`);
+                return;
+            }
+            respuestas.push({ numero_pregunta: i, respuesta_correcta: valor });
+        }
+        
+        if (!confirm('¿Está seguro de guardar el gabarito?\n\nEsto reemplazará cualquier gabarito existente.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/gabarito/guardar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proceso: '{{ proceso_actual }}',
+                    respuestas: respuestas
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error al guardar');
+            
+            alert('✅ Gabarito guardado correctamente');
+            window.location.reload();
+            
+        } catch (error) {
+            alert('❌ Error: ' + error.message);
+        }
+    }
+    
+    function limpiarFormulario() {
+        if (confirm('¿Limpiar todas las respuestas?')) {
+            document.getElementById('formGabarito').reset();
+        }
+    }
+    
+    function procesarArchivo(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const contenido = e.target.result;
+            const lineas = contenido.trim().split('\n');
+            
+            if (lineas.length !== 100) {
+                alert(`El archivo debe tener exactamente 100 líneas. Encontradas: ${lineas.length}`);
+                return;
+            }
+            
+            // Mostrar preview
+            let previewHTML = '';
+            lineas.forEach((linea, i) => {
+                const letra = linea.trim().toUpperCase();
+                if (!['A', 'B', 'C', 'D', 'E'].includes(letra)) {
+                    alert(`Línea ${i+1}: "${letra}" no es una respuesta válida`);
+                    return;
+                }
+                previewHTML += `<div class="preview-item"><span>${i+1}</span><span>${letra}</span></div>`;
+            });
+            
+            document.getElementById('previewGrid').innerHTML = previewHTML;
+            document.getElementById('previewArchivo').style.display = 'block';
+            document.getElementById('uploadArea').style.display = 'none';
+        };
+        
+        reader.readAsText(file);
+    }
+    
+    function cancelarImport() {
+        document.getElementById('previewArchivo').style.display = 'none';
+        document.getElementById('uploadArea').style.display = 'block';
+        document.getElementById('archivoInput').value = '';
+    }
+    
+    function exportarGabarito() {
+        window.location.href = '/api/gabarito/exportar?proceso={{ proceso_actual }}';
+    }
+</script>
+{% endblock %}

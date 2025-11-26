@@ -1,0 +1,796 @@
+<!--
+    POSTULANDO - Publicación de Resultados
+    app/templates/admin/resultados/publicar.html
+    
+    Permite:
+    - Previsualizar resultados antes de publicar
+    - Autorizar publicación oficial
+    - Configurar opciones de publicación
+    - Generar acta oficial
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Publicar Resultados{% endblock %}
+{% block header_title %}Publicación de Resultados{% endblock %}
+{% block header_subtitle %}Autorizar y publicar resultados oficiales{% endblock %}
+
+{% block content %}
+<div class="publicacion-container fade-in">
+
+    <!-- ============================================================ -->
+    <!-- ESTADO DE PUBLICACIÓN -->
+    <!-- ============================================================ -->
+    <div class="estado-publicacion card">
+        <div class="estado-content">
+            <div class="estado-icon {% if resultados_publicados %}publicado{% else %}pendiente{% endif %}">
+                {% if resultados_publicados %}📢{% else %}🔒{% endif %}
+            </div>
+            <div class="estado-info">
+                <h2>
+                    {% if resultados_publicados %}
+                        Resultados Publicados
+                    {% else %}
+                        Resultados Pendientes de Publicación
+                    {% endif %}
+                </h2>
+                <p>
+                    {% if resultados_publicados %}
+                        Los resultados fueron publicados el {{ fecha_publicacion }} por {{ publicado_por }}
+                    {% else %}
+                        Los resultados del proceso {{ proceso_actual }} están listos para ser publicados
+                    {% endif %}
+                </p>
+            </div>
+        </div>
+
+        {% if resultados_publicados %}
+        <div class="links-publicos">
+            <h4>Enlaces públicos:</h4>
+            <div class="link-item">
+                <span>🔗 Resultados generales:</span>
+                <a href="{{ url_resultados }}" target="_blank">{{ url_resultados }}</a>
+                <button class="btn-copy" onclick="copiarLink('{{ url_resultados }}')">📋</button>
+            </div>
+            <div class="link-item">
+                <span>🔗 Consulta individual:</span>
+                <a href="{{ url_consulta }}" target="_blank">{{ url_consulta }}</a>
+                <button class="btn-copy" onclick="copiarLink('{{ url_consulta }}')">📋</button>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if not resultados_publicados %}
+    <!-- ============================================================ -->
+    <!-- VERIFICACIÓN PRE-PUBLICACIÓN -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">✅ Verificación Pre-Publicación</h3>
+        </div>
+
+        <div class="verificacion-grid">
+            <div class="verificacion-item {% if gabarito_ok %}ok{% else %}error{% endif %}">
+                <span class="verificacion-icon">{% if gabarito_ok %}✓{% else %}✗{% endif %}</span>
+                <span class="verificacion-texto">Gabarito registrado (100 respuestas)</span>
+            </div>
+            
+            <div class="verificacion-item {% if calificacion_ok %}ok{% else %}error{% endif %}">
+                <span class="verificacion-icon">{% if calificacion_ok %}✓{% else %}✗{% endif %}</span>
+                <span class="verificacion-texto">Calificación ejecutada</span>
+            </div>
+            
+            <div class="verificacion-item {% if todas_calificadas %}ok{% else %}warning{% endif %}">
+                <span class="verificacion-icon">{% if todas_calificadas %}✓{% else %}⚠{% endif %}</span>
+                <span class="verificacion-texto">{{ hojas_calificadas }}/{{ total_hojas }} hojas calificadas</span>
+            </div>
+            
+            <div class="verificacion-item {% if sin_revision_pendiente %}ok{% else %}warning{% endif %}">
+                <span class="verificacion-icon">{% if sin_revision_pendiente %}✓{% else %}⚠{% endif %}</span>
+                <span class="verificacion-texto">{{ hojas_pendientes_revision }} hojas pendientes de revisión</span>
+            </div>
+        </div>
+
+        {% if not puede_publicar %}
+        <div class="alerta-bloqueo">
+            <span>⚠️</span>
+            <p>No se puede publicar hasta completar los requisitos marcados en rojo.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- RESUMEN DE RESULTADOS -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📊 Resumen de Resultados</h3>
+        </div>
+
+        <div class="resumen-stats">
+            <div class="resumen-stat">
+                <div class="resumen-valor">{{ total_postulantes }}</div>
+                <div class="resumen-label">Total Postulantes</div>
+            </div>
+            <div class="resumen-stat">
+                <div class="resumen-valor">{{ total_ingresantes }}</div>
+                <div class="resumen-label">Ingresantes</div>
+            </div>
+            <div class="resumen-stat">
+                <div class="resumen-valor">{{ total_no_ingresaron }}</div>
+                <div class="resumen-label">No Ingresaron</div>
+            </div>
+            <div class="resumen-stat">
+                <div class="resumen-valor">{{ promedio | round(2) }}</div>
+                <div class="resumen-label">Promedio General</div>
+            </div>
+            <div class="resumen-stat highlight">
+                <div class="resumen-valor">{{ nota_corte }}</div>
+                <div class="resumen-label">Nota de Corte</div>
+            </div>
+        </div>
+
+        <!-- Resumen por programa -->
+        <h4 class="subtitulo">Ingresantes por Programa Educativo</h4>
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Programa</th>
+                        <th class="text-center">Vacantes</th>
+                        <th class="text-center">Ingresantes</th>
+                        <th class="text-center">Nota Mínima</th>
+                        <th class="text-center">Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prog in programas_resumen %}
+                    <tr>
+                        <td>{{ prog.nombre }}</td>
+                        <td class="text-center">{{ prog.vacantes }}</td>
+                        <td class="text-center">{{ prog.ingresantes }}</td>
+                        <td class="text-center">{{ prog.nota_minima }}</td>
+                        <td class="text-center">
+                            {% if prog.ingresantes >= prog.vacantes %}
+                                <span class="badge badge-success">Completo</span>
+                            {% else %}
+                                <span class="badge badge-warning">{{ prog.vacantes - prog.ingresantes }} vacantes</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- CONFIGURACIÓN DE PUBLICACIÓN -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">⚙️ Configuración de Publicación</h3>
+        </div>
+
+        <form id="formPublicacion" onsubmit="publicarResultados(event)">
+            <div class="config-grid">
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" name="mostrar_dni" checked>
+                        <span>Mostrar DNI completo en lista pública</span>
+                    </label>
+                    <small>Si se desactiva, se mostrará parcialmente (ej: ****1234)</small>
+                </div>
+
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" name="mostrar_nota" checked>
+                        <span>Mostrar nota obtenida</span>
+                    </label>
+                    <small>Mostrar el puntaje junto al estado</small>
+                </div>
+
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" name="permitir_consulta_individual" checked>
+                        <span>Habilitar consulta individual por DNI</span>
+                    </label>
+                    <small>Permitir que cada postulante consulte su resultado</small>
+                </div>
+
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" name="generar_acta">
+                        <span>Generar acta oficial automáticamente</span>
+                    </label>
+                    <small>Crear documento PDF con firma digital</small>
+                </div>
+
+                <div class="config-item">
+                    <label class="config-label">
+                        <input type="checkbox" name="notificar_email">
+                        <span>Enviar notificación por email a ingresantes</span>
+                    </label>
+                    <small>Requiere que los postulantes tengan email registrado</small>
+                </div>
+            </div>
+
+            <!-- Fecha de publicación -->
+            <div class="fecha-publicacion">
+                <label for="fechaPublicacion">Fecha y hora de publicación:</label>
+                <div class="fecha-options">
+                    <label class="fecha-option">
+                        <input type="radio" name="cuando_publicar" value="ahora" checked onchange="toggleFechaPersonalizada()">
+                        <span>Publicar inmediatamente</span>
+                    </label>
+                    <label class="fecha-option">
+                        <input type="radio" name="cuando_publicar" value="programar" onchange="toggleFechaPersonalizada()">
+                        <span>Programar publicación</span>
+                    </label>
+                </div>
+                <input 
+                    type="datetime-local" 
+                    id="fechaPersonalizada" 
+                    name="fecha_programada"
+                    style="display: none;"
+                >
+            </div>
+
+            <!-- Autorización -->
+            <div class="autorizacion-section">
+                <h4>🔐 Autorización</h4>
+                <p>La publicación de resultados oficiales requiere autorización del Director/Rector.</p>
+                
+                <div class="autorizacion-form">
+                    <div class="campo">
+                        <label>Nombre del autorizante:</label>
+                        <input type="text" name="autorizante_nombre" value="{{ usuario.nombres }}" required>
+                    </div>
+                    <div class="campo">
+                        <label>Cargo:</label>
+                        <input type="text" name="autorizante_cargo" value="{{ usuario.cargo or 'Director' }}" required>
+                    </div>
+                    <div class="campo">
+                        <label>Contraseña de autorización:</label>
+                        <input type="password" name="password" placeholder="Ingrese su contraseña" required>
+                    </div>
+                </div>
+
+                <label class="checkbox-confirmacion">
+                    <input type="checkbox" name="confirmo" required>
+                    <span>Confirmo que he revisado los resultados y autorizo su publicación oficial</span>
+                </label>
+            </div>
+
+            <!-- Botón de publicación -->
+            <div class="publicar-actions">
+                <a href="/admin/ranking" class="btn btn-outline">
+                    👁️ Revisar Ranking Nuevamente
+                </a>
+                <button type="submit" class="btn btn-success btn-lg" {% if not puede_publicar %}disabled{% endif %}>
+                    📢 Publicar Resultados Oficiales
+                </button>
+            </div>
+        </form>
+    </div>
+    {% else %}
+    
+    <!-- ============================================================ -->
+    <!-- OPCIONES POST-PUBLICACIÓN -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📋 Documentos y Acciones</h3>
+        </div>
+
+        <div class="acciones-post-publicacion">
+            <a href="/api/resultados/acta-pdf" class="accion-btn">
+                <span class="accion-icon">📄</span>
+                <span class="accion-texto">
+                    <strong>Descargar Acta Oficial</strong>
+                    <small>Documento PDF con firma</small>
+                </span>
+            </a>
+
+            <a href="/api/resultados/lista-ingresantes" class="accion-btn">
+                <span class="accion-icon">📊</span>
+                <span class="accion-texto">
+                    <strong>Lista de Ingresantes</strong>
+                    <small>Excel con datos completos</small>
+                </span>
+            </a>
+
+            <a href="/api/resultados/constancias" class="accion-btn">
+                <span class="accion-icon">🎓</span>
+                <span class="accion-texto">
+                    <strong>Generar Constancias</strong>
+                    <small>Constancias de ingreso individuales</small>
+                </span>
+            </a>
+
+            <button onclick="despublicar()" class="accion-btn danger">
+                <span class="accion-icon">🔒</span>
+                <span class="accion-texto">
+                    <strong>Despublicar Resultados</strong>
+                    <small>Requiere autorización</small>
+                </span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .publicacion-container {
+        max-width: 1000px;
+        margin: 0 auto;
+    }
+
+    /* Estado de publicación */
+    .estado-publicacion {
+        margin-bottom: 24px;
+    }
+
+    .estado-content {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+    }
+
+    .estado-icon {
+        width: 80px;
+        height: 80px;
+        border-radius: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+    }
+
+    .estado-icon.publicado {
+        background: rgba(16, 185, 129, 0.15);
+    }
+
+    .estado-icon.pendiente {
+        background: rgba(245, 158, 11, 0.15);
+    }
+
+    .estado-info h2 {
+        font-size: 1.5rem;
+        margin-bottom: 8px;
+    }
+
+    .estado-info p {
+        color: var(--text-muted);
+    }
+
+    .links-publicos {
+        margin-top: 24px;
+        padding-top: 24px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .links-publicos h4 {
+        font-size: 0.9rem;
+        margin-bottom: 12px;
+        color: var(--text-muted);
+    }
+
+    .link-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 12px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+        margin-bottom: 8px;
+    }
+
+    .link-item a {
+        color: var(--primary);
+        flex: 1;
+        word-break: break-all;
+    }
+
+    .btn-copy {
+        background: none;
+        border: none;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 6px;
+        transition: var(--transition);
+    }
+
+    .btn-copy:hover {
+        background: var(--bg-card);
+    }
+
+    /* Verificación */
+    .verificacion-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+
+    @media (max-width: 600px) {
+        .verificacion-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .verificacion-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+        border-left: 4px solid var(--border-color);
+    }
+
+    .verificacion-item.ok {
+        border-left-color: var(--success);
+    }
+
+    .verificacion-item.error {
+        border-left-color: var(--danger);
+    }
+
+    .verificacion-item.warning {
+        border-left-color: var(--warning);
+    }
+
+    .verificacion-icon {
+        font-size: 1.25rem;
+    }
+
+    .verificacion-item.ok .verificacion-icon { color: var(--success); }
+    .verificacion-item.error .verificacion-icon { color: var(--danger); }
+    .verificacion-item.warning .verificacion-icon { color: var(--warning); }
+
+    .alerta-bloqueo {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-top: 20px;
+        padding: 16px;
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+        border-radius: 8px;
+        color: var(--danger);
+    }
+
+    /* Resumen stats */
+    .resumen-stats {
+        display: flex;
+        gap: 24px;
+        flex-wrap: wrap;
+        margin-bottom: 32px;
+    }
+
+    .resumen-stat {
+        flex: 1;
+        min-width: 120px;
+        text-align: center;
+        padding: 20px;
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+    }
+
+    .resumen-stat.highlight {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+    }
+
+    .resumen-valor {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+    }
+
+    .resumen-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-top: 4px;
+    }
+
+    .resumen-stat.highlight .resumen-label {
+        color: rgba(255, 255, 255, 0.8);
+    }
+
+    .subtitulo {
+        font-size: 1rem;
+        margin-bottom: 16px;
+        color: var(--text-secondary);
+    }
+
+    /* Configuración */
+    .config-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .config-item {
+        padding: 16px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+    }
+
+    .config-label {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        cursor: pointer;
+        font-weight: 500;
+    }
+
+    .config-label input[type="checkbox"] {
+        width: 20px;
+        height: 20px;
+        cursor: pointer;
+    }
+
+    .config-item small {
+        display: block;
+        margin-top: 8px;
+        margin-left: 32px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Fecha publicación */
+    .fecha-publicacion {
+        margin-bottom: 24px;
+        padding: 20px;
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+    }
+
+    .fecha-publicacion > label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 12px;
+    }
+
+    .fecha-options {
+        display: flex;
+        gap: 24px;
+        margin-bottom: 12px;
+    }
+
+    .fecha-option {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+    }
+
+    #fechaPersonalizada {
+        width: 100%;
+        max-width: 300px;
+        padding: 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+    }
+
+    /* Autorización */
+    .autorizacion-section {
+        padding: 24px;
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        border-radius: 12px;
+        margin-bottom: 24px;
+    }
+
+    .autorizacion-section h4 {
+        margin-bottom: 8px;
+    }
+
+    .autorizacion-section > p {
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        margin-bottom: 20px;
+    }
+
+    .autorizacion-form {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .autorizacion-form {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .campo label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+
+    .campo input {
+        width: 100%;
+        padding: 10px;
+        background: var(--bg-card);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+    }
+
+    .checkbox-confirmacion {
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        cursor: pointer;
+    }
+
+    .checkbox-confirmacion input {
+        margin-top: 4px;
+    }
+
+    /* Acciones */
+    .publicar-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+
+    /* Acciones post-publicación */
+    .acciones-post-publicacion {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    @media (max-width: 600px) {
+        .acciones-post-publicacion {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .accion-btn {
+        display: flex;
+        align-items: center;
+        gap: 16px;
+        padding: 20px;
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+        transition: var(--transition);
+        border: none;
+        cursor: pointer;
+        text-align: left;
+        width: 100%;
+    }
+
+    .accion-btn:hover {
+        background: var(--bg-dark);
+        transform: translateY(-2px);
+    }
+
+    .accion-btn.danger:hover {
+        background: rgba(239, 68, 68, 0.1);
+        border: 1px solid rgba(239, 68, 68, 0.3);
+    }
+
+    .accion-icon {
+        font-size: 2rem;
+    }
+
+    .accion-texto strong {
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .accion-texto small {
+        color: var(--text-muted);
+        font-size: 0.8rem;
+    }
+
+    .text-center { text-align: center; }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function toggleFechaPersonalizada() {
+        const programar = document.querySelector('input[value="programar"]').checked;
+        document.getElementById('fechaPersonalizada').style.display = programar ? 'block' : 'none';
+    }
+    
+    async function publicarResultados(event) {
+        event.preventDefault();
+        
+        const form = event.target;
+        const formData = new FormData(form);
+        
+        if (!confirm('⚠️ IMPORTANTE ⚠️\n\n¿Está completamente seguro de PUBLICAR los resultados oficiales?\n\nEsta acción hará que los resultados sean visibles públicamente.')) {
+            return;
+        }
+        
+        // Segunda confirmación
+        const password = prompt('Ingrese nuevamente su contraseña para confirmar:');
+        if (password !== formData.get('password')) {
+            alert('❌ Contraseña incorrecta');
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/resultados/publicar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proceso: '{{ proceso_actual }}',
+                    mostrar_dni: formData.get('mostrar_dni') === 'on',
+                    mostrar_nota: formData.get('mostrar_nota') === 'on',
+                    permitir_consulta: formData.get('permitir_consulta_individual') === 'on',
+                    generar_acta: formData.get('generar_acta') === 'on',
+                    notificar_email: formData.get('notificar_email') === 'on',
+                    cuando_publicar: formData.get('cuando_publicar'),
+                    fecha_programada: formData.get('fecha_programada'),
+                    autorizante_nombre: formData.get('autorizante_nombre'),
+                    autorizante_cargo: formData.get('autorizante_cargo'),
+                    password: formData.get('password')
+                })
+            });
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Error al publicar');
+            }
+            
+            alert('✅ ¡Resultados publicados exitosamente!');
+            window.location.reload();
+            
+        } catch (error) {
+            alert('❌ Error: ' + error.message);
+        }
+    }
+    
+    function copiarLink(url) {
+        navigator.clipboard.writeText(url).then(() => {
+            alert('✅ Enlace copiado al portapapeles');
+        });
+    }
+    
+    async function despublicar() {
+        const password = prompt('⚠️ ATENCIÓN ⚠️\n\nVa a DESPUBLICAR los resultados.\n\nIngrese su contraseña de autorización:');
+        
+        if (!password) return;
+        
+        if (!confirm('¿Confirma que desea DESPUBLICAR los resultados?\n\nLos resultados dejarán de ser visibles públicamente.')) {
+            return;
+        }
+        
+        try {
+            const response = await fetch('/api/resultados/despublicar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    proceso: '{{ proceso_actual }}',
+                    password: password
+                })
+            });
+            
+            if (!response.ok) throw new Error('Error al despublicar');
+            
+            alert('🔒 Resultados despublicados');
+            window.location.reload();
+            
+        } catch (error) {
+            alert('❌ Error: ' + error.message);
+        }
+    }
+</script>
+{% endblock %}

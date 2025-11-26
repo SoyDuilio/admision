@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Coordinador | I.S.T. Pedro A. del Águila H.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .header {
+            background: white;
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 24px;
+            text-align: center;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.2);
+        }
+        
+        .header h1 {
+            font-size: 2rem;
+            color: #1a202c;
+            margin-bottom: 4px;
+        }
+        
+        .header .instituto {
+            font-size: 0.9rem;
+            color: #718096;
+            margin-bottom: 12px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .stat-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 12px;
+        }
+        
+        .stat-icon {
+            font-size: 2rem;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 4px;
+        }
+        
+        .stat-label {
+            color: #718096;
+            font-size: 0.85rem;
+        }
+        
+        .actions-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .actions-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #2d3748;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .action-btn {
+            padding: 20px;
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 172, 254, 0.4);
+        }
+        
+        .action-btn .icon {
+            font-size: 2rem;
+        }
+        
+        .monitor-section {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .monitor-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #2d3748;
+        }
+        
+        .progress-item {
+            margin-bottom: 16px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+        
+        .progress-bar {
+            height: 10px;
+            background: #e2e8f0;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4facfe 0%, #00f2fe 100%);
+            transition: width 0.3s;
+        }
+        
+        .footer {
+            background: white;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        
+        .footer a {
+            color: #4facfe;
+            text-decoration: none;
+            font-weight: 500;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 Dashboard Coordinador</h1>
+            <div class="instituto">I.S.T. Pedro A. del Águila H.</div>
+            <p>{{ usuario.nombres }} {{ usuario.apellidos }} | Proceso: {{ proceso_actual }}</p>
+        </div>
+        
+        <!-- Estadísticas en tiempo real -->
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value" id="totalPostulantes">-</div>
+                        <div class="stat-label">Total Postulantes</div>
+                    </div>
+                    <div class="stat-icon">👥</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value" id="hojasCapturadasHoy">-</div>
+                        <div class="stat-label">Capturadas Hoy</div>
+                    </div>
+                    <div class="stat-icon">📸</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value" id="hojasProcesadas">-</div>
+                        <div class="stat-label">Procesadas</div>
+                    </div>
+                    <div class="stat-icon">✅</div>
+                </div>
+            </div>
+            
+            <div class="stat-card">
+                <div class="stat-header">
+                    <div>
+                        <div class="stat-value" id="profesoresActivos">-</div>
+                        <div class="stat-label">Profesores Activos</div>
+                    </div>
+                    <div class="stat-icon">👨‍🏫</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Monitor de progreso -->
+        <div class="monitor-section">
+            <div class="monitor-title">📈 Progreso de Captura</div>
+            <div class="progress-item">
+                <div class="progress-header">
+                    <span>Hojas Capturadas</span>
+                    <span><strong id="capturadasNum">0</strong> de <strong id="totalNum">0</strong></span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressCaptura" style="width: 0%"></div>
+                </div>
+            </div>
+            
+            <div class="progress-item">
+                <div class="progress-header">
+                    <span>Hojas Procesadas (IA)</span>
+                    <span><strong id="procesadasNum">0</strong> de <strong id="capturadasTotal">0</strong></span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressProceso" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Acciones principales -->
+        <div class="actions-section">
+            <div class="actions-title">🎯 Acciones Rápidas</div>
+            <div class="actions-grid">
+                <a href="/" class="action-btn">
+                    <span class="icon">📷</span>
+                    <span>Sistema de Captura</span>
+                </a>
+                
+                <a href="/admin/gabarito" class="action-btn">
+                    <span class="icon">📝</span>
+                    <span>Gestionar Gabarito</span>
+                </a>
+                
+                <a href="/admin/ranking" class="action-btn">
+                    <span class="icon">🏆</span>
+                    <span>Ver Ranking</span>
+                </a>
+                
+                <a href="/admin/estadisticas" class="action-btn">
+                    <span class="icon">📊</span>
+                    <span>Estadísticas</span>
+                </a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <a href="/admin/logout">🚪 Cerrar Sesión</a>
+        </div>
+    </div>
+    
+    <script>
+        async function cargarDatos() {
+            try {
+                const response = await fetch('/admin/api/stats-coordinador');
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    // Estadísticas
+                    document.getElementById('totalPostulantes').textContent = data.total_postulantes || 0;
+                    document.getElementById('hojasCapturadasHoy').textContent = data.capturadas_hoy || 0;
+                    document.getElementById('hojasProcesadas').textContent = data.hojas_procesadas || 0;
+                    document.getElementById('profesoresActivos').textContent = data.profesores_activos || 0;
+                    
+                    // Progreso de captura
+                    const total = data.total_postulantes || 0;
+                    const capturadas = data.capturadas_hoy || 0;
+                    const procesadas = data.hojas_procesadas || 0;
+                    
+                    document.getElementById('capturadasNum').textContent = capturadas;
+                    document.getElementById('totalNum').textContent = total;
+                    document.getElementById('procesadasNum').textContent = procesadas;
+                    document.getElementById('capturadasTotal').textContent = capturadas;
+                    
+                    const porcentajeCaptura = total > 0 ? (capturadas / total * 100) : 0;
+                    const porcentajeProceso = capturadas > 0 ? (procesadas / capturadas * 100) : 0;
+                    
+                    document.getElementById('progressCaptura').style.width = porcentajeCaptura + '%';
+                    document.getElementById('progressProceso').style.width = porcentajeProceso + '%';
+                }
+            } catch (error) {
+                console.error('Error:', error);
+            }
+        }
+        
+        cargarDatos();
+        // Actualizar cada 10 segundos durante captura
+        setInterval(cargarDatos, 10000);
+    </script>
+</body>
+</html>

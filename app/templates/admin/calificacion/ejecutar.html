@@ -1,0 +1,617 @@
+<!--
+    POSTULANDO - Página de Calificación
+    app/templates/admin/calificacion/ejecutar.html
+    
+    Permite:
+    - Ejecutar calificación masiva
+    - Ver progreso en tiempo real
+    - Ver resumen de resultados
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Calificación{% endblock %}
+{% block header_title %}Proceso de Calificación{% endblock %}
+{% block header_subtitle %}Calificar hojas de respuesta{% endblock %}
+
+{% block content %}
+<div class="calificacion-container fade-in">
+
+    <!-- ============================================================ -->
+    <!-- VERIFICACIÓN DE REQUISITOS -->
+    <!-- ============================================================ -->
+    <div class="requisitos-card card">
+        <div class="card-header">
+            <h3 class="card-title">📋 Verificación de Requisitos</h3>
+        </div>
+        
+        <div class="requisitos-grid">
+            <!-- Gabarito -->
+            <div class="requisito-item {% if gabarito_ok %}ok{% else %}error{% endif %}">
+                <div class="requisito-icon">
+                    {% if gabarito_ok %}✅{% else %}❌{% endif %}
+                </div>
+                <div class="requisito-content">
+                    <h4>Gabarito Registrado</h4>
+                    {% if gabarito_ok %}
+                        <p>100 respuestas correctas cargadas</p>
+                        <small>Registrado: {{ gabarito_fecha }}</small>
+                    {% else %}
+                        <p>No se ha registrado el gabarito</p>
+                        <a href="/admin/gabarito" class="btn btn-sm btn-primary">Registrar ahora</a>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Hojas de respuesta -->
+            <div class="requisito-item {% if hojas_ok %}ok{% else %}warning{% endif %}">
+                <div class="requisito-icon">
+                    {% if hojas_ok %}✅{% elif total_hojas > 0 %}⚠️{% else %}❌{% endif %}
+                </div>
+                <div class="requisito-content">
+                    <h4>Hojas de Respuesta</h4>
+                    <p>{{ total_hojas }} hojas procesadas</p>
+                    {% if hojas_pendientes > 0 %}
+                        <small class="text-warning">{{ hojas_pendientes }} pendientes de procesar</small>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Estado -->
+            <div class="requisito-item {% if calificacion_lista %}ok{% else %}pending{% endif %}">
+                <div class="requisito-icon">
+                    {% if ya_calificado %}🔄{% elif calificacion_lista %}🟢{% else %}⏳{% endif %}
+                </div>
+                <div class="requisito-content">
+                    <h4>Estado</h4>
+                    {% if ya_calificado %}
+                        <p>Calificación ejecutada</p>
+                        <small>Última: {{ ultima_calificacion }}</small>
+                    {% elif calificacion_lista %}
+                        <p>Listo para calificar</p>
+                    {% else %}
+                        <p>Requisitos pendientes</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PANEL DE CALIFICACIÓN -->
+    <!-- ============================================================ -->
+    <div class="calificacion-panel card">
+        <div class="card-header">
+            <h3 class="card-title">⚡ Ejecutar Calificación</h3>
+            <span class="proceso-badge">Proceso: {{ proceso_actual }}</span>
+        </div>
+
+        <div class="calificacion-content">
+            <!-- Estado inicial -->
+            <div id="estadoInicial" class="estado-panel">
+                <div class="estado-icon">📝</div>
+                <h3>Calificación Masiva de Hojas</h3>
+                <p>
+                    Se compararán las respuestas de <strong>{{ total_hojas }}</strong> hojas 
+                    con las <strong>100</strong> respuestas del gabarito.
+                </p>
+                
+                <div class="formula-box">
+                    <h4>Fórmula de calificación:</h4>
+                    <div class="formula">
+                        <span class="formula-item correct">✓ Correcta = +1 punto</span>
+                        <span class="formula-item incorrect">✗ Incorrecta = 0 puntos</span>
+                        <span class="formula-item blank">○ En blanco = 0 puntos</span>
+                    </div>
+                    <p class="formula-note">Nota máxima posible: 100 puntos</p>
+                </div>
+
+                <button 
+                    id="btnCalificar"
+                    class="btn btn-lg btn-success"
+                    onclick="iniciarCalificacion()"
+                    {% if not calificacion_lista %}disabled{% endif %}
+                >
+                    🚀 Iniciar Calificación
+                </button>
+
+                {% if ya_calificado %}
+                <p class="recalificar-note">
+                    ⚠️ Ya existe una calificación previa. Al ejecutar nuevamente se actualizarán los resultados.
+                </p>
+                {% endif %}
+            </div>
+
+            <!-- Estado en progreso -->
+            <div id="estadoProcesando" class="estado-panel" style="display: none;">
+                <div class="loader-container">
+                    <div class="loader"></div>
+                </div>
+                <h3>Procesando calificación...</h3>
+                <p id="mensajeProceso">Comparando respuestas con el gabarito</p>
+                
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <span class="progress-text" id="progressText">0%</span>
+                </div>
+            </div>
+
+            <!-- Estado completado -->
+            <div id="estadoCompletado" class="estado-panel" style="display: none;">
+                <div class="estado-icon success">✅</div>
+                <h3>¡Calificación Completada!</h3>
+                
+                <div class="resultados-resumen">
+                    <div class="resultado-item">
+                        <span class="resultado-label">Hojas calificadas</span>
+                        <span class="resultado-valor" id="resHojasCalificadas">0</span>
+                    </div>
+                    <div class="resultado-item">
+                        <span class="resultado-label">Tiempo de proceso</span>
+                        <span class="resultado-valor" id="resTiempo">0s</span>
+                    </div>
+                    <div class="resultado-item">
+                        <span class="resultado-label">Promedio general</span>
+                        <span class="resultado-valor" id="resPromedio">0</span>
+                    </div>
+                    <div class="resultado-item">
+                        <span class="resultado-label">Nota máxima</span>
+                        <span class="resultado-valor highlight" id="resMaxima">0</span>
+                    </div>
+                    <div class="resultado-item">
+                        <span class="resultado-label">Nota mínima</span>
+                        <span class="resultado-valor" id="resMinima">0</span>
+                    </div>
+                </div>
+
+                <div class="acciones-post">
+                    <a href="/admin/ranking" class="btn btn-primary btn-lg">
+                        🏆 Ver Ranking Completo
+                    </a>
+                    <a href="/admin/estadisticas" class="btn btn-outline">
+                        📊 Ver Estadísticas
+                    </a>
+                    <a href="/admin/resultados" class="btn btn-success">
+                        📢 Publicar Resultados
+                    </a>
+                </div>
+            </div>
+
+            <!-- Estado error -->
+            <div id="estadoError" class="estado-panel" style="display: none;">
+                <div class="estado-icon error">❌</div>
+                <h3>Error en la Calificación</h3>
+                <p id="mensajeError">Ha ocurrido un error inesperado</p>
+                
+                <button class="btn btn-primary" onclick="reintentar()">
+                    🔄 Reintentar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DISTRIBUCIÓN PREVIA (si ya hay calificación) -->
+    <!-- ============================================================ -->
+    {% if ya_calificado %}
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📊 Distribución Actual de Notas</h3>
+        </div>
+        
+        <div class="distribucion-grid">
+            <div class="distribucion-item">
+                <span class="rango">90-100</span>
+                <div class="barra">
+                    <div class="barra-fill excelente" style="width: {{ dist_90_100_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_90_100 }}</span>
+            </div>
+            <div class="distribucion-item">
+                <span class="rango">80-89</span>
+                <div class="barra">
+                    <div class="barra-fill muy_bueno" style="width: {{ dist_80_89_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_80_89 }}</span>
+            </div>
+            <div class="distribucion-item">
+                <span class="rango">70-79</span>
+                <div class="barra">
+                    <div class="barra-fill bueno" style="width: {{ dist_70_79_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_70_79 }}</span>
+            </div>
+            <div class="distribucion-item">
+                <span class="rango">60-69</span>
+                <div class="barra">
+                    <div class="barra-fill regular" style="width: {{ dist_60_69_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_60_69 }}</span>
+            </div>
+            <div class="distribucion-item">
+                <span class="rango">50-59</span>
+                <div class="barra">
+                    <div class="barra-fill bajo" style="width: {{ dist_50_59_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_50_59 }}</span>
+            </div>
+            <div class="distribucion-item">
+                <span class="rango">&lt;50</span>
+                <div class="barra">
+                    <div class="barra-fill muy_bajo" style="width: {{ dist_menos_50_pct }}%"></div>
+                </div>
+                <span class="cantidad">{{ dist_menos_50 }}</span>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .calificacion-container {
+        max-width: 900px;
+        margin: 0 auto;
+    }
+
+    /* Requisitos */
+    .requisitos-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+        .requisitos-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    .requisito-item {
+        display: flex;
+        gap: 16px;
+        padding: 20px;
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+        border-left: 4px solid var(--border-color);
+    }
+
+    .requisito-item.ok {
+        border-left-color: var(--success);
+    }
+
+    .requisito-item.error {
+        border-left-color: var(--danger);
+    }
+
+    .requisito-item.warning {
+        border-left-color: var(--warning);
+    }
+
+    .requisito-icon {
+        font-size: 2rem;
+    }
+
+    .requisito-content h4 {
+        font-size: 0.95rem;
+        margin-bottom: 4px;
+    }
+
+    .requisito-content p {
+        font-size: 0.8rem;
+        color: var(--text-secondary);
+        margin-bottom: 4px;
+    }
+
+    .requisito-content small {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .text-warning {
+        color: var(--warning) !important;
+    }
+
+    /* Panel de calificación */
+    .calificacion-panel {
+        margin-top: 24px;
+    }
+
+    .calificacion-content {
+        padding: 40px;
+        text-align: center;
+    }
+
+    .estado-panel {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 20px;
+    }
+
+    .estado-icon {
+        font-size: 4rem;
+    }
+
+    .estado-icon.success {
+        color: var(--success);
+    }
+
+    .estado-icon.error {
+        color: var(--danger);
+    }
+
+    .estado-panel h3 {
+        font-size: 1.5rem;
+    }
+
+    .estado-panel p {
+        color: var(--text-secondary);
+        max-width: 500px;
+    }
+
+    /* Formula box */
+    .formula-box {
+        background: var(--bg-card-hover);
+        border-radius: 12px;
+        padding: 24px;
+        margin: 20px 0;
+        width: 100%;
+        max-width: 500px;
+    }
+
+    .formula-box h4 {
+        font-size: 0.9rem;
+        color: var(--text-muted);
+        margin-bottom: 16px;
+    }
+
+    .formula {
+        display: flex;
+        justify-content: center;
+        gap: 24px;
+        flex-wrap: wrap;
+    }
+
+    .formula-item {
+        padding: 8px 16px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+
+    .formula-item.correct {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
+    }
+
+    .formula-item.incorrect {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+    }
+
+    .formula-item.blank {
+        background: rgba(100, 116, 139, 0.15);
+        color: var(--text-muted);
+    }
+
+    .formula-note {
+        margin-top: 16px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .recalificar-note {
+        margin-top: 16px;
+        font-size: 0.8rem;
+        color: var(--warning);
+    }
+
+    /* Loader */
+    .loader-container {
+        margin-bottom: 20px;
+    }
+
+    .loader {
+        width: 60px;
+        height: 60px;
+        border: 4px solid var(--border-color);
+        border-top-color: var(--primary);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        to { transform: rotate(360deg); }
+    }
+
+    /* Progress */
+    .progress-container {
+        width: 100%;
+        max-width: 400px;
+        display: flex;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .progress-bar {
+        flex: 1;
+        height: 8px;
+        background: var(--bg-card-hover);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .progress-fill {
+        height: 100%;
+        background: linear-gradient(135deg, var(--primary), var(--success));
+        border-radius: 4px;
+        width: 0%;
+        transition: width 0.3s;
+    }
+
+    .progress-text {
+        font-weight: 700;
+        min-width: 50px;
+    }
+
+    /* Resultados */
+    .resultados-resumen {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 16px;
+        width: 100%;
+        max-width: 600px;
+        margin: 24px 0;
+    }
+
+    .resultado-item {
+        background: var(--bg-card-hover);
+        padding: 20px;
+        border-radius: 12px;
+        text-align: center;
+    }
+
+    .resultado-label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
+
+    .resultado-valor {
+        font-size: 1.5rem;
+        font-weight: 700;
+    }
+
+    .resultado-valor.highlight {
+        color: var(--success);
+    }
+
+    .acciones-post {
+        display: flex;
+        gap: 16px;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-top: 24px;
+    }
+
+    /* Distribución */
+    .distribucion-grid {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .distribucion-item {
+        display: grid;
+        grid-template-columns: 80px 1fr 60px;
+        align-items: center;
+        gap: 16px;
+    }
+
+    .distribucion-item .rango {
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .distribucion-item .barra {
+        height: 24px;
+        background: var(--bg-card-hover);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .distribucion-item .barra-fill {
+        height: 100%;
+        border-radius: 4px;
+    }
+
+    .barra-fill.excelente { background: #10b981; }
+    .barra-fill.muy_bueno { background: #3b82f6; }
+    .barra-fill.bueno { background: #8b5cf6; }
+    .barra-fill.regular { background: #f59e0b; }
+    .barra-fill.bajo { background: #f97316; }
+    .barra-fill.muy_bajo { background: #ef4444; }
+
+    .distribucion-item .cantidad {
+        font-weight: 600;
+        text-align: right;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    async function iniciarCalificacion() {
+        const btnCalificar = document.getElementById('btnCalificar');
+        
+        // Confirmar
+        if (!confirm('¿Está seguro de iniciar el proceso de calificación?\n\nEsto calificará todas las hojas procesadas.')) {
+            return;
+        }
+        
+        // Cambiar estado
+        document.getElementById('estadoInicial').style.display = 'none';
+        document.getElementById('estadoProcesando').style.display = 'flex';
+        
+        // Simular progreso
+        let progress = 0;
+        const progressInterval = setInterval(() => {
+            progress += Math.random() * 15;
+            if (progress > 95) progress = 95;
+            document.getElementById('progressFill').style.width = progress + '%';
+            document.getElementById('progressText').textContent = Math.round(progress) + '%';
+        }, 200);
+        
+        try {
+            const response = await fetch('/api/calificacion/ejecutar', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ proceso: '{{ proceso_actual }}' })
+            });
+            
+            clearInterval(progressInterval);
+            
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.detail || 'Error en calificación');
+            }
+            
+            const data = await response.json();
+            
+            // Completar progreso
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressText').textContent = '100%';
+            
+            setTimeout(() => {
+                // Mostrar resultados
+                document.getElementById('estadoProcesando').style.display = 'none';
+                document.getElementById('estadoCompletado').style.display = 'flex';
+                
+                // Llenar datos
+                document.getElementById('resHojasCalificadas').textContent = data.total_hojas || 0;
+                document.getElementById('resTiempo').textContent = data.tiempo || '0s';
+                document.getElementById('resPromedio').textContent = (data.promedio_nota || 0).toFixed(2);
+                document.getElementById('resMaxima').textContent = data.nota_maxima || 0;
+                document.getElementById('resMinima').textContent = data.nota_minima || 0;
+            }, 500);
+            
+        } catch (error) {
+            clearInterval(progressInterval);
+            
+            document.getElementById('estadoProcesando').style.display = 'none';
+            document.getElementById('estadoError').style.display = 'flex';
+            document.getElementById('mensajeError').textContent = error.message;
+        }
+    }
+    
+    function reintentar() {
+        document.getElementById('estadoError').style.display = 'none';
+        document.getElementById('estadoInicial').style.display = 'flex';
+    }
+</script>
+{% endblock %}

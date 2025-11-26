@@ -1,0 +1,596 @@
+<!--
+    POSTULANDO - Estadísticas Detalladas
+    app/templates/admin/estadisticas.html
+    
+    Muestra:
+    - Estadísticas generales del proceso
+    - Distribución de notas con gráfico
+    - Análisis por programa educativo
+    - Análisis de dificultad de preguntas
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Estadísticas{% endblock %}
+{% block header_title %}Estadísticas del Proceso{% endblock %}
+{% block header_subtitle %}Análisis detallado del proceso de admisión{% endblock %}
+
+{% block content %}
+<div class="estadisticas-container fade-in">
+
+    <!-- ============================================================ -->
+    <!-- ESTADÍSTICAS GENERALES -->
+    <!-- ============================================================ -->
+    <div class="stats-grid">
+        <div class="stat-card">
+            <div class="stat-icon blue">📊</div>
+            <div class="stat-content">
+                <div class="stat-label">Total Evaluados</div>
+                <div class="stat-value">{{ stats_generales.total_postulantes or 0 }}</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon green">📈</div>
+            <div class="stat-content">
+                <div class="stat-label">Promedio General</div>
+                <div class="stat-value">{{ "%.2f"|format(stats_generales.promedio_general or 0) }}</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon yellow">🏆</div>
+            <div class="stat-content">
+                <div class="stat-label">Nota Máxima</div>
+                <div class="stat-value">{{ stats_generales.nota_maxima or 0 }}</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon red">📉</div>
+            <div class="stat-content">
+                <div class="stat-label">Nota Mínima</div>
+                <div class="stat-value">{{ stats_generales.nota_minima or 0 }}</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon purple">📐</div>
+            <div class="stat-content">
+                <div class="stat-label">Mediana</div>
+                <div class="stat-value">{{ "%.2f"|format(stats_generales.mediana or 0) }}</div>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon cyan">📏</div>
+            <div class="stat-content">
+                <div class="stat-label">Desviación Estándar</div>
+                <div class="stat-value">{{ "%.2f"|format(stats_generales.desviacion_estandar or 0) }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- DISTRIBUCIÓN DE NOTAS -->
+    <!-- ============================================================ -->
+    <div class="grid-2-cols">
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">📊 Distribución de Notas</h3>
+            </div>
+            
+            <div class="distribucion-chart">
+                <!-- Gráfico de barras horizontal -->
+                <div class="chart-bars">
+                    {% set rangos = [
+                        ('90-100', stats_generales.rango_90_100 or 0, '#10b981', 'Excelente'),
+                        ('80-89', stats_generales.rango_80_89 or 0, '#3b82f6', 'Muy Bueno'),
+                        ('70-79', stats_generales.rango_70_79 or 0, '#8b5cf6', 'Bueno'),
+                        ('60-69', stats_generales.rango_60_69 or 0, '#f59e0b', 'Regular'),
+                        ('50-59', stats_generales.rango_50_59 or 0, '#f97316', 'Aprobado'),
+                        ('<50', stats_generales.rango_menos_50 or 0, '#ef4444', 'Desaprobado')
+                    ] %}
+                    
+                    {% set max_valor = [rangos[0][1], rangos[1][1], rangos[2][1], rangos[3][1], rangos[4][1], rangos[5][1]] | max %}
+                    {% set max_valor = max_valor if max_valor > 0 else 1 %}
+                    
+                    {% for rango, valor, color, label in rangos %}
+                    <div class="chart-bar-row">
+                        <span class="bar-label">{{ rango }}</span>
+                        <div class="bar-container">
+                            <div class="bar-fill" style="width: {{ (valor / max_valor * 100) }}%; background: {{ color }};"></div>
+                        </div>
+                        <span class="bar-value">{{ valor }}</span>
+                        <span class="bar-percent">({{ "%.1f"|format(valor * 100 / (stats_generales.calificados or 1)) }}%)</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            
+            <div class="chart-legend">
+                <div class="legend-item"><span class="legend-color" style="background: #10b981;"></span> Excelente (90-100)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span> Muy Bueno (80-89)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #8b5cf6;"></span> Bueno (70-79)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span> Regular (60-69)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #f97316;"></span> Aprobado (50-59)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span> Desaprobado (&lt;50)</div>
+            </div>
+        </div>
+
+        <!-- Resumen de aprobación -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">✅ Resumen de Aprobación</h3>
+            </div>
+            
+            {% set aprobados = (stats_generales.rango_90_100 or 0) + (stats_generales.rango_80_89 or 0) + (stats_generales.rango_70_79 or 0) + (stats_generales.rango_60_69 or 0) + (stats_generales.rango_50_59 or 0) %}
+            {% set desaprobados = stats_generales.rango_menos_50 or 0 %}
+            {% set total = aprobados + desaprobados %}
+            {% set pct_aprobados = (aprobados * 100 / total) if total > 0 else 0 %}
+            
+            <div class="donut-chart-container">
+                <div class="donut-chart">
+                    <svg viewBox="0 0 36 36">
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#ef4444" stroke-width="3"></circle>
+                        <circle cx="18" cy="18" r="15.9" fill="none" stroke="#10b981" stroke-width="3"
+                                stroke-dasharray="{{ pct_aprobados }}, 100"
+                                transform="rotate(-90 18 18)"></circle>
+                    </svg>
+                    <div class="donut-center">
+                        <span class="donut-value">{{ "%.1f"|format(pct_aprobados) }}%</span>
+                        <span class="donut-label">Aprobados</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="aprobacion-stats">
+                <div class="aprobacion-item aprobado">
+                    <span class="aprobacion-icon">✓</span>
+                    <div>
+                        <strong>{{ aprobados }}</strong>
+                        <span>Aprobados</span>
+                    </div>
+                </div>
+                <div class="aprobacion-item desaprobado">
+                    <span class="aprobacion-icon">✗</span>
+                    <div>
+                        <strong>{{ desaprobados }}</strong>
+                        <span>Desaprobados</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ESTADÍSTICAS POR PROGRAMA -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="card-header">
+            <h3 class="card-title">📚 Rendimiento por Programa Educativo</h3>
+        </div>
+        
+        <div class="table-container">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Programa</th>
+                        <th class="text-center">Postulantes</th>
+                        <th class="text-center">Promedio</th>
+                        <th class="text-center">Máxima</th>
+                        <th class="text-center">Mínima</th>
+                        <th class="text-center">Mediana</th>
+                        <th>Comparación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for prog in stats_programa %}
+                    <tr>
+                        <td>
+                            <strong>{{ prog.programa_educativo }}</strong>
+                        </td>
+                        <td class="text-center">{{ prog.total_postulantes }}</td>
+                        <td class="text-center">
+                            <span class="nota-badge {% if prog.promedio_nota >= 60 %}alta{% elif prog.promedio_nota >= 50 %}media{% else %}baja{% endif %}">
+                                {{ "%.2f"|format(prog.promedio_nota or 0) }}
+                            </span>
+                        </td>
+                        <td class="text-center">{{ prog.nota_maxima or 0 }}</td>
+                        <td class="text-center">{{ prog.nota_minima or 0 }}</td>
+                        <td class="text-center">{{ "%.2f"|format(prog.mediana or 0) }}</td>
+                        <td>
+                            {% set diff = (prog.promedio_nota or 0) - (stats_generales.promedio_general or 0) %}
+                            <span class="comparacion {% if diff > 0 %}positiva{% elif diff < 0 %}negativa{% endif %}">
+                                {% if diff > 0 %}+{% endif %}{{ "%.2f"|format(diff) }}
+                            </span>
+                            <span class="comparacion-label">vs promedio general</span>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="7" class="text-center text-muted">No hay datos disponibles</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ANÁLISIS DE PREGUNTAS -->
+    <!-- ============================================================ -->
+    <div class="grid-2-cols">
+        <!-- Preguntas más difíciles -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🔴 Preguntas Más Difíciles</h3>
+            </div>
+            
+            <div class="preguntas-list">
+                {% for p in preguntas_dificiles %}
+                <div class="pregunta-item dificil">
+                    <span class="pregunta-numero">P{{ p.numero_pregunta }}</span>
+                    <div class="pregunta-barra">
+                        <div class="pregunta-fill" style="width: {{ p.porcentaje_acierto }}%;"></div>
+                    </div>
+                    <span class="pregunta-pct">{{ "%.1f"|format(p.porcentaje_acierto or 0) }}%</span>
+                    <span class="pregunta-resp">Rpta: {{ p.respuesta_correcta }}</span>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">No hay datos</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Preguntas más fáciles -->
+        <div class="card">
+            <div class="card-header">
+                <h3 class="card-title">🟢 Preguntas Más Fáciles</h3>
+            </div>
+            
+            <div class="preguntas-list">
+                {% for p in preguntas_faciles %}
+                <div class="pregunta-item facil">
+                    <span class="pregunta-numero">P{{ p.numero_pregunta }}</span>
+                    <div class="pregunta-barra">
+                        <div class="pregunta-fill" style="width: {{ p.porcentaje_acierto }}%;"></div>
+                    </div>
+                    <span class="pregunta-pct">{{ "%.1f"|format(p.porcentaje_acierto or 0) }}%</span>
+                    <span class="pregunta-resp">Rpta: {{ p.respuesta_correcta }}</span>
+                </div>
+                {% else %}
+                <p class="text-muted text-center">No hay datos</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- ACCIONES -->
+    <!-- ============================================================ -->
+    <div class="acciones-bar">
+        <button class="btn btn-outline" onclick="exportarEstadisticasPDF()">
+            📄 Exportar PDF
+        </button>
+        <button class="btn btn-outline" onclick="exportarEstadisticasExcel()">
+            📊 Exportar Excel
+        </button>
+        <button class="btn btn-primary" onclick="window.print()">
+            🖨️ Imprimir
+        </button>
+    </div>
+
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .estadisticas-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .grid-2-cols {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 24px;
+        margin-bottom: 24px;
+    }
+
+    @media (max-width: 1024px) {
+        .grid-2-cols {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    /* Stats grid */
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(6, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    @media (max-width: 1200px) {
+        .stats-grid {
+            grid-template-columns: repeat(3, 1fr);
+        }
+    }
+
+    @media (max-width: 768px) {
+        .stats-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    .stat-icon.purple { background: rgba(139, 92, 246, 0.15); color: #8b5cf6; }
+    .stat-icon.cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4; }
+
+    /* Chart bars */
+    .chart-bars {
+        padding: 20px 0;
+    }
+
+    .chart-bar-row {
+        display: grid;
+        grid-template-columns: 60px 1fr 50px 60px;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .bar-label {
+        font-size: 0.85rem;
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .bar-container {
+        height: 24px;
+        background: var(--bg-card-hover);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .bar-fill {
+        height: 100%;
+        border-radius: 4px;
+        transition: width 0.5s ease;
+    }
+
+    .bar-value {
+        font-weight: 700;
+        text-align: right;
+    }
+
+    .bar-percent {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .chart-legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .legend-item {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .legend-color {
+        width: 12px;
+        height: 12px;
+        border-radius: 3px;
+    }
+
+    /* Donut chart */
+    .donut-chart-container {
+        display: flex;
+        justify-content: center;
+        padding: 20px;
+    }
+
+    .donut-chart {
+        position: relative;
+        width: 180px;
+        height: 180px;
+    }
+
+    .donut-chart svg {
+        width: 100%;
+        height: 100%;
+    }
+
+    .donut-center {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        text-align: center;
+    }
+
+    .donut-value {
+        display: block;
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--success);
+    }
+
+    .donut-label {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .aprobacion-stats {
+        display: flex;
+        justify-content: center;
+        gap: 40px;
+        padding-top: 20px;
+    }
+
+    .aprobacion-item {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .aprobacion-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.25rem;
+    }
+
+    .aprobacion-item.aprobado .aprobacion-icon {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
+    }
+
+    .aprobacion-item.desaprobado .aprobacion-icon {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+    }
+
+    .aprobacion-item div strong {
+        display: block;
+        font-size: 1.5rem;
+    }
+
+    .aprobacion-item div span {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Tabla */
+    .nota-badge {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 6px;
+        font-weight: 600;
+    }
+
+    .nota-badge.alta {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
+    }
+
+    .nota-badge.media {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+    }
+
+    .nota-badge.baja {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+    }
+
+    .comparacion {
+        font-weight: 600;
+    }
+
+    .comparacion.positiva {
+        color: var(--success);
+    }
+
+    .comparacion.negativa {
+        color: var(--danger);
+    }
+
+    .comparacion-label {
+        display: block;
+        font-size: 0.7rem;
+        color: var(--text-muted);
+    }
+
+    /* Preguntas */
+    .preguntas-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .pregunta-item {
+        display: grid;
+        grid-template-columns: 40px 1fr 50px 70px;
+        align-items: center;
+        gap: 12px;
+        padding: 10px;
+        background: var(--bg-card-hover);
+        border-radius: 8px;
+    }
+
+    .pregunta-numero {
+        font-weight: 700;
+        font-size: 0.85rem;
+    }
+
+    .pregunta-barra {
+        height: 8px;
+        background: var(--bg-dark);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+
+    .pregunta-item.dificil .pregunta-fill {
+        background: linear-gradient(90deg, #ef4444, #f97316);
+    }
+
+    .pregunta-item.facil .pregunta-fill {
+        background: linear-gradient(90deg, #10b981, #3b82f6);
+    }
+
+    .pregunta-fill {
+        height: 100%;
+        border-radius: 4px;
+    }
+
+    .pregunta-pct {
+        font-weight: 600;
+        font-size: 0.85rem;
+    }
+
+    .pregunta-resp {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    /* Acciones */
+    .acciones-bar {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 24px;
+    }
+
+    .text-center { text-align: center; }
+    .text-muted { color: var(--text-muted); }
+
+    /* Print styles */
+    @media print {
+        .acciones-bar { display: none; }
+        .card { break-inside: avoid; }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function exportarEstadisticasPDF() {
+        window.location.href = '/api/estadisticas/exportar/pdf?proceso={{ proceso_actual }}';
+    }
+    
+    function exportarEstadisticasExcel() {
+        window.location.href = '/api/estadisticas/exportar/excel?proceso={{ proceso_actual }}';
+    }
+</script>
+{% endblock %}

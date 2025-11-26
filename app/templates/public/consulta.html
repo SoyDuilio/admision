@@ -1,0 +1,672 @@
+<!--
+    POSTULANDO - Consulta Pública de Resultados
+    app/templates/public/consulta.html
+    
+    Permite a los postulantes:
+    - Consultar su resultado por DNI
+    - Ver su nota y posición en el ranking
+    - Descargar constancia (si ingresó)
+-->
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta de Resultados | POSTULANDO</title>
+    
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎓</text></svg>">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --primary: #3b82f6;
+            --primary-dark: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --bg-dark: #0f172a;
+            --bg-darker: #020617;
+            --bg-card: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
+            --border-color: #334155;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: var(--bg-darker);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        /* Header público */
+        .header {
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-color);
+            padding: 16px 24px;
+        }
+
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .logo-text h1 {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .logo-text span {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .institucion {
+            text-align: right;
+        }
+
+        .institucion h2 {
+            font-size: 1rem;
+            font-weight: 600;
+        }
+
+        .institucion p {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        /* Main content */
+        .main {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+
+        .page-title {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .page-title h2 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .page-title p {
+            color: var(--text-muted);
+        }
+
+        /* Formulario de consulta */
+        .consulta-form {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+        }
+
+        .form-group {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            background: var(--bg-dark);
+            border: 2px solid var(--border-color);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-align: center;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-input::placeholder {
+            color: var(--text-muted);
+            letter-spacing: normal;
+            font-weight: 400;
+        }
+
+        .form-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        .btn-consultar {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-consultar:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-consultar:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Resultado */
+        .resultado {
+            display: none;
+        }
+
+        .resultado.show {
+            display: block;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .resultado-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        /* Estado: Ingresante */
+        .resultado-card.ingresante {
+            border-color: var(--success);
+        }
+
+        .resultado-card.ingresante .resultado-header {
+            background: linear-gradient(135deg, var(--success), #059669);
+        }
+
+        /* Estado: No ingresó */
+        .resultado-card.no-ingreso {
+            border-color: var(--warning);
+        }
+
+        .resultado-card.no-ingreso .resultado-header {
+            background: linear-gradient(135deg, var(--warning), #d97706);
+        }
+
+        .resultado-header {
+            padding: 24px;
+            text-align: center;
+        }
+
+        .resultado-estado {
+            font-size: 3rem;
+            margin-bottom: 8px;
+        }
+
+        .resultado-titulo {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .resultado-body {
+            padding: 24px;
+        }
+
+        .postulante-info {
+            text-align: center;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+
+        .postulante-nombre {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 4px;
+        }
+
+        .postulante-dni {
+            color: var(--text-muted);
+        }
+
+        .postulante-programa {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 6px 16px;
+            background: rgba(59, 130, 246, 0.15);
+            color: var(--primary);
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .notas-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .nota-item {
+            background: var(--bg-dark);
+            padding: 16px;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .nota-valor {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        .nota-item.destacado .nota-valor {
+            color: var(--success);
+        }
+
+        .nota-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        .resultado-acciones {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn-accion {
+            padding: 12px 24px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-decoration: none;
+        }
+
+        .btn-constancia {
+            background: var(--success);
+            color: white;
+            border: none;
+        }
+
+        .btn-constancia:hover {
+            background: #059669;
+        }
+
+        .btn-nueva {
+            background: transparent;
+            border: 2px solid var(--border-color);
+            color: var(--text-secondary);
+        }
+
+        .btn-nueva:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Error */
+        .error-message {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            border-radius: 10px;
+            padding: 16px;
+            text-align: center;
+            color: var(--danger);
+            margin-bottom: 24px;
+            display: none;
+        }
+
+        .error-message.show {
+            display: block;
+        }
+
+        /* Info adicional */
+        .info-adicional {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 32px;
+        }
+
+        .info-adicional h4 {
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .info-adicional ul {
+            list-style: none;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .info-adicional li {
+            padding: 6px 0;
+            padding-left: 20px;
+            position: relative;
+        }
+
+        .info-adicional li::before {
+            content: '•';
+            position: absolute;
+            left: 0;
+            color: var(--primary);
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 24px;
+            color: var(--text-muted);
+            font-size: 0.8rem;
+        }
+
+        .footer a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 600px) {
+            .header-content {
+                flex-direction: column;
+                gap: 16px;
+                text-align: center;
+            }
+
+            .institucion {
+                text-align: center;
+            }
+
+            .notas-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .resultado-acciones {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <div class="logo-icon">🎓</div>
+                <div class="logo-text">
+                    <h1>POSTULANDO</h1>
+                    <span>Sistema de Admisión</span>
+                </div>
+            </div>
+            <div class="institucion">
+                <h2>Instituto Superior Tecnológico SANTANA</h2>
+                <p>Proceso de Admisión {{ proceso }}</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <main class="main">
+        <div class="page-title">
+            <h2>📋 Consulta de Resultados</h2>
+            <p>Ingrese su número de DNI para consultar su resultado</p>
+        </div>
+
+        <!-- Formulario -->
+        <div class="consulta-form" id="formContainer">
+            <div class="form-group">
+                <label class="form-label">Número de DNI</label>
+                <input 
+                    type="text" 
+                    class="form-input" 
+                    id="dniInput"
+                    placeholder="Ingrese sus 8 dígitos"
+                    maxlength="8"
+                    pattern="[0-9]{8}"
+                    inputmode="numeric"
+                    autocomplete="off"
+                >
+                <p class="form-hint">Ingrese los 8 dígitos de su DNI sin espacios ni guiones</p>
+            </div>
+
+            <div class="error-message" id="errorMessage">
+                <span id="errorText">Error al consultar</span>
+            </div>
+
+            <button class="btn-consultar" id="btnConsultar" onclick="consultarResultado()">
+                <span class="spinner" id="spinner"></span>
+                <span id="btnText">🔍 Consultar Resultado</span>
+            </button>
+        </div>
+
+        <!-- Resultado -->
+        <div class="resultado" id="resultadoContainer">
+            <div class="resultado-card" id="resultadoCard">
+                <div class="resultado-header">
+                    <div class="resultado-estado" id="resultadoEstado">🎉</div>
+                    <h3 class="resultado-titulo" id="resultadoTitulo">¡INGRESANTE!</h3>
+                </div>
+                
+                <div class="resultado-body">
+                    <div class="postulante-info">
+                        <h4 class="postulante-nombre" id="postulNombre">-</h4>
+                        <p class="postulante-dni">DNI: <span id="postulDNI">-</span></p>
+                        <span class="postulante-programa" id="postulPrograma">-</span>
+                    </div>
+
+                    <div class="notas-grid">
+                        <div class="nota-item destacado">
+                            <div class="nota-valor" id="postulNota">-</div>
+                            <div class="nota-label">Nota Final</div>
+                        </div>
+                        <div class="nota-item">
+                            <div class="nota-valor" id="postulCorrectas">-</div>
+                            <div class="nota-label">Respuestas Correctas</div>
+                        </div>
+                        <div class="nota-item">
+                            <div class="nota-valor" id="postulRanking">-</div>
+                            <div class="nota-label">Posición General</div>
+                        </div>
+                    </div>
+
+                    <div class="resultado-acciones">
+                        <a href="#" class="btn-accion btn-constancia" id="btnConstancia" style="display: none;">
+                            📜 Descargar Constancia
+                        </a>
+                        <button class="btn-accion btn-nueva" onclick="nuevaConsulta()">
+                            🔄 Nueva Consulta
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info adicional -->
+        <div class="info-adicional">
+            <h4>📌 Información Importante</h4>
+            <ul>
+                <li>Los resultados son oficiales y definitivos.</li>
+                <li>Si eres ingresante, debes completar tu matrícula en las fechas establecidas.</li>
+                <li>Para reclamos, acércate a la oficina de admisión con tu DNI original.</li>
+                <li>Conserva el número de tu código de postulante para trámites futuros.</li>
+            </ul>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p>
+            © 2025 Instituto Superior Tecnológico SANTANA • 
+            <a href="/resultados/{{ proceso }}">Ver lista completa de resultados</a>
+        </p>
+    </footer>
+
+    <script>
+        // Auto-formato del DNI
+        document.getElementById('dniInput').addEventListener('input', function(e) {
+            this.value = this.value.replace(/[^0-9]/g, '').slice(0, 8);
+        });
+
+        // Consultar con Enter
+        document.getElementById('dniInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                consultarResultado();
+            }
+        });
+
+        async function consultarResultado() {
+            const dni = document.getElementById('dniInput').value.trim();
+            const errorDiv = document.getElementById('errorMessage');
+            const errorText = document.getElementById('errorText');
+            const btn = document.getElementById('btnConsultar');
+            const spinner = document.getElementById('spinner');
+            const btnText = document.getElementById('btnText');
+            
+            // Validar DNI
+            if (!/^[0-9]{8}$/.test(dni)) {
+                errorText.textContent = 'Ingrese un DNI válido de 8 dígitos';
+                errorDiv.classList.add('show');
+                return;
+            }
+            
+            // Ocultar error anterior
+            errorDiv.classList.remove('show');
+            
+            // Mostrar loading
+            spinner.style.display = 'block';
+            btnText.textContent = 'Consultando...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`/api/consulta/${dni}?proceso={{ proceso }}`);
+                
+                if (!response.ok) {
+                    if (response.status === 404) {
+                        throw new Error('No se encontró ningún postulante con ese DNI');
+                    }
+                    throw new Error('Error al consultar. Intente nuevamente.');
+                }
+                
+                const data = await response.json();
+                mostrarResultado(data);
+                
+            } catch (error) {
+                errorText.textContent = error.message;
+                errorDiv.classList.add('show');
+            } finally {
+                spinner.style.display = 'none';
+                btnText.textContent = '🔍 Consultar Resultado';
+                btn.disabled = false;
+            }
+        }
+
+        function mostrarResultado(data) {
+            // Ocultar formulario
+            document.getElementById('formContainer').style.display = 'none';
+            
+            // Configurar card según estado
+            const card = document.getElementById('resultadoCard');
+            const esIngresante = data.nota_final >= 50; // Nota de corte
+            
+            if (esIngresante) {
+                card.className = 'resultado-card ingresante';
+                document.getElementById('resultadoEstado').textContent = '🎉';
+                document.getElementById('resultadoTitulo').textContent = '¡INGRESANTE!';
+                document.getElementById('btnConstancia').style.display = 'inline-block';
+                document.getElementById('btnConstancia').href = `/api/constancia/${data.postulante_id}`;
+            } else {
+                card.className = 'resultado-card no-ingreso';
+                document.getElementById('resultadoEstado').textContent = '📋';
+                document.getElementById('resultadoTitulo').textContent = 'NO ALCANZÓ VACANTE';
+                document.getElementById('btnConstancia').style.display = 'none';
+            }
+            
+            // Llenar datos
+            document.getElementById('postulNombre').textContent = data.nombre_completo;
+            document.getElementById('postulDNI').textContent = data.dni;
+            document.getElementById('postulPrograma').textContent = data.programa_educativo;
+            document.getElementById('postulNota').textContent = data.nota_final;
+            document.getElementById('postulCorrectas').textContent = data.respuestas_correctas + '/100';
+            document.getElementById('postulRanking').textContent = '#' + data.ranking;
+            
+            // Mostrar resultado
+            document.getElementById('resultadoContainer').classList.add('show');
+        }
+
+        function nuevaConsulta() {
+            document.getElementById('formContainer').style.display = 'block';
+            document.getElementById('resultadoContainer').classList.remove('show');
+            document.getElementById('dniInput').value = '';
+            document.getElementById('dniInput').focus();
+            document.getElementById('errorMessage').classList.remove('show');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,741 @@
+<!--
+    POSTULANDO - Página de Ranking
+    app/templates/admin/resultados/ranking.html
+    
+    Muestra:
+    - Ranking completo de postulantes
+    - Filtros por programa
+    - Exportación a Excel/PDF
+    - Búsqueda rápida
+-->
+{% extends "admin/base_admin.html" %}
+
+{% block title %}Ranking{% endblock %}
+{% block header_title %}Ranking de Postulantes{% endblock %}
+{% block header_subtitle %}Resultados ordenados por puntaje{% endblock %}
+
+{% block content %}
+<div class="ranking-container fade-in">
+
+    <!-- ============================================================ -->
+    <!-- RESUMEN TOP -->
+    <!-- ============================================================ -->
+    <div class="top-3-section">
+        <h3 class="section-title">🏆 Top 3 Postulantes</h3>
+        
+        <div class="podium">
+            <!-- 2do lugar -->
+            <div class="podium-item segundo">
+                <div class="podium-avatar">
+                    <span>🥈</span>
+                </div>
+                <div class="podium-info">
+                    <span class="podium-rank">2°</span>
+                    <h4>{{ top3[1].nombre_completo if top3|length > 1 else '-' }}</h4>
+                    <p>{{ top3[1].programa_educativo if top3|length > 1 else '' }}</p>
+                    <span class="podium-nota">{{ top3[1].nota_final if top3|length > 1 else '-' }}</span>
+                </div>
+                <div class="podium-base segundo"></div>
+            </div>
+
+            <!-- 1er lugar -->
+            <div class="podium-item primero">
+                <div class="podium-avatar">
+                    <span>🥇</span>
+                </div>
+                <div class="podium-info">
+                    <span class="podium-rank">1°</span>
+                    <h4>{{ top3[0].nombre_completo if top3|length > 0 else '-' }}</h4>
+                    <p>{{ top3[0].programa_educativo if top3|length > 0 else '' }}</p>
+                    <span class="podium-nota">{{ top3[0].nota_final if top3|length > 0 else '-' }}</span>
+                </div>
+                <div class="podium-base primero"></div>
+            </div>
+
+            <!-- 3er lugar -->
+            <div class="podium-item tercero">
+                <div class="podium-avatar">
+                    <span>🥉</span>
+                </div>
+                <div class="podium-info">
+                    <span class="podium-rank">3°</span>
+                    <h4>{{ top3[2].nombre_completo if top3|length > 2 else '-' }}</h4>
+                    <p>{{ top3[2].programa_educativo if top3|length > 2 else '' }}</p>
+                    <span class="podium-nota">{{ top3[2].nota_final if top3|length > 2 else '-' }}</span>
+                </div>
+                <div class="podium-base tercero"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- FILTROS Y ACCIONES -->
+    <!-- ============================================================ -->
+    <div class="card">
+        <div class="filtros-bar">
+            <div class="filtros-left">
+                <!-- Búsqueda -->
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input 
+                        type="text" 
+                        id="searchInput"
+                        placeholder="Buscar por DNI o nombre..."
+                        onkeyup="filtrarTabla()"
+                    >
+                </div>
+
+                <!-- Filtro por programa -->
+                <select id="filtroPrograma" onchange="filtrarTabla()" class="select-filtro">
+                    <option value="">Todos los programas</option>
+                    {% for prog in programas %}
+                    <option value="{{ prog }}">{{ prog }}</option>
+                    {% endfor %}
+                </select>
+
+                <!-- Cantidad a mostrar -->
+                <select id="cantidadMostrar" onchange="cambiarCantidad()" class="select-filtro">
+                    <option value="50">50 registros</option>
+                    <option value="100">100 registros</option>
+                    <option value="500">500 registros</option>
+                    <option value="all">Todos</option>
+                </select>
+            </div>
+
+            <div class="filtros-right">
+                <button class="btn btn-outline" onclick="exportarExcel()">
+                    📊 Exportar Excel
+                </button>
+                <button class="btn btn-outline" onclick="exportarPDF()">
+                    📄 Exportar PDF
+                </button>
+                <button class="btn btn-primary" onclick="imprimirRanking()">
+                    🖨️ Imprimir
+                </button>
+            </div>
+        </div>
+
+        <!-- Estadísticas rápidas -->
+        <div class="stats-mini">
+            <div class="stat-mini-item">
+                <span class="stat-mini-value">{{ total_postulantes }}</span>
+                <span class="stat-mini-label">Total</span>
+            </div>
+            <div class="stat-mini-item">
+                <span class="stat-mini-value">{{ promedio | round(2) }}</span>
+                <span class="stat-mini-label">Promedio</span>
+            </div>
+            <div class="stat-mini-item">
+                <span class="stat-mini-value">{{ nota_maxima }}</span>
+                <span class="stat-mini-label">Máxima</span>
+            </div>
+            <div class="stat-mini-item">
+                <span class="stat-mini-value">{{ nota_minima }}</span>
+                <span class="stat-mini-label">Mínima</span>
+            </div>
+            <div class="stat-mini-item">
+                <span class="stat-mini-value">{{ mediana | round(2) }}</span>
+                <span class="stat-mini-label">Mediana</span>
+            </div>
+        </div>
+
+        <!-- Tabla de ranking -->
+        <div class="table-container">
+            <table class="table ranking-table" id="tablaRanking">
+                <thead>
+                    <tr>
+                        <th class="col-rank">#</th>
+                        <th class="col-dni">DNI</th>
+                        <th class="col-codigo">Código</th>
+                        <th class="col-nombre">Postulante</th>
+                        <th class="col-programa">Programa Educativo</th>
+                        <th class="col-correctas">Correctas</th>
+                        <th class="col-nota">Nota</th>
+                        <th class="col-estado">Estado</th>
+                        <th class="col-acciones">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="rankingBody">
+                    {% for p in ranking %}
+                    <tr data-programa="{{ p.programa_educativo }}">
+                        <td>
+                            <span class="rank-number {% if loop.index <= 3 %}top-3{% elif loop.index <= 10 %}top-10{% endif %}">
+                                {{ loop.index }}
+                            </span>
+                        </td>
+                        <td class="font-mono">{{ p.dni }}</td>
+                        <td class="font-mono">{{ p.codigo_unico }}</td>
+                        <td>
+                            <div class="postulante-cell">
+                                <strong>{{ p.apellido_paterno }} {{ p.apellido_materno }}</strong>
+                                <span>{{ p.nombres }}</span>
+                            </div>
+                        </td>
+                        <td>
+                            <span class="programa-tag">{{ p.programa_educativo }}</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="correctas-badge">{{ p.respuestas_correctas }}/100</span>
+                        </td>
+                        <td class="text-center">
+                            <span class="nota-badge {% if p.nota_final >= 70 %}alta{% elif p.nota_final >= 50 %}media{% else %}baja{% endif %}">
+                                {{ p.nota_final }}
+                            </span>
+                        </td>
+                        <td>
+                            {% if p.nota_final >= nota_aprobatoria %}
+                                <span class="badge badge-success">INGRESANTE</span>
+                            {% else %}
+                                <span class="badge badge-warning">NO INGRESÓ</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <button class="btn-icon" onclick="verDetalle('{{ p.postulante_id }}')" title="Ver detalle">
+                                👁️
+                            </button>
+                            <button class="btn-icon" onclick="verHoja('{{ p.hoja_id }}')" title="Ver hoja">
+                                📄
+                            </button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center text-muted">
+                            No hay datos de ranking disponibles
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Paginación -->
+        <div class="pagination-bar">
+            <span class="pagination-info">
+                Mostrando <strong id="showingCount">{{ ranking|length }}</strong> de <strong>{{ total_postulantes }}</strong> postulantes
+            </span>
+            
+            <div class="pagination-controls" id="paginationControls">
+                <button class="btn-page" onclick="cambiarPagina(-1)" id="btnPrev" disabled>
+                    ← Anterior
+                </button>
+                <span class="page-info">Página <span id="currentPage">1</span></span>
+                <button class="btn-page" onclick="cambiarPagina(1)" id="btnNext">
+                    Siguiente →
+                </button>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Modal de detalle -->
+<div id="modalDetalle" class="modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Detalle del Postulante</h3>
+            <button class="modal-close" onclick="cerrarModal()">×</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- Contenido dinámico -->
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .ranking-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+
+    .section-title {
+        font-size: 1.25rem;
+        margin-bottom: 24px;
+        text-align: center;
+    }
+
+    /* Podium */
+    .top-3-section {
+        margin-bottom: 32px;
+    }
+
+    .podium {
+        display: flex;
+        justify-content: center;
+        align-items: flex-end;
+        gap: 20px;
+        padding: 40px 20px;
+    }
+
+    .podium-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        width: 200px;
+    }
+
+    .podium-avatar {
+        width: 80px;
+        height: 80px;
+        background: var(--bg-card);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 2.5rem;
+        margin-bottom: 16px;
+        border: 3px solid var(--border-color);
+    }
+
+    .podium-item.primero .podium-avatar {
+        width: 100px;
+        height: 100px;
+        border-color: #fbbf24;
+        box-shadow: 0 0 30px rgba(251, 191, 36, 0.3);
+    }
+
+    .podium-info {
+        text-align: center;
+        margin-bottom: 16px;
+    }
+
+    .podium-rank {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .podium-info h4 {
+        font-size: 1rem;
+        margin: 4px 0;
+        max-width: 180px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .podium-info p {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    .podium-nota {
+        display: inline-block;
+        background: linear-gradient(135deg, var(--success), #059669);
+        padding: 6px 16px;
+        border-radius: 20px;
+        font-weight: 700;
+        font-size: 1.25rem;
+        margin-top: 8px;
+    }
+
+    .podium-base {
+        width: 100%;
+        border-radius: 8px 8px 0 0;
+    }
+
+    .podium-base.primero {
+        height: 120px;
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+    }
+
+    .podium-base.segundo {
+        height: 90px;
+        background: linear-gradient(135deg, #94a3b8, #64748b);
+    }
+
+    .podium-base.tercero {
+        height: 60px;
+        background: linear-gradient(135deg, #d97706, #b45309);
+    }
+
+    /* Filtros */
+    .filtros-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .filtros-left {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+    }
+
+    .filtros-right {
+        display: flex;
+        gap: 8px;
+    }
+
+    .search-box {
+        position: relative;
+    }
+
+    .search-box input {
+        width: 280px;
+        padding: 10px 16px 10px 42px;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+    }
+
+    .search-box input:focus {
+        outline: none;
+        border-color: var(--primary);
+    }
+
+    .search-icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+    }
+
+    .select-filtro {
+        padding: 10px 16px;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-primary);
+        font-size: 0.875rem;
+        cursor: pointer;
+    }
+
+    /* Stats mini */
+    .stats-mini {
+        display: flex;
+        gap: 32px;
+        padding: 16px 0;
+        margin-bottom: 20px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .stat-mini-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+    }
+
+    .stat-mini-value {
+        font-size: 1.5rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .stat-mini-label {
+        font-size: 0.75rem;
+        color: var(--text-muted);
+    }
+
+    /* Tabla */
+    .ranking-table th {
+        position: sticky;
+        top: 0;
+        background: var(--bg-dark);
+        z-index: 10;
+    }
+
+    .rank-number {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        font-weight: 600;
+        font-size: 0.8rem;
+        background: var(--bg-card-hover);
+    }
+
+    .rank-number.top-3 {
+        background: linear-gradient(135deg, #fbbf24, #f59e0b);
+        color: #1e1b4b;
+    }
+
+    .rank-number.top-10 {
+        background: linear-gradient(135deg, var(--primary), var(--primary-dark));
+        color: white;
+    }
+
+    .font-mono {
+        font-family: 'Consolas', monospace;
+    }
+
+    .postulante-cell {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .postulante-cell strong {
+        font-size: 0.875rem;
+    }
+
+    .postulante-cell span {
+        font-size: 0.8rem;
+        color: var(--text-muted);
+    }
+
+    .programa-tag {
+        display: inline-block;
+        padding: 4px 10px;
+        background: rgba(59, 130, 246, 0.15);
+        color: var(--primary);
+        border-radius: 6px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+
+    .correctas-badge {
+        font-weight: 600;
+        color: var(--text-secondary);
+    }
+
+    .nota-badge {
+        display: inline-block;
+        padding: 6px 14px;
+        border-radius: 8px;
+        font-weight: 700;
+    }
+
+    .nota-badge.alta {
+        background: rgba(16, 185, 129, 0.15);
+        color: var(--success);
+    }
+
+    .nota-badge.media {
+        background: rgba(245, 158, 11, 0.15);
+        color: var(--warning);
+    }
+
+    .nota-badge.baja {
+        background: rgba(239, 68, 68, 0.15);
+        color: var(--danger);
+    }
+
+    .btn-icon {
+        background: none;
+        border: none;
+        padding: 6px;
+        cursor: pointer;
+        font-size: 1rem;
+        border-radius: 6px;
+        transition: var(--transition);
+    }
+
+    .btn-icon:hover {
+        background: var(--bg-card-hover);
+    }
+
+    .text-center { text-align: center; }
+
+    /* Paginación */
+    .pagination-bar {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 20px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .pagination-info {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    .pagination-controls {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .btn-page {
+        padding: 8px 16px;
+        background: var(--bg-card-hover);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        color: var(--text-secondary);
+        cursor: pointer;
+        transition: var(--transition);
+    }
+
+    .btn-page:hover:not(:disabled) {
+        border-color: var(--primary);
+        color: var(--primary);
+    }
+
+    .btn-page:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+
+    .page-info {
+        font-size: 0.875rem;
+        color: var(--text-muted);
+    }
+
+    /* Modal */
+    .modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+    }
+
+    .modal-content {
+        background: var(--bg-card);
+        border-radius: var(--radius);
+        width: 90%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow: hidden;
+    }
+
+    .modal-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 20px 24px;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .modal-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: var(--text-muted);
+        cursor: pointer;
+    }
+
+    .modal-body {
+        padding: 24px;
+        overflow-y: auto;
+        max-height: calc(80vh - 70px);
+    }
+
+    @media (max-width: 768px) {
+        .podium {
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .podium-item {
+            width: 100%;
+            max-width: 250px;
+        }
+
+        .podium-base {
+            height: 40px !important;
+        }
+
+        .filtros-bar {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .filtros-left, .filtros-right {
+            width: 100%;
+        }
+
+        .search-box input {
+            width: 100%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    function filtrarTabla() {
+        const searchValue = document.getElementById('searchInput').value.toLowerCase();
+        const programaValue = document.getElementById('filtroPrograma').value;
+        const rows = document.querySelectorAll('#rankingBody tr');
+        
+        let visibleCount = 0;
+        
+        rows.forEach(row => {
+            const dni = row.cells[1]?.textContent.toLowerCase() || '';
+            const nombre = row.cells[3]?.textContent.toLowerCase() || '';
+            const programa = row.dataset.programa || '';
+            
+            const matchSearch = dni.includes(searchValue) || nombre.includes(searchValue);
+            const matchPrograma = !programaValue || programa === programaValue;
+            
+            if (matchSearch && matchPrograma) {
+                row.style.display = '';
+                visibleCount++;
+            } else {
+                row.style.display = 'none';
+            }
+        });
+        
+        document.getElementById('showingCount').textContent = visibleCount;
+    }
+    
+    function cambiarCantidad() {
+        const cantidad = document.getElementById('cantidadMostrar').value;
+        // Recargar con parámetro de cantidad
+        window.location.href = `/admin/ranking?limit=${cantidad}`;
+    }
+    
+    function exportarExcel() {
+        window.location.href = '/api/ranking/exportar/excel?proceso={{ proceso_actual }}';
+    }
+    
+    function exportarPDF() {
+        window.location.href = '/api/ranking/exportar/pdf?proceso={{ proceso_actual }}';
+    }
+    
+    function imprimirRanking() {
+        window.print();
+    }
+    
+    function verDetalle(postulanteId) {
+        document.getElementById('modalDetalle').style.display = 'flex';
+        document.getElementById('modalBody').innerHTML = '<p>Cargando...</p>';
+        
+        fetch(`/api/postulante/${postulanteId}/detalle`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('modalBody').innerHTML = `
+                    <div class="detalle-grid">
+                        <p><strong>DNI:</strong> ${data.dni}</p>
+                        <p><strong>Nombre:</strong> ${data.nombre_completo}</p>
+                        <p><strong>Programa:</strong> ${data.programa_educativo}</p>
+                        <p><strong>Código:</strong> ${data.codigo_unico}</p>
+                        <p><strong>Nota:</strong> ${data.nota_final}</p>
+                        <p><strong>Correctas:</strong> ${data.respuestas_correctas}/100</p>
+                    </div>
+                `;
+            })
+            .catch(err => {
+                document.getElementById('modalBody').innerHTML = '<p>Error al cargar datos</p>';
+            });
+    }
+    
+    function verHoja(hojaId) {
+        window.open(`/admin/hoja/${hojaId}`, '_blank');
+    }
+    
+    function cerrarModal() {
+        document.getElementById('modalDetalle').style.display = 'none';
+    }
+    
+    // Cerrar modal con ESC
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') cerrarModal();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Director | I.S.T. Pedro A. del Águila H.</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #f0f4f8;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
+            color: white;
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .header-left h1 { font-size: 1.5rem; margin-bottom: 4px; }
+        .header-left span { font-size: 0.85rem; opacity: 0.8; }
+        .header-right { display: flex; align-items: center; gap: 16px; }
+        
+        .user-badge {
+            background: rgba(255,255,255,0.15);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+        
+        .btn-logout {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.3);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 0.85rem;
+        }
+        
+        .container { max-width: 900px; margin: 0 auto; padding: 24px; }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+        
+        .card-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1e3a5f;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        
+        .stat-item {
+            background: #f8fafc;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+        }
+        
+        .stat-item .icon { font-size: 1.75rem; margin-bottom: 8px; }
+        .stat-item .value { font-size: 2rem; font-weight: 700; color: #1e3a5f; }
+        .stat-item .label { font-size: 0.8rem; color: #64748b; margin-top: 4px; }
+        
+        .proceso-status {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 14px;
+            background: #f8fafc;
+            border-radius: 10px;
+            border: 2px solid transparent;
+        }
+        
+        .status-item.completado { background: #f0fdf4; border-color: #86efac; }
+        .status-item.pendiente { background: #fffbeb; border-color: #fde68a; }
+        
+        .status-item .check {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1rem;
+        }
+        
+        .status-item.completado .check { background: #22c55e; color: white; }
+        .status-item.pendiente .check { background: #fbbf24; color: white; }
+        
+        .status-item .text h4 { font-size: 0.9rem; color: #1e3a5f; }
+        .status-item .text p { font-size: 0.75rem; color: #64748b; }
+        
+        .conformidad-section {
+            margin-top: 20px;
+            padding-top: 20px;
+            border-top: 2px solid #e2e8f0;
+        }
+        
+        .conformidad-options { display: flex; flex-direction: column; gap: 12px; }
+        
+        .conformidad-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .conformidad-option:hover { border-color: #3b82f6; background: #f8fafc; }
+        .conformidad-option.selected { border-color: #3b82f6; background: #eff6ff; }
+        .conformidad-option input[type="radio"] { width: 20px; height: 20px; margin-top: 2px; }
+        .conformidad-option .option-content h4 { font-size: 0.95rem; color: #1e3a5f; margin-bottom: 4px; }
+        .conformidad-option .option-content p { font-size: 0.8rem; color: #64748b; }
+        
+        .conformidad-option.success { border-left: 4px solid #22c55e; }
+        .conformidad-option.warning { border-left: 4px solid #fbbf24; }
+        .conformidad-option.danger { border-left: 4px solid #ef4444; }
+        .conformidad-option.info { border-left: 4px solid #3b82f6; }
+        
+        .observaciones-area { margin-top: 16px; display: none; }
+        .observaciones-area.show { display: block; }
+        .observaciones-area label { display: block; font-size: 0.9rem; font-weight: 500; margin-bottom: 8px; color: #1e3a5f; }
+        
+        .observaciones-area textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e2e8f0;
+            border-radius: 10px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+            min-height: 100px;
+        }
+        
+        .observaciones-area textarea:focus { outline: none; border-color: #3b82f6; }
+        
+        .actions-row { display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap; }
+        
+        .btn {
+            padding: 14px 24px;
+            border-radius: 10px;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); color: white; }
+        .btn-primary:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3); }
+        
+        .btn-success { background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: white; }
+        .btn-success:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(34, 197, 94, 0.3); }
+        
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        
+        .btn-outline { background: white; border: 2px solid #e2e8f0; color: #64748b; }
+        .btn-outline:hover { border-color: #3b82f6; color: #3b82f6; }
+        
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+        
+        .quick-action {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 16px;
+            background: #f8fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            text-decoration: none;
+            color: inherit;
+            transition: all 0.3s;
+        }
+        
+        .quick-action:hover { border-color: #3b82f6; background: #eff6ff; }
+        .quick-action .icon { font-size: 1.5rem; }
+        .quick-action h4 { font-size: 0.9rem; color: #1e3a5f; }
+        .quick-action p { font-size: 0.75rem; color: #64748b; }
+        
+        @media (max-width: 768px) {
+            .header { flex-direction: column; gap: 16px; text-align: center; }
+            .actions-row { flex-direction: column; }
+            .btn { width: 100%; justify-content: center; }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="header-left">
+            <h1>👔 Panel del Director</h1>
+            <span>I.S.T. Pedro A. del Águila H. | Proceso: {{ proceso_actual }}</span>
+        </div>
+        <div class="header-right">
+            <span class="user-badge">👤 {{ usuario.nombres }} {{ usuario.apellidos }}</span>
+            <a href="/admin/logout" class="btn-logout">🚪 Salir</a>
+        </div>
+    </header>
+    
+    <div class="container">
+        <div class="card">
+            <h3 class="card-title">📊 Resumen del Proceso</h3>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="icon">👥</div>
+                    <div class="value">{{ stats.total_postulantes or 0 }}</div>
+                    <div class="label">Postulantes</div>
+                </div>
+                <div class="stat-item">
+                    <div class="icon">📄</div>
+                    <div class="value">{{ stats.hojas_procesadas or 0 }}</div>
+                    <div class="label">Procesadas</div>
+                </div>
+                <div class="stat-item">
+                    <div class="icon">📊</div>
+                    <div class="value">{{ stats.promedio_nota or '-' }}</div>
+                    <div class="label">Promedio</div>
+                </div>
+                <div class="stat-item">
+                    <div class="icon">✅</div>
+                    <div class="value">{{ stats.aprobados or 0 }}</div>
+                    <div class="label">Aprobados</div>
+                </div>
+                <div class="stat-item">
+                    <div class="icon">🎯</div>
+                    <div class="value">{{ stats.total_vacantes or '-' }}</div>
+                    <div class="label">Vacantes</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="card-title">📋 Estado del Proceso</h3>
+            <div class="proceso-status">
+                <div class="status-item {{ 'completado' if stats.hojas_completas else 'pendiente' }}">
+                    <div class="check">{{ '✓' if stats.hojas_completas else '⏳' }}</div>
+                    <div class="text">
+                        <h4>Hojas Capturadas</h4>
+                        <p>{{ stats.hojas_procesadas or 0 }}/{{ stats.total_postulantes or 0 }}</p>
+                    </div>
+                </div>
+                
+                <div class="status-item {{ 'completado' if stats.gabarito_cargado else 'pendiente' }}">
+                    <div class="check">{{ '✓' if stats.gabarito_cargado else '⏳' }}</div>
+                    <div class="text">
+                        <h4>Gabarito</h4>
+                        <p>{{ 'Cargado' if stats.gabarito_cargado else 'Pendiente' }}</p>
+                    </div>
+                </div>
+                
+                <div class="status-item {{ 'completado' if stats.calificacion_ejecutada else 'pendiente' }}">
+                    <div class="check">{{ '✓' if stats.calificacion_ejecutada else '⏳' }}</div>
+                    <div class="text">
+                        <h4>Calificación</h4>
+                        <p>{{ 'Ejecutada' if stats.calificacion_ejecutada else 'Pendiente' }}</p>
+                    </div>
+                </div>
+                
+                <div class="status-item {{ 'completado' if stats.resultados_publicados else 'pendiente' }}">
+                    <div class="check">{{ '✓' if stats.resultados_publicados else '⏳' }}</div>
+                    <div class="text">
+                        <h4>Publicación</h4>
+                        <p>{{ 'Publicado' if stats.resultados_publicados else 'Pendiente' }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h3 class="card-title">✍️ Conformidad del Proceso</h3>
+            <p style="color: #64748b; font-size: 0.9rem; margin-bottom: 16px;">
+                Antes de publicar, indique el estado del proceso:
+            </p>
+            
+            <form id="formConformidad" action="/admin/director/conformidad" method="POST">
+                <div class="conformidad-options">
+                    <label class="conformidad-option success" onclick="selectOption(this, 'conforme_sin')">
+                        <input type="radio" name="conformidad" value="conforme_sin">
+                        <div class="option-content">
+                            <h4>✅ Conforme sin observaciones</h4>
+                            <p>Proceso correcto. Proceder con calificación y publicación.</p>
+                        </div>
+                    </label>
+                    
+                    <label class="conformidad-option warning" onclick="selectOption(this, 'conforme_con')">
+                        <input type="radio" name="conformidad" value="conforme_con">
+                        <div class="option-content">
+                            <h4>⚠️ Conforme con observaciones</h4>
+                            <p>Proceso válido con observaciones a registrar.</p>
+                        </div>
+                    </label>
+                    
+                    <label class="conformidad-option danger" onclick="selectOption(this, 'no_conforme')">
+                        <input type="radio" name="conformidad" value="no_conforme">
+                        <div class="option-content">
+                            <h4>❌ No Conforme</h4>
+                            <p>Irregularidades que impiden continuar.</p>
+                        </div>
+                    </label>
+                    
+                    <label class="conformidad-option danger" onclick="selectOption(this, 'anular')">
+                        <input type="radio" name="conformidad" value="anular">
+                        <div class="option-content">
+                            <h4>🚫 Anular Proceso</h4>
+                            <p>Hechos graves que anulan el proceso.</p>
+                        </div>
+                    </label>
+                    
+                    <label class="conformidad-option info" onclick="selectOption(this, 'suspenso')">
+                        <input type="radio" name="conformidad" value="suspenso">
+                        <div class="option-content">
+                            <h4>⏸️ Calificar y dejar en suspenso</h4>
+                            <p>Procesar pero mantener pendiente de revisión.</p>
+                        </div>
+                    </label>
+                </div>
+                
+                <div class="observaciones-area" id="areaObservaciones">
+                    <label>Detalle de observaciones / eventos:</label>
+                    <textarea name="observaciones" placeholder="Describa las observaciones..."></textarea>
+                </div>
+                
+                <div class="actions-row">
+                    <button type="button" class="btn btn-primary" id="btnCalificar" 
+                            onclick="ejecutarCalificacion()" 
+                            {{ 'disabled' if not stats.gabarito_cargado else '' }}>
+                        🎯 Ejecutar Calificación
+                    </button>
+                    
+                    <button type="button" class="btn btn-success" id="btnPublicar" 
+                            onclick="publicarResultados()"
+                            {{ 'disabled' if not stats.calificacion_ejecutada else '' }}>
+                        📢 Publicar Resultados
+                    </button>
+                    
+                    <button type="submit" class="btn btn-outline">
+                        💾 Guardar Conformidad
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <div class="card">
+            <h3 class="card-title">🔗 Accesos Rápidos</h3>
+            <div class="quick-actions">
+                <a href="/resultados" target="_blank" class="quick-action">
+                    <div class="icon">🏆</div>
+                    <div>
+                        <h4>Ver Ranking</h4>
+                        <p>Consultar posiciones</p>
+                    </div>
+                </a>
+                
+                <a href="/estadisticas" class="quick-action">
+                    <div class="icon">📈</div>
+                    <div>
+                        <h4>Estadísticas</h4>
+                        <p>Análisis detallado</p>
+                    </div>
+                </a>
+                
+                <a href="/registrar-gabarito" class="quick-action">
+                    <div class="icon">📝</div>
+                    <div>
+                        <h4>Ver Gabarito</h4>
+                        <p>Respuestas correctas</p>
+                    </div>
+                </a>
+                
+                <a href="/" class="quick-action">
+                    <div class="icon">🏠</div>
+                    <div>
+                        <h4>Sistema Principal</h4>
+                        <p>Dashboard operativo</p>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function selectOption(element, value) {
+            document.querySelectorAll('.conformidad-option').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            
+            const areaObs = document.getElementById('areaObservaciones');
+            if (value !== 'conforme_sin') {
+                areaObs.classList.add('show');
+            } else {
+                areaObs.classList.remove('show');
+            }
+        }
+        
+        async function ejecutarCalificacion() {
+            if (!confirm('¿Ejecutar la calificación de todas las hojas?')) return;
+            
+            const btn = document.getElementById('btnCalificar');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Procesando...';
+            
+            try {
+                const response = await fetch('/admin/api/calificacion/ejecutar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ proceso: '{{ proceso_actual }}' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Calificación ejecutada.\nCalificadas: ' + data.calificadas + '\nPromedio: ' + data.promedio);
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                    btn.disabled = false;
+                    btn.innerHTML = '🎯 Ejecutar Calificación';
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '🎯 Ejecutar Calificación';
+            }
+        }
+        
+        async function publicarResultados() {
+            const conformidad = document.querySelector('input[name="conformidad"]:checked');
+            
+            if (!conformidad) {
+                alert('⚠️ Seleccione una opción de conformidad.');
+                return;
+            }
+            
+            if (conformidad.value === 'anular' || conformidad.value === 'no_conforme') {
+                alert('❌ No puede publicar con esa conformidad.');
+                return;
+            }
+            
+            if (!confirm('¿PUBLICAR los resultados oficialmente?')) return;
+            
+            const btn = document.getElementById('btnPublicar');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Publicando...';
+            
+            try {
+                const response = await fetch('/admin/api/publicar', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        proceso: '{{ proceso_actual }}',
+                        conformidad: conformidad.value,
+                        observaciones: document.querySelector('textarea[name="observaciones"]').value
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    alert('✅ Resultados publicados.\nURL: ' + data.url);
+                    location.reload();
+                } else {
+                    alert('❌ Error: ' + data.error);
+                    btn.disabled = false;
+                    btn.innerHTML = '📢 Publicar Resultados';
+                }
+            } catch (error) {
+                alert('❌ Error: ' + error.message);
+                btn.disabled = false;
+                btn.innerHTML = '📢 Publicar Resultados';
+            }
+        }
+    </script>
+</body>
+</html>
