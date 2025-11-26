@@ -1,0 +1,594 @@
+<!-- 
+    Modal de Generación de Hojas por Aula
+    app/templates/components/modal_generar_hojas_aula.html
+-->
+
+<div id="modalGenerarHojasAula" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 800px;">
+        <div class="modal-header">
+            <h2>📦 Generar Hojas por Aula</h2>
+            <button class="modal-close" onclick="cerrarModalHojasAula()">✕</button>
+        </div>
+
+        <div class="modal-body">
+            
+            <!-- Indicadores -->
+            <div class="stats-row">
+                <div class="stat-box">
+                    <div class="stat-value" id="totalAulas">10</div>
+                    <div class="stat-label">Aulas Configuradas</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="totalAsignados">0</div>
+                    <div class="stat-label">Postulantes Asignados</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value" id="totalSinAsignar">0</div>
+                    <div class="stat-label">Sin Asignar</div>
+                </div>
+            </div>
+
+            <!-- Alerta si hay asignaciones incompletas -->
+            <div id="alertaIncompleto" class="alert-warning" style="display: none;">
+                <h4>⚠️ Asignaciones incompletas:</h4>
+                <p>- Postulantes sin asignar: <span id="alertaSinAsignar">0</span></p>
+                <p>Complete las asignaciones antes de generar hojas.</p>
+
+                <!-- BOTÓN DE ASIGNACIÓN AUTOMÁTICA -->
+                <button class="btn-asignar-auto" onclick="asignarAutomaticamente()" id="btnAsignarAuto">
+                    🎯 Asignar Automáticamente
+                </button>
+            </div>
+
+            <!-- Opciones de Generación -->
+            <div id="opcionesGeneracion" style="display: none;">
+                <h3 style="margin-bottom: 20px;">Seleccione una opción:</h3>
+
+                <div class="option-card" onclick="seleccionarOpcionTodas()">
+                    <div class="option-icon">📦</div>
+                    <div class="option-content">
+                        <h4>Generar Todas las Aulas</h4>
+                        <p>Genera un ZIP con PDFs de todas las aulas</p>
+                    </div>
+                    <div class="option-arrow">→</div>
+                </div>
+
+                <div class="option-card" onclick="seleccionarOpcionEspecifica()">
+                    <div class="option-icon">🏫</div>
+                    <div class="option-content">
+                        <h4>Seleccionar Aula Específica</h4>
+                        <p>Genera PDF de un aula individual</p>
+                    </div>
+                    <div class="option-arrow">→</div>
+                </div>
+            </div>
+
+            <!-- Lista de Aulas -->
+            <div id="listaAulas" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                    <h3>Seleccione un aula:</h3>
+                    <button class="btn-secondary" onclick="volverAOpciones()">← Volver</button>
+                </div>
+                
+                <div id="listaAulasContainer">
+                    <!-- Se llenará dinámicamente -->
+                </div>
+            </div>
+
+            <!-- Botón Cancelar -->
+            <div style="margin-top: 30px; text-align: center;">
+                <button class="btn-cancel" onclick="cerrarModalHojasAula()">Cancelar</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    padding: 20px;
+}
+
+.modal-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 20px;
+    width: 100%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+.modal-header {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    padding: 24px 30px;
+    border-radius: 18px 18px 0 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.modal-header h2 {
+    margin: 0;
+    color: white;
+    font-size: 1.5rem;
+}
+
+.modal-close {
+    background: rgba(255, 255, 255, 0.2);
+    border: none;
+    color: white;
+    font-size: 1.5rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.modal-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+    transform: rotate(90deg);
+}
+
+.modal-body {
+    padding: 30px;
+}
+
+/* Stats Row */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 30px;
+}
+
+.stat-box {
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+}
+
+.stat-value {
+    font-size: 2.5rem;
+    font-weight: bold;
+    color: #3b82f6;
+    line-height: 1;
+}
+
+.stat-label {
+    font-size: 0.85rem;
+    color: #94a3b8;
+    margin-top: 8px;
+}
+
+/* Alert */
+.alert-warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 2px solid rgba(245, 158, 11, 0.4);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.alert-warning h4 {
+    color: #f59e0b;
+    margin: 0 0 10px 0;
+}
+
+.alert-warning p {
+    color: #fbbf24;
+    margin: 5px 0;
+}
+
+/* Option Cards */
+.option-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.option-card:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    transform: translateX(8px);
+}
+
+.option-icon {
+    font-size: 3rem;
+    line-height: 1;
+}
+
+.option-content {
+    flex: 1;
+}
+
+.option-content h4 {
+    margin: 0 0 8px 0;
+    color: white;
+    font-size: 1.1rem;
+}
+
+.option-content p {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 0.9rem;
+}
+
+.option-arrow {
+    font-size: 2rem;
+    color: #3b82f6;
+    transition: transform 0.3s;
+}
+
+.option-card:hover .option-arrow {
+    transform: translateX(8px);
+}
+
+/* Aulas Grid */
+.aulas-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.aula-card {
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.aula-card:hover {
+    background: rgba(59, 130, 246, 0.1);
+    border-color: #3b82f6;
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
+}
+
+.aula-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.aula-codigo {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #3b82f6;
+}
+
+.aula-badge {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 4px 12px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.aula-nombre {
+    color: white;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+}
+
+.aula-ubicacion {
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+/* Buttons */
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-cancel {
+    background: transparent;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    color: white;
+    padding: 12px 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: all 0.3s;
+}
+
+.btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.4);
+}
+
+
+.btn-asignar-auto {
+    margin-top: 16px;
+    padding: 14px 24px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: bold;
+    cursor: pointer;
+    width: 100%;
+    font-size: 1rem;
+    transition: all 0.3s;
+}
+
+.btn-asignar-auto:hover {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(16, 185, 129, 0.4);
+}
+
+.btn-asignar-auto:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+}
+
+</style>
+
+<script>
+let aulasDisponibles = [];
+
+async function abrirModalHojasAula() {
+    document.getElementById('modalGenerarHojasAula').style.display = 'flex';
+    await verificarAsignaciones();
+}
+
+function cerrarModalHojasAula() {
+    document.getElementById('modalGenerarHojasAula').style.display = 'none';
+    
+    // Reset
+    document.getElementById('opcionesGeneracion').style.display = 'none';
+    document.getElementById('listaAulas').style.display = 'none';
+}
+
+async function verificarAsignaciones() {
+    try {
+        const response = await fetch('/api/verificar-asignaciones-completas?proceso=2025-2');
+        const data = await response.json();
+        
+        // Obtener total de aulas activas
+        const responseAulas = await fetch('/api/aulas-con-asignaciones?proceso=2025-2');
+        const dataAulas = await responseAulas.json();
+        
+        // Actualizar contadores
+        document.getElementById('totalAulas').textContent = dataAulas.total_aulas || 0;
+        document.getElementById('totalAsignados').textContent = data.total_asignados || 0;
+        document.getElementById('totalSinAsignar').textContent = data.sin_asignar || 0;
+        
+        // LÓGICA CORREGIDA: Mostrar alerta si hay sin asignar
+        const sinAsignar = data.sin_asignar || 0;
+        const alertaDiv = document.getElementById('alertaIncompleto');
+        const opcionesDiv = document.getElementById('opcionesGeneracion');
+        
+        if (sinAsignar > 0) {
+            // HAY POSTULANTES SIN ASIGNAR → Mostrar alerta con botón
+            alertaDiv.style.display = 'block';
+            document.getElementById('alertaSinAsignar').textContent = sinAsignar;
+            opcionesDiv.style.display = 'none';
+        } else {
+            // TODOS ASIGNADOS → Mostrar opciones de generación
+            alertaDiv.style.display = 'none';
+            opcionesDiv.style.display = 'block';
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar datos del modal');
+    }
+}
+
+async function asignarAutomaticamente() {
+    if (!confirm('¿Desea asignar automáticamente los postulantes a aulas?\n\nSe crearán las aulas necesarias.')) {
+        return;
+    }
+    
+    const btn = document.getElementById('btnAsignarAuto');
+    if (btn) {
+        const originalText = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Asignando...';
+    }
+    
+    try {
+        const response = await fetch('/api/asignar-postulantes-automatico', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proceso_admision: '2025-2',
+                capacidad_por_aula: 25
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error al asignar');
+        }
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(
+                `✅ Asignación completada\n\n` +
+                `📦 Aulas creadas: ${data.aulas_creadas}\n` +
+                `👥 Postulantes asignados: ${data.postulantes_asignados}\n` +
+                `⏳ Sin asignar: ${data.sin_asignar}`
+            );
+            
+            // Recargar datos del modal
+            await verificarAsignaciones();
+        } else {
+            throw new Error(data.message || 'Error desconocido');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al asignar:\n' + error.message);
+        
+        if (btn) {
+            btn.disabled = false;
+            btn.innerHTML = originalText;
+        }
+    }
+}
+
+
+async function seleccionarOpcionTodas() {
+    if (!confirm('¿Generar hojas para TODAS las aulas?\n\nSe generará un ZIP con todos los PDFs.')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/generar-todas-las-aulas', { method: 'POST' });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Generación completada\n\nAulas procesadas: ${data.total_aulas_procesadas}`);
+            cerrarModalHojasAula();
+        } else {
+            alert('❌ Error: ' + (data.mensaje || data.error));
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al generar hojas');
+    }
+}
+
+async function seleccionarOpcionEspecifica() {
+    try {
+        const response = await fetch('/api/aulas-con-asignaciones?proceso=2025-2');
+        const data = await response.json();
+        
+        if (data.success) {
+            aulasDisponibles = data.aulas;
+            mostrarListaAulas(data.aulas);
+        } else {
+            alert('Error al cargar aulas');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al cargar aulas');
+    }
+}
+
+function mostrarListaAulas(aulas) {
+    const container = document.getElementById('listaAulasContainer');
+    
+    if (aulas.length === 0) {
+        container.innerHTML = '<p style="text-align: center; color: #94a3b8;">No hay aulas con postulantes asignados</p>';
+        return;
+    }
+    
+    let html = '<div class="aulas-grid">';
+    
+    aulas.forEach(aula => {
+        html += `
+            <div class="aula-card" onclick="generarHojasAula(${aula.aula_id})">
+                <div class="aula-header">
+                    <span class="aula-codigo">${aula.codigo_aula}</span>
+                    <span class="aula-badge">${aula.postulantes_asignados} estudiantes</span>
+                </div>
+                <div class="aula-nombre">${aula.nombre}</div>
+                <div class="aula-ubicacion">📍 ${aula.edificio} - Piso ${aula.piso}</div>
+            </div>
+        `;
+    });
+    
+    html += '</div>';
+    container.innerHTML = html;
+    
+    document.getElementById('opcionesGeneracion').style.display = 'none';
+    document.getElementById('listaAulas').style.display = 'block';
+}
+
+function volverAOpciones() {
+    document.getElementById('listaAulas').style.display = 'none';
+    document.getElementById('opcionesGeneracion').style.display = 'block';
+}
+
+async function generarHojasAula(aulaId) {
+    try {
+        // VERIFICAR si ya tiene hojas generadas
+        const verificacionResponse = await fetch(`/api/verificar-hojas-aula/${aulaId}`);
+        const verificacion = await verificacionResponse.json();
+        
+        if (verificacion.hojas_generadas) {
+            // Ya tiene hojas - pedir confirmación
+            const aula = aulasDisponibles.find(a => a.aula_id === aulaId);
+            if (typeof abrirModalConfirmarRegeneracion === 'function') {
+                abrirModalConfirmarRegeneracion(aula, verificacion);
+            } else {
+                if (confirm(`Esta aula ya tiene ${verificacion.total_hojas} hojas generadas.\n\n¿Desea regenerarlas? Esto ANULARÁ las anteriores.`)) {
+                    await ejecutarGeneracionAula(aulaId);
+                }
+            }
+            return;
+        }
+        
+        // NO tiene hojas - generar directamente
+        await ejecutarGeneracionAula(aulaId);
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al generar hojas');
+    }
+}
+
+async function ejecutarGeneracionAula(aulaId) {
+    try {
+        const response = await fetch(`/api/generar-hojas-aula/${aulaId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Hojas generadas exitosamente\n\nAula: ${data.aula.codigo}\nTotal: ${data.total_postulantes} hojas`);
+            cerrarModalHojasAula();
+        } else {
+            alert('❌ Error: ' + (data.mensaje || data.message));
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('Error al generar hojas');
+    }
+}
+</script>

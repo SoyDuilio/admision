@@ -1,0 +1,597 @@
+<!-- 
+    Modal de Gestión de Asignaciones
+    app/templates/components/modal_gestion_asignaciones.html
+    
+    Permite:
+    - Ver estado del proceso
+    - Limpiar todo
+    - Limpiar por aula
+    - Regenerar hojas
+    - Limpiar hojas de un aula
+-->
+
+<div id="modalGestionAsignaciones" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 800px;">
+        
+        <!-- Header -->
+        <div class="modal-header">
+            <h2>🗑️ Gestión de Asignaciones</h2>
+            <button class="modal-close" onclick="cerrarModalGestion()">✕</button>
+        </div>
+
+        <div class="modal-body">
+            
+            <!-- Estado del proceso -->
+            <div class="estado-card">
+                <h3 style="margin-bottom: 16px; color: white;">📊 Estado Actual</h3>
+                <div id="estadoContent">
+                    <div style="text-align: center; padding: 20px; color: #94a3b8;">
+                        Cargando...
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modo desarrollo -->
+            <div class="modo-dev-toggle">
+                <label class="toggle-label">
+                    <input type="checkbox" id="modoDesarrollo">
+                    <span>⚡ Modo Desarrollo (ejecuta sin confirmaciones adicionales)</span>
+                </label>
+            </div>
+
+            <!-- Acciones -->
+            <div class="acciones-container">
+                <h3 style="margin-bottom: 16px; color: white;">⚙️ Acciones Disponibles</h3>
+                
+                <!-- Acción 1: Limpiar todo -->
+                <div class="accion-card danger">
+                    <div class="accion-header">
+                        <div class="accion-icon">🗑️</div>
+                        <div class="accion-info">
+                            <strong>Limpiar Todo el Proceso</strong>
+                            <p>Elimina todas las asignaciones, hojas generadas y logs. Los postulantes quedan disponibles para reasignar.</p>
+                        </div>
+                    </div>
+                    <button class="btn-action btn-danger" onclick="limpiarProcesoCompleto()">
+                        Ejecutar
+                    </button>
+                </div>
+
+                <!-- Acción 2: Limpiar por aula -->
+                <div class="accion-card warning">
+                    <div class="accion-header">
+                        <div class="accion-icon">📋</div>
+                        <div class="accion-info">
+                            <strong>Limpiar Aula Específica</strong>
+                            <p>Elimina solo la asignación de un aula. Los postulantes de esa aula quedan disponibles.</p>
+                        </div>
+                    </div>
+                    <div class="accion-controls">
+                        <select id="aulaLimpiar" class="select-aula">
+                            <option value="">Seleccionar aula...</option>
+                        </select>
+                        <button class="btn-action btn-warning" onclick="limpiarAula()">
+                            Ejecutar
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Acción 3: Regenerar hojas -->
+                <div class="accion-card info">
+                    <div class="accion-header">
+                        <div class="accion-icon">🔄</div>
+                        <div class="accion-info">
+                            <strong>Regenerar Solo Hojas (Mantener Asignaciones)</strong>
+                            <p>Elimina los PDFs generados pero mantiene las asignaciones. Útil si necesitas regenerar por error en impresión.</p>
+                        </div>
+                    </div>
+                    <button class="btn-action btn-info" onclick="regenerarHojas()">
+                        Ejecutar
+                    </button>
+                </div>
+
+                <!-- Acción 4: Limpiar hojas de un aula -->
+                <div class="accion-card info">
+                    <div class="accion-header">
+                        <div class="accion-icon">📄</div>
+                        <div class="accion-info">
+                            <strong>Limpiar Hojas de un Aula (Mantener Asignaciones)</strong>
+                            <p>Elimina solo los PDFs de un aula, las asignaciones permanecen. Útil para reimprimir solo esa aula.</p>
+                        </div>
+                    </div>
+                    <div class="accion-controls">
+                        <select id="aulaLimpiarHojas" class="select-aula">
+                            <option value="">Seleccionar aula...</option>
+                        </select>
+                        <button class="btn-action btn-info" onclick="limpiarHojasAula()">
+                            Ejecutar
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botón cerrar -->
+            <div style="text-align: center; margin-top: 24px;">
+                <button class="btn-secondary" onclick="cerrarModalGestion()">
+                    Cerrar
+                </button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+.estado-card {
+    background: rgba(59, 130, 246, 0.05);
+    border: 2px solid rgba(59, 130, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.estado-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 20px;
+}
+
+.estado-item {
+    text-align: center;
+    padding: 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+}
+
+.estado-item .label {
+    display: block;
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.estado-item .value {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #60a5fa;
+}
+
+.aulas-lista {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+    padding: 12px;
+    max-height: 150px;
+    overflow-y: auto;
+}
+
+.aula-item {
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 6px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.aula-item:last-child {
+    margin-bottom: 0;
+}
+
+.modo-dev-toggle {
+    background: rgba(245, 158, 11, 0.1);
+    border: 2px solid rgba(245, 158, 11, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 24px;
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    color: #fbbf24;
+    font-weight: 600;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.acciones-container {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.accion-card {
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.accion-card.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid rgba(239, 68, 68, 0.3);
+}
+
+.accion-card.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border: 2px solid rgba(245, 158, 11, 0.3);
+}
+
+.accion-card.info {
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.accion-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.accion-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.accion-info {
+    flex: 1;
+}
+
+.accion-info strong {
+    display: block;
+    color: white;
+    font-size: 1rem;
+    margin-bottom: 4px;
+}
+
+.accion-info p {
+    color: #94a3b8;
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.accion-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.select-aula {
+    flex: 1;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: white;
+    font-size: 0.95rem;
+}
+
+.select-aula option {
+    background: #1e293b;
+}
+
+.btn-action {
+    padding: 10px 24px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    white-space: nowrap;
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    transform: translateY(-2px);
+}
+
+.btn-warning {
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: white;
+}
+
+.btn-warning:hover {
+    background: linear-gradient(135deg, #d97706, #b45309);
+    transform: translateY(-2px);
+}
+
+.btn-info {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.btn-info:hover {
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    transform: translateY(-2px);
+}
+</style>
+
+<script>
+// ============================================================================
+// VARIABLES GLOBALES
+// ============================================================================
+
+let estadoProceso = null;
+let aulasDisponiblesGestion = [];
+
+// ============================================================================
+// ABRIR/CERRAR MODAL
+// ============================================================================
+
+async function abrirModalGestion() {
+    document.getElementById('modalGestionAsignaciones').style.display = 'flex';
+    await cargarEstadoProceso();
+}
+
+function cerrarModalGestion() {
+    document.getElementById('modalGestionAsignaciones').style.display = 'none';
+}
+
+// ============================================================================
+// CARGAR ESTADO
+// ============================================================================
+
+async function cargarEstadoProceso() {
+    try {
+        const response = await fetch('/api/estado-proceso?proceso=2025-2');
+        const data = await response.json();
+        
+        if (!data.success) {
+            throw new Error(data.message || 'Error al cargar estado');
+        }
+        
+        estadoProceso = data;
+        aulasDisponiblesGestion = data.aulas;
+        
+        renderizarEstado();
+        llenarSelectsAulas();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        document.getElementById('estadoContent').innerHTML = `
+            <div style="text-align: center; padding: 20px; color: #ef4444;">
+                Error al cargar estado: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function renderizarEstado() {
+    const html = `
+        <div class="estado-grid">
+            <div class="estado-item">
+                <span class="label">Postulantes</span>
+                <span class="value">${estadoProceso.resumen.total_postulantes}</span>
+            </div>
+            <div class="estado-item">
+                <span class="label">Asignados</span>
+                <span class="value">${estadoProceso.resumen.postulantes_asignados}</span>
+            </div>
+            <div class="estado-item">
+                <span class="label">Sin Asignar</span>
+                <span class="value">${estadoProceso.resumen.postulantes_sin_asignar}</span>
+            </div>
+            <div class="estado-item">
+                <span class="label">Hojas</span>
+                <span class="value">${estadoProceso.resumen.hojas_generadas}</span>
+            </div>
+            <div class="estado-item">
+                <span class="label">Aulas</span>
+                <span class="value">${estadoProceso.resumen.aulas_usadas}</span>
+            </div>
+            <div class="estado-item">
+                <span class="label">Logs</span>
+                <span class="value">${estadoProceso.resumen.logs_anulacion}</span>
+            </div>
+        </div>
+        
+        ${estadoProceso.aulas.length > 0 ? `
+            <div class="aulas-lista">
+                ${estadoProceso.aulas.map(aula => `
+                    <div class="aula-item">
+                        <span style="color: white; font-weight: 600;">${aula.codigo}</span>
+                        <span style="color: #94a3b8; font-size: 0.875rem;">${aula.asignados} estudiantes</span>
+                    </div>
+                `).join('')}
+            </div>
+        ` : ''}
+    `;
+    
+    document.getElementById('estadoContent').innerHTML = html;
+}
+
+function llenarSelectsAulas() {
+    const options = aulasDisponiblesGestion.map(aula => 
+        `<option value="${aula.aula_id}">${aula.codigo} (${aula.asignados} estudiantes)</option>`
+    ).join('');
+    
+    document.getElementById('aulaLimpiar').innerHTML = '<option value="">Seleccionar aula...</option>' + options;
+    document.getElementById('aulaLimpiarHojas').innerHTML = '<option value="">Seleccionar aula...</option>' + options;
+}
+
+// ============================================================================
+// ACCIONES
+// ============================================================================
+
+async function limpiarProcesoCompleto() {
+    const modoDev = document.getElementById('modoDesarrollo').checked;
+    
+    if (!modoDev) {
+        if (!confirm(
+            '⚠️ ADVERTENCIA\n\n' +
+            'Esto eliminará TODA la información del proceso 2025-2:\n\n' +
+            `• ${estadoProceso.resumen.postulantes_asignados} asignaciones\n` +
+            `• ${estadoProceso.resumen.hojas_generadas} hojas generadas\n` +
+            `• ${estadoProceso.resumen.logs_anulacion} logs\n\n` +
+            '¿Está completamente seguro?'
+        )) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/limpiar-proceso-completo', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                proceso_admision: '2025-2',
+                confirmar: true,
+                modo_desarrollo: modoDev
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ Proceso limpiado exitosamente\n\nEliminados:\n• ${data.eliminados.asignaciones} asignaciones\n• ${data.eliminados.hojas} hojas\n• ${data.eliminados.logs} logs`);
+            await cargarEstadoProceso();
+        } else {
+            throw new Error(data.message || 'Error al limpiar');
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+async function limpiarAula() {
+    const aulaId = document.getElementById('aulaLimpiar').value;
+    
+    if (!aulaId) {
+        alert('Debe seleccionar un aula');
+        return;
+    }
+    
+    const aula = aulasDisponiblesGestion.find(a => a.aula_id == aulaId);
+    const modoDev = document.getElementById('modoDesarrollo').checked;
+    
+    if (!modoDev) {
+        if (!confirm(`¿Limpiar aula ${aula.codigo}?\n\nSe eliminarán ${aula.asignados} asignaciones y hojas.`)) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/limpiar-aula', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                aula_id: parseInt(aulaId),
+                proceso_admision: '2025-2',
+                confirmar: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ ${data.message}\n\n${data.eliminados} postulantes liberados`);
+            await cargarEstadoProceso();
+        } else {
+            throw new Error(data.message);
+        }
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+async function regenerarHojas() {
+    const modoDev = document.getElementById('modoDesarrollo').checked;
+    
+    if (!modoDev) {
+        if (!confirm(
+            'Regenerar hojas?\n\n' +
+            `Se eliminarán ${estadoProceso.resumen.hojas_generadas} hojas.\n` +
+            'Las asignaciones se mantendrán intactas.\n\n' +
+            'Después podrá ejecutar la generación nuevamente.'
+        )) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/regenerar-hojas', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                proceso_admision: '2025-2',
+                confirmar: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ ${data.message}\n\n${data.nota}`);
+            await cargarEstadoProceso();
+        } else {
+            throw new Error(data.message);
+        }
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+
+async function limpiarHojasAula() {
+    const aulaId = document.getElementById('aulaLimpiarHojas').value;
+    
+    if (!aulaId) {
+        alert('Debe seleccionar un aula');
+        return;
+    }
+    
+    const aula = aulasDisponiblesGestion.find(a => a.aula_id == aulaId);
+    const modoDev = document.getElementById('modoDesarrollo').checked;
+    
+    if (!modoDev) {
+        if (!confirm(`¿Limpiar hojas del aula ${aula.codigo}?\n\nLas asignaciones se mantendrán.`)) {
+            return;
+        }
+    }
+    
+    try {
+        const response = await fetch('/api/limpiar-hojas-aula', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                aula_id: parseInt(aulaId),
+                proceso_admision: '2025-2',
+                confirmar: true
+            })
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`✅ ${data.message}\n\n${data.nota}`);
+            await cargarEstadoProceso();
+        } else {
+            throw new Error(data.message);
+        }
+        
+    } catch (error) {
+        alert('❌ Error: ' + error.message);
+    }
+}
+</script>

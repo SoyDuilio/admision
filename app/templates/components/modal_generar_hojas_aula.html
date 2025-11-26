@@ -1,78 +1,187 @@
 <!-- 
-    Modal de Generación de Hojas por Aula
-    app/templates/components/modal_generar_hojas_aula.html
+    Modal Multi-Paso: Generación de Hojas por Aula
+    app/templates/components/modal_asignacion_aulas.html
+    
+    FLUJO:
+    1. Seleccionar aulas + cantidad de estudiantes por aula
+    2. Asignar profesor a cada aula seleccionada
+    3. Confirmar → Genera asignaciones + PDFs automáticamente
 -->
 
-<div id="modalGenerarHojasAula" class="modal-overlay" style="display: none;">
-    <div class="modal-container" style="max-width: 800px;">
+<div id="modalAsignacionAulas" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 900px;">
+        
+        <!-- Header -->
         <div class="modal-header">
-            <h2>📦 Generar Hojas por Aula</h2>
-            <button class="modal-close" onclick="cerrarModalHojasAula()">✕</button>
+            <h2 id="modalTitulo">📦 Paso 1: Seleccionar Aulas</h2>
+            <button class="modal-close" onclick="cerrarModalAsignacion()">✕</button>
         </div>
 
         <div class="modal-body">
             
-            <!-- Indicadores -->
-            <div class="stats-row">
-                <div class="stat-box">
-                    <div class="stat-value" id="totalAulas">10</div>
-                    <div class="stat-label">Aulas Configuradas</div>
+            <!-- Progress Bar -->
+            <div class="progress-steps">
+                <div class="step active" id="stepIndicator1">
+                    <div class="step-number">1</div>
+                    <div class="step-label">Aulas</div>
                 </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="totalAsignados">0</div>
-                    <div class="stat-label">Postulantes Asignados</div>
-                </div>
-                <div class="stat-box">
-                    <div class="stat-value" id="totalSinAsignar">0</div>
-                    <div class="stat-label">Sin Asignar</div>
+                <div class="step-divider"></div>
+                <div class="step" id="stepIndicator2">
+                    <div class="step-number">2</div>
+                    <div class="step-label">Profesores</div>
                 </div>
             </div>
 
-            <!-- Alerta si hay asignaciones incompletas -->
-            <div id="alertaIncompleto" class="alert-warning" style="display: none;">
-                <h4>⚠️ Asignaciones incompletas:</h4>
-                <p>- Postulantes sin asignar: <span id="alertaSinAsignar">0</span></p>
-                <p>Complete las asignaciones antes de generar hojas.</p>
+            <!-- Info de postulantes -->
+            <div class="info-banner">
+                <strong>Total de postulantes sin asignar:</strong> 
+                <span id="totalDisponibles">112</span>
             </div>
 
-            <!-- Opciones de Generación -->
-            <div id="opcionesGeneracion" style="display: none;">
-                <h3 style="margin-bottom: 20px;">Seleccione una opción:</h3>
-
-                <div class="option-card" onclick="seleccionarOpcionTodas()">
-                    <div class="option-icon">📦</div>
-                    <div class="option-content">
-                        <h4>Generar Todas las Aulas</h4>
-                        <p>Genera un ZIP con PDFs de todas las aulas</p>
-                    </div>
-                    <div class="option-arrow">→</div>
-                </div>
-
-                <div class="option-card" onclick="seleccionarOpcionEspecifica()">
-                    <div class="option-icon">🏫</div>
-                    <div class="option-content">
-                        <h4>Seleccionar Aula Específica</h4>
-                        <p>Genera PDF de un aula individual</p>
-                    </div>
-                    <div class="option-arrow">→</div>
-                </div>
-            </div>
-
-            <!-- Lista de Aulas -->
-            <div id="listaAulas" style="display: none;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                    <h3>Seleccione un aula:</h3>
-                    <button class="btn-secondary" onclick="volverAOpciones()">← Volver</button>
-                </div>
+            <!-- ============================================ -->
+            <!-- PASO 1: SELECCIÓN DE AULAS -->
+            <!-- ============================================ -->
+            <div id="paso1Container" style="display: block;">
                 
-                <div id="listaAulasContainer">
-                    <!-- Se llenará dinámicamente -->
+                <!-- Filtros y búsqueda -->
+                <div class="search-filters">
+                    <input type="text" 
+                           id="searchAulas" 
+                           class="search-input" 
+                           placeholder="🔍 Buscar aula..."
+                           onkeyup="filtrarAulas()">
+                    
+                    <button class="btn-select-all" onclick="seleccionarTodasAulas()">
+                        ☑️ Seleccionar Todas
+                    </button>
+                    
+                    <button class="btn-deselect-all" onclick="deseleccionarTodasAulas()">
+                        ☐ Deseleccionar Todas
+                    </button>
+                </div>
+
+                <!-- Tabla compacta de aulas -->
+                <div class="aulas-table-container">
+                    <table class="aulas-table">
+                        <thead>
+                            <tr>
+                                <th style="width: 60px;">
+                                    <input type="checkbox" id="checkboxAll" onchange="toggleTodasAulas()">
+                                </th>
+                                <th>Código</th>
+                                <th>Capacidad</th>
+                                <th style="width: 120px;">Cantidad</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaTodyAulas">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Modo de Generación -->
+                <div class="modo-generacion-selector" style="margin-top: 20px; margin-bottom: 20px;">
+                    <h4 style="color: white; margin-bottom: 12px; font-size: 1rem;">
+                        📦 Modo de Generación
+                    </h4>
+                    <div class="radio-group-horizontal">
+                        <label class="radio-card">
+                            <input type="radio" name="modoGeneracion" value="unico" checked>
+                            <div class="radio-content">
+                                <div class="radio-icon">📦</div>
+                                <div class="radio-label">
+                                    <strong>ZIP Único</strong>
+                                    <span>Un archivo con todas las aulas organizadas en carpetas</span>
+                                </div>
+                            </div>
+                        </label>
+                        <label class="radio-card">
+                            <input type="radio" name="modoGeneracion" value="individual">
+                            <div class="radio-content">
+                                <div class="radio-icon">📁</div>
+                                <div class="radio-label">
+                                    <strong>ZIP por Aula</strong>
+                                    <span>Un archivo ZIP independiente para cada aula</span>
+                                </div>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- FIN DEL BLOQUE A AGREGAR -->
+
+                <!-- Resumen -->
+                <div class="resumen-seleccion">
+                    <div class="resumen-item">
+                        <span>Aulas</span>
+                        <strong id="aulasSeleccionadasCount">0</strong>
+                    </div>
+                    <div class="resumen-item">
+                        <span>Total</span>
+                        <strong id="totalAsignarCount">0</strong>
+                    </div>
+                    <div class="resumen-item" id="resumenRestante">
+                        <span>Faltantes</span>
+                        <strong id="faltantesCount">112</strong>
+                    </div>
+                </div>
+
+                <!-- Botones Paso 1 -->
+                <div class="modal-actions">
+                    <button class="btn-cancel" onclick="cerrarModalAsignacion()">
+                        Cancelar
+                    </button>
+                    <button class="btn-primary" id="btnSiguientePaso1" onclick="irAPaso2()" disabled>
+                        Siguiente: Asignar Profesores →
+                    </button>
                 </div>
             </div>
 
-            <!-- Botón Cancelar -->
-            <div style="margin-top: 30px; text-align: center;">
-                <button class="btn-cancel" onclick="cerrarModalHojasAula()">Cancelar</button>
+            <!-- ============================================ -->
+            <!-- PASO 2: ASIGNACIÓN DE PROFESORES -->
+            <!-- ============================================ -->
+            <div id="paso2Container" style="display: none;">
+                
+                <!-- Tabla de asignación de profesores -->
+                <div class="profesores-table-container">
+                    <table class="profesores-table">
+                        <thead>
+                            <tr>
+                                <th>Aula</th>
+                                <th>Estudiantes</th>
+                                <th style="width: 50%;">Profesor</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tablaBodyProfesores">
+                            <!-- Se llena dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Botones Paso 2 -->
+                <div class="modal-actions">
+                    <button class="btn-secondary" onclick="volverAPaso1()">
+                        ← Atrás
+                    </button>
+                    <button class="btn-primary" id="btnConfirmarAsignacion" onclick="confirmarYGenerar()">
+                        ✓ Confirmar y Generar Hojas
+                    </button>
+                </div>
+            </div>
+
+            <!-- ============================================ -->
+            <!-- PASO 3: PROCESANDO (LOADING) -->
+            <!-- ============================================ -->
+            <div id="paso3Container" style="display: none; text-align: center; padding: 60px 20px;">
+                <div class="spinner-large"></div>
+                <h3 style="margin-top: 20px; color: white;">Generando hojas...</h3>
+                <p style="color: #94a3b8; margin-top: 10px;">
+                    Esto puede tomar unos minutos.<br>
+                    Por favor no cierre esta ventana.
+                </p>
+                <div class="progress-text" id="progressText">
+                    Procesando asignaciones...
+                </div>
             </div>
 
         </div>
@@ -80,228 +189,324 @@
 </div>
 
 <style>
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.85);
-    backdrop-filter: blur(8px);
+/* Progress Steps */
+.progress-steps {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 9999;
+    margin-bottom: 30px;
     padding: 20px;
 }
 
-.modal-container {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border: 2px solid rgba(59, 130, 246, 0.3);
-    border-radius: 20px;
-    width: 100%;
-    max-height: 90vh;
-    overflow-y: auto;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
-}
-
-.modal-header {
-    background: linear-gradient(135deg, #3b82f6, #2563eb);
-    padding: 24px 30px;
-    border-radius: 18px 18px 0 0;
+.step {
     display: flex;
-    justify-content: space-between;
+    flex-direction: column;
     align-items: center;
+    gap: 8px;
 }
 
-.modal-header h2 {
-    margin: 0;
-    color: white;
-    font-size: 1.5rem;
-}
-
-.modal-close {
-    background: rgba(255, 255, 255, 0.2);
-    border: none;
-    color: white;
-    font-size: 1.5rem;
+.step-number {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    cursor: pointer;
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #94a3b8;
+    font-weight: bold;
+    font-size: 1.1rem;
     transition: all 0.3s;
 }
 
-.modal-close:hover {
-    background: rgba(255, 255, 255, 0.3);
-    transform: rotate(90deg);
+.step.active .step-number {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    border-color: #3b82f6;
+    color: white;
+    box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
 }
 
-.modal-body {
-    padding: 30px;
+.step-label {
+    font-size: 0.875rem;
+    color: #94a3b8;
+    font-weight: 600;
 }
 
-/* Stats Row */
-.stats-row {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 16px;
-    margin-bottom: 30px;
+.step.active .step-label {
+    color: white;
 }
 
-.stat-box {
+.step-divider {
+    width: 100px;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.2);
+    margin: 0 20px;
+}
+
+/* Info Banner */
+.info-banner {
     background: rgba(59, 130, 246, 0.1);
     border: 2px solid rgba(59, 130, 246, 0.3);
     border-radius: 12px;
-    padding: 20px;
-    text-align: center;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    color: #60a5fa;
+    font-size: 1rem;
 }
 
-.stat-value {
-    font-size: 2.5rem;
-    font-weight: bold;
-    color: #3b82f6;
-    line-height: 1;
-}
-
-.stat-label {
-    font-size: 0.85rem;
-    color: #94a3b8;
-    margin-top: 8px;
-}
-
-/* Alert */
-.alert-warning {
-    background: rgba(245, 158, 11, 0.1);
-    border: 2px solid rgba(245, 158, 11, 0.4);
-    border-radius: 12px;
-    padding: 20px;
+/* Búsqueda y filtros */
+.search-filters {
+    display: flex;
+    gap: 12px;
     margin-bottom: 20px;
 }
 
-.alert-warning h4 {
-    color: #f59e0b;
-    margin: 0 0 10px 0;
-}
-
-.alert-warning p {
-    color: #fbbf24;
-    margin: 5px 0;
-}
-
-/* Option Cards */
-.option-card {
-    background: rgba(255, 255, 255, 0.05);
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
-    cursor: pointer;
-    transition: all 0.3s;
-}
-
-.option-card:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: #3b82f6;
-    transform: translateX(8px);
-}
-
-.option-icon {
-    font-size: 3rem;
-    line-height: 1;
-}
-
-.option-content {
+.search-input {
     flex: 1;
-}
-
-.option-content h4 {
-    margin: 0 0 8px 0;
-    color: white;
-    font-size: 1.1rem;
-}
-
-.option-content p {
-    margin: 0;
-    color: #94a3b8;
-    font-size: 0.9rem;
-}
-
-.option-arrow {
-    font-size: 2rem;
-    color: #3b82f6;
-    transition: transform 0.3s;
-}
-
-.option-card:hover .option-arrow {
-    transform: translateX(8px);
-}
-
-/* Aulas Grid */
-.aulas-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 16px;
-}
-
-.aula-card {
-    background: rgba(255, 255, 255, 0.05);
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
     border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
-    padding: 20px;
+    border-radius: 8px;
+    color: white;
+    font-size: 0.95rem;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+.btn-select-all,
+.btn-deselect-all {
+    padding: 12px 20px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 8px;
+    color: #60a5fa;
     cursor: pointer;
+    font-size: 0.875rem;
+    font-weight: 600;
+    white-space: nowrap;
     transition: all 0.3s;
 }
 
-.aula-card:hover {
+.btn-select-all:hover,
+.btn-deselect-all:hover {
+    background: rgba(59, 130, 246, 0.2);
+}
+
+/* Tabla de aulas */
+.aulas-table-container {
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.aulas-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.aulas-table thead {
+    position: sticky;
+    top: 0;
+    background: rgba(59, 130, 246, 0.15);
+    z-index: 10;
+}
+
+.aulas-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #60a5fa;
+    text-transform: uppercase;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.3);
+}
+
+.aulas-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.2s;
+}
+
+.aulas-table tbody tr:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.aulas-table tbody tr.selected {
     background: rgba(59, 130, 246, 0.1);
-    border-color: #3b82f6;
-    transform: translateY(-4px);
-    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.3);
 }
 
-.aula-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 12px;
+.aulas-table td {
+    padding: 12px 16px;
+    color: white;
+    font-size: 0.95rem;
 }
 
-.aula-codigo {
-    font-size: 1.2rem;
-    font-weight: bold;
-    color: #3b82f6;
+.aulas-table input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
 }
 
-.aula-badge {
+.aulas-table input[type="number"] {
+    width: 80px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    color: white;
+    text-align: center;
+    font-weight: 600;
+    font-size: 1rem;
+}
+
+.aulas-table input[type="number"]:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+/* Resumen de Selección */
+.resumen-seleccion {
+    background: rgba(16, 185, 129, 0.1);
+    border: 2px solid rgba(16, 185, 129, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 24px 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+}
+
+.resumen-seleccion.warning {
+    background: rgba(245, 158, 11, 0.1);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.resumen-item {
+    text-align: center;
+}
+
+.resumen-item span {
+    display: block;
+    font-size: 0.875rem;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.resumen-item strong {
+    font-size: 2rem;
+    color: #10b981;
+}
+
+.resumen-seleccion.warning .resumen-item strong {
+    color: #f59e0b;
+}
+
+/* Tabla de profesores - Paso 2 */
+.profesores-table-container {
+    max-height: 450px;
+    overflow-y: auto;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    margin-bottom: 20px;
+}
+
+.profesores-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.profesores-table thead {
+    position: sticky;
+    top: 0;
+    background: rgba(139, 92, 246, 0.15);
+    z-index: 10;
+}
+
+.profesores-table th {
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 0.875rem;
+    font-weight: 700;
+    color: #a78bfa;
+    text-transform: uppercase;
+    border-bottom: 2px solid rgba(139, 92, 246, 0.3);
+}
+
+.profesores-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.profesores-table td {
+    padding: 16px;
+    color: white;
+}
+
+.profesor-select {
+    width: 100%;
+    padding: 10px 12px;
+    border-radius: 8px;
+    border: 2px solid rgba(139, 92, 246, 0.3);
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 0.95rem;
+    cursor: pointer;
+}
+
+.profesor-select option {
+    background: #1e293b;
+    color: white;
+    padding: 10px;
+}
+
+.cantidad-badge {
+    display: inline-block;
     background: rgba(59, 130, 246, 0.2);
     color: #60a5fa;
     padding: 4px 12px;
     border-radius: 12px;
-    font-size: 0.75rem;
+    font-size: 0.875rem;
     font-weight: 600;
 }
 
-.aula-nombre {
-    color: white;
+/* Spinner Loading */
+.spinner-large {
+    width: 60px;
+    height: 60px;
+    border: 4px solid rgba(59, 130, 246, 0.2);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin: 0 auto;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.progress-text {
+    margin-top: 20px;
+    color: #60a5fa;
     font-size: 0.95rem;
-    margin-bottom: 8px;
 }
 
-.aula-ubicacion {
-    color: #94a3b8;
-    font-size: 0.85rem;
+/* Modal Actions */
+.modal-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 30px;
+    justify-content: flex-end;
 }
 
-/* Buttons */
 .btn-secondary {
     background: rgba(255, 255, 255, 0.1);
     border: 2px solid rgba(255, 255, 255, 0.2);
     color: white;
-    padding: 10px 20px;
+    padding: 12px 24px;
     border-radius: 8px;
     cursor: pointer;
     font-weight: 600;
@@ -310,184 +515,658 @@
 
 .btn-secondary:hover {
     background: rgba(255, 255, 255, 0.15);
-    border-color: rgba(255, 255, 255, 0.3);
 }
 
-.btn-cancel {
-    background: transparent;
-    border: 2px solid rgba(255, 255, 255, 0.3);
+.btn-primary {
+    background: linear-gradient(135deg, #10b981, #059669);
     color: white;
+    border: none;
     padding: 12px 32px;
     border-radius: 8px;
     cursor: pointer;
-    font-weight: 600;
+    font-weight: 700;
     transition: all 0.3s;
 }
 
-.btn-cancel:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.4);
+.btn-primary:hover:not(:disabled) {
+    background: linear-gradient(135deg, #059669, #047857);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(16, 185, 129, 0.4);
 }
+
+.btn-primary:disabled {
+    background: #6b7280;
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* MODO DE GENERACION DE ARCHIVOS CON HOJAS */
+/* AGREGAR AL FINAL DE LA SECCIÓN <style> */
+
+.modo-generacion-selector {
+    background: rgba(139, 92, 246, 0.05);
+    border: 2px solid rgba(139, 92, 246, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.radio-group-horizontal {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+}
+
+.radio-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.radio-card:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(139, 92, 246, 0.4);
+}
+
+.radio-card input[type="radio"] {
+    display: none;
+}
+
+.radio-card input[type="radio"]:checked + .radio-content {
+    border-color: #8b5cf6;
+}
+
+.radio-card input[type="radio"]:checked + .radio-content .radio-icon {
+    background: rgba(139, 92, 246, 0.2);
+    color: #a78bfa;
+}
+
+.radio-content {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border: 2px solid transparent;
+    border-radius: 8px;
+    padding: 8px;
+    transition: all 0.3s;
+}
+
+.radio-icon {
+    font-size: 2rem;
+    width: 50px;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    transition: all 0.3s;
+}
+
+.radio-label {
+    flex: 1;
+}
+
+.radio-label strong {
+    display: block;
+    color: white;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.radio-label span {
+    display: block;
+    color: #94a3b8;
+    font-size: 0.8rem;
+    line-height: 1.4;
+}
+
 </style>
 
 <script>
+// ============================================================================
+// VARIABLES GLOBALES
+// ============================================================================
+
 let aulasDisponibles = [];
+let profesoresDisponibles = [];
+let aulasSeleccionadas = {}; // { aula_id: cantidad }
+let profesoresAsignados = {}; // { aula_id: profesor_id }
+let totalPostulantesSinAsignar = 0;
+
+// ============================================================================
+// ABRIR MODAL
+// ============================================================================
 
 async function abrirModalHojasAula() {
-    document.getElementById('modalGenerarHojasAula').style.display = 'flex';
-    await verificarAsignaciones();
+    document.getElementById('modalAsignacionAulas').style.display = 'flex';
+    
+    // Cargar datos
+    await cargarDatosIniciales();
+    
+    // Mostrar paso 1
+    mostrarPaso(1);
 }
 
-function cerrarModalHojasAula() {
-    document.getElementById('modalGenerarHojasAula').style.display = 'none';
+function cerrarModalAsignacion() {
+    document.getElementById('modalAsignacionAulas').style.display = 'none';
     
     // Reset
-    document.getElementById('opcionesGeneracion').style.display = 'none';
-    document.getElementById('listaAulas').style.display = 'none';
+    aulasSeleccionadas = {};
+    profesoresAsignados = {};
+    mostrarPaso(1);
 }
 
-async function verificarAsignaciones() {
+// ============================================================================
+// CARGAR DATOS
+// ============================================================================
+
+async function cargarDatosIniciales() {
     try {
-        const response = await fetch('/api/verificar-asignaciones-completas?proceso=2025-2');
-        const data = await response.json();
+        // Obtener postulantes sin asignar
+        const responseVerif = await fetch('/api/verificar-asignaciones-completas?proceso=2025-2');
+        const dataVerif = await responseVerif.json();
+        totalPostulantesSinAsignar = dataVerif.sin_asignar || 0;
         
-        // Actualizar contadores
-        document.getElementById('totalAulas').textContent = 10;
-        document.getElementById('totalAsignados').textContent = data.total_asignados || 0;
-        document.getElementById('totalSinAsignar').textContent = data.sin_asignar || 0;
+        document.getElementById('totalDisponibles').textContent = totalPostulantesSinAsignar;
+        document.getElementById('faltantesCount').textContent = totalPostulantesSinAsignar;
         
-        if (!data.puede_generar_hojas) {
-            document.getElementById('alertaIncompleto').style.display = 'block';
-            document.getElementById('alertaSinAsignar').textContent = data.sin_asignar || 0;
-            document.getElementById('opcionesGeneracion').style.display = 'none';
-        } else {
-            document.getElementById('alertaIncompleto').style.display = 'none';
-            document.getElementById('opcionesGeneracion').style.display = 'block';
-        }
+        // Obtener aulas
+        const responseAulas = await fetch('/api/aulas');
+        const dataAulas = await responseAulas.json();
+        aulasDisponibles = dataAulas.aulas || [];
+        
+        // Obtener profesores
+        const responseProfes = await fetch('/api/profesores');
+        const dataProfes = await responseProfes.json();
+        profesoresDisponibles = dataProfes.profesores || [];
+        
+        renderizarAulasSeleccion();
         
     } catch (error) {
-        console.error('Error:', error);
+        console.error('Error al cargar datos:', error);
+        alert('Error al cargar datos iniciales');
     }
 }
 
-async function seleccionarOpcionTodas() {
-    if (!confirm('¿Generar hojas para TODAS las aulas?\n\nSe generará un ZIP con todos los PDFs.')) {
+// ============================================================================
+// PASO 1: SELECCIÓN DE AULAS
+// ============================================================================
+
+function renderizarAulasSeleccion() {
+    const tbody = document.getElementById('tablaTodyAulas');
+    
+    if (aulasDisponibles.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="4" style="text-align: center; padding: 40px; color: #94a3b8;">
+                    No hay aulas configuradas
+                </td>
+            </tr>
+        `;
         return;
     }
     
-    try {
-        const response = await fetch('/api/generar-todas-las-aulas', { method: 'POST' });
-        const data = await response.json();
-        
-        if (data.success) {
-            alert(`✅ Generación completada\n\nAulas procesadas: ${data.total_aulas_procesadas}`);
-            cerrarModalHojasAula();
-        } else {
-            alert('❌ Error: ' + (data.mensaje || data.error));
-        }
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al generar hojas');
-    }
-}
-
-async function seleccionarOpcionEspecifica() {
-    try {
-        const response = await fetch('/api/aulas-con-asignaciones?proceso=2025-2');
-        const data = await response.json();
-        
-        if (data.success) {
-            aulasDisponibles = data.aulas;
-            mostrarListaAulas(data.aulas);
-        } else {
-            alert('Error al cargar aulas');
-        }
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al cargar aulas');
-    }
-}
-
-function mostrarListaAulas(aulas) {
-    const container = document.getElementById('listaAulasContainer');
+    let html = '';
     
-    if (aulas.length === 0) {
-        container.innerHTML = '<p style="text-align: center; color: #94a3b8;">No hay aulas con postulantes asignados</p>';
-        return;
-    }
-    
-    let html = '<div class="aulas-grid">';
-    
-    aulas.forEach(aula => {
+    aulasDisponibles.forEach(aula => {
+        const isSelected = aulasSeleccionadas[aula.id] !== undefined;
+        const cantidad = aulasSeleccionadas[aula.id] || aula.capacidad;
+        
         html += `
-            <div class="aula-card" onclick="generarHojasAula(${aula.aula_id})">
-                <div class="aula-header">
-                    <span class="aula-codigo">${aula.codigo_aula}</span>
-                    <span class="aula-badge">${aula.postulantes_asignados} estudiantes</span>
-                </div>
-                <div class="aula-nombre">${aula.nombre}</div>
-                <div class="aula-ubicacion">📍 ${aula.edificio} - Piso ${aula.piso}</div>
-            </div>
+            <tr class="${isSelected ? 'selected' : ''}" id="aulaRow${aula.id}">
+                <td>
+                    <input type="checkbox" 
+                           id="checkAula${aula.id}"
+                           ${isSelected ? 'checked' : ''}
+                           onchange="toggleAula(${aula.id})">
+                </td>
+                <td>
+                    <strong>${aula.codigo}</strong>
+                    <div style="font-size: 0.75rem; color: #94a3b8;">
+                        ${aula.nombre || 'Sin nombre'}
+                    </div>
+                </td>
+                <td style="color: #94a3b8;">
+                    ${aula.capacidad} estudiantes
+                </td>
+                <td>
+                    <input type="number" 
+                           id="cantidadAula${aula.id}"
+                           min="1" 
+                           max="${aula.capacidad}" 
+                           value="${cantidad}"
+                           ${!isSelected ? 'disabled' : ''}
+                           onchange="actualizarCantidad(${aula.id}, this.value)">
+                </td>
+            </tr>
         `;
     });
     
-    html += '</div>';
-    container.innerHTML = html;
+    tbody.innerHTML = html;
+}
+
+function toggleAula(aulaId) {
+    const checkbox = document.getElementById(`checkAula${aulaId}`);
+    const input = document.getElementById(`cantidadAula${aulaId}`);
+    const row = document.getElementById(`aulaRow${aulaId}`);
     
-    document.getElementById('opcionesGeneracion').style.display = 'none';
-    document.getElementById('listaAulas').style.display = 'block';
+    if (checkbox.checked) {
+        const aula = aulasDisponibles.find(a => a.id === aulaId);
+        aulasSeleccionadas[aulaId] = parseInt(input.value) || aula.capacidad;
+        input.disabled = false;
+        row.classList.add('selected');
+    } else {
+        delete aulasSeleccionadas[aulaId];
+        input.disabled = true;
+        row.classList.remove('selected');
+    }
+    
+    actualizarCheckboxAll();
+    actualizarResumen();
 }
 
-function volverAOpciones() {
-    document.getElementById('listaAulas').style.display = 'none';
-    document.getElementById('opcionesGeneracion').style.display = 'block';
+function toggleTodasAulas() {
+    const checkAll = document.getElementById('checkboxAll');
+    
+    if (checkAll.checked) {
+        seleccionarTodasAulas();
+    } else {
+        deseleccionarTodasAulas();
+    }
 }
 
-async function generarHojasAula(aulaId) {
-    try {
-        // VERIFICAR si ya tiene hojas generadas
-        const verificacionResponse = await fetch(`/api/verificar-hojas-aula/${aulaId}`);
-        const verificacion = await verificacionResponse.json();
+function seleccionarTodasAulas() {
+    aulasDisponibles.forEach(aula => {
+        aulasSeleccionadas[aula.id] = aula.capacidad;
+    });
+    renderizarAulasSeleccion();
+    document.getElementById('checkboxAll').checked = true;
+    actualizarResumen();
+}
+
+function deseleccionarTodasAulas() {
+    aulasSeleccionadas = {};
+    renderizarAulasSeleccion();
+    document.getElementById('checkboxAll').checked = false;
+    actualizarResumen();
+}
+
+function actualizarCheckboxAll() {
+    const totalAulas = aulasDisponibles.length;
+    const seleccionadas = Object.keys(aulasSeleccionadas).length;
+    const checkAll = document.getElementById('checkboxAll');
+    
+    checkAll.checked = (totalAulas > 0 && seleccionadas === totalAulas);
+    checkAll.indeterminate = (seleccionadas > 0 && seleccionadas < totalAulas);
+}
+
+function filtrarAulas() {
+    const filtro = document.getElementById('searchAulas').value.toLowerCase();
+    const filas = document.querySelectorAll('#tablaTodyAulas tr');
+    
+    filas.forEach(fila => {
+        const texto = fila.textContent.toLowerCase();
+        if (texto.includes(filtro)) {
+            fila.style.display = '';
+        } else {
+            fila.style.display = 'none';
+        }
+    });
+}
+
+function actualizarCantidad(aulaId, cantidad) {
+    const cant = parseInt(cantidad) || 0;
+    const aula = aulasDisponibles.find(a => a.id === aulaId);
+    
+    if (cant > aula.capacidad) {
+        alert(`La cantidad no puede exceder la capacidad del aula (${aula.capacidad})`);
+        document.getElementById(`cantidadAula${aulaId}`).value = aula.capacidad;
+        aulasSeleccionadas[aulaId] = aula.capacidad;
+    } else if (cant < 1) {
+        document.getElementById(`cantidadAula${aulaId}`).value = 1;
+        aulasSeleccionadas[aulaId] = 1;
+    } else {
+        aulasSeleccionadas[aulaId] = cant;
+    }
+    
+    actualizarResumen();
+}
+
+function actualizarResumen() {
+    const totalAulas = Object.keys(aulasSeleccionadas).length;
+    const totalAsignar = Object.values(aulasSeleccionadas).reduce((sum, val) => sum + val, 0);
+    const faltantes = totalPostulantesSinAsignar - totalAsignar;
+    
+    document.getElementById('aulasSeleccionadasCount').textContent = totalAulas;
+    document.getElementById('totalAsignarCount').textContent = totalAsignar;
+    document.getElementById('faltantesCount').textContent = faltantes;
+    
+    const resumenDiv = document.querySelector('.resumen-seleccion');
+    if (faltantes !== 0) {
+        resumenDiv.classList.add('warning');
+    } else {
+        resumenDiv.classList.remove('warning');
+    }
+    
+    // Habilitar/deshabilitar botón siguiente
+    const btnSiguiente = document.getElementById('btnSiguientePaso1');
+    btnSiguiente.disabled = (totalAulas === 0 || totalAsignar === 0);
+}
+
+// ============================================================================
+// NAVEGACIÓN ENTRE PASOS
+// ============================================================================
+
+function mostrarPaso(paso) {
+    // Ocultar todos
+    document.getElementById('paso1Container').style.display = 'none';
+    document.getElementById('paso2Container').style.display = 'none';
+    document.getElementById('paso3Container').style.display = 'none';
+    
+    // Actualizar indicadores
+    document.getElementById('stepIndicator1').classList.remove('active');
+    document.getElementById('stepIndicator2').classList.remove('active');
+    
+    if (paso === 1) {
+        document.getElementById('paso1Container').style.display = 'block';
+        document.getElementById('stepIndicator1').classList.add('active');
+        document.getElementById('modalTitulo').textContent = '📦 Paso 1: Seleccionar Aulas';
+    } else if (paso === 2) {
+        document.getElementById('paso2Container').style.display = 'block';
+        document.getElementById('stepIndicator2').classList.add('active');
+        document.getElementById('modalTitulo').textContent = '👨‍🏫 Paso 2: Asignar Profesores';
+    } else if (paso === 3) {
+        document.getElementById('paso3Container').style.display = 'block';
+        document.getElementById('modalTitulo').textContent = '⏳ Generando Hojas...';
+    }
+}
+
+function irAPaso2() {
+    // Validar que haya selección
+    if (Object.keys(aulasSeleccionadas).length === 0) {
+        alert('Debe seleccionar al menos un aula');
+        return;
+    }
+    
+    renderizarAsignacionProfesores();
+    mostrarPaso(2);
+}
+
+function volverAPaso1() {
+    mostrarPaso(1);
+}
+
+// ============================================================================
+// PASO 2: ASIGNACIÓN DE PROFESORES
+// ============================================================================
+
+function renderizarAsignacionProfesores() {
+    const tbody = document.getElementById('tablaBodyProfesores');
+    
+    let html = '';
+    
+    for (const [aulaId, cantidad] of Object.entries(aulasSeleccionadas)) {
+        const aula = aulasDisponibles.find(a => a.id == aulaId);
+        const profesorActual = profesoresAsignados[aulaId] || '';
         
-        if (verificacion.hojas_generadas) {
-            // Ya tiene hojas - pedir confirmación
-            const aula = aulasDisponibles.find(a => a.aula_id === aulaId);
-            if (typeof abrirModalConfirmarRegeneracion === 'function') {
-                abrirModalConfirmarRegeneracion(aula, verificacion);
-            } else {
-                if (confirm(`Esta aula ya tiene ${verificacion.total_hojas} hojas generadas.\n\n¿Desea regenerarlas? Esto ANULARÁ las anteriores.`)) {
-                    await ejecutarGeneracionAula(aulaId);
+        html += `
+            <tr>
+                <td>
+                    <strong style="color: #8b5cf6;">${aula.codigo}</strong>
+                    <div style="font-size: 0.75rem; color: #94a3b8; margin-top: 2px;">
+                        ${aula.nombre || 'Sin nombre'}
+                    </div>
+                </td>
+                <td>
+                    <span class="cantidad-badge">${cantidad} estudiantes</span>
+                </td>
+                <td>
+                    <select class="profesor-select" 
+                            id="profesorAula${aulaId}"
+                            onchange="asignarProfesor(${aulaId}, this.value)">
+                        <option value="">Seleccionar profesor...</option>
+                        ${profesoresDisponibles.map(p => `
+                            <option value="${p.id}" ${p.id == profesorActual ? 'selected' : ''}>
+                                ${p.nombre_completo}
+                            </option>
+                        `).join('')}
+                    </select>
+                </td>
+            </tr>
+        `;
+    }
+    
+    tbody.innerHTML = html;
+    validarPaso2();
+}
+
+function asignarProfesor(aulaId, profesorId) {
+    if (profesorId) {
+        profesoresAsignados[aulaId] = parseInt(profesorId);
+    } else {
+        delete profesoresAsignados[aulaId];
+    }
+    
+    validarPaso2();
+}
+
+function validarPaso2() {
+    const totalAulas = Object.keys(aulasSeleccionadas).length;
+    const totalProfesores = Object.keys(profesoresAsignados).length;
+    
+    const btnConfirmar = document.getElementById('btnConfirmarAsignacion');
+    btnConfirmar.disabled = (totalProfesores < totalAulas);
+}
+
+// ============================================================================
+// PASO 3: CONFIRMAR Y GENERAR
+// ============================================================================
+
+// ============================================================================
+// REEMPLAZAR LA FUNCIÓN confirmarYGenerar() COMPLETA
+// ============================================================================
+
+async function confirmarYGenerar() {
+    // Validar que todos tengan profesor
+    const totalAulas = Object.keys(aulasSeleccionadas).length;
+    const totalProfesores = Object.keys(profesoresAsignados).length;
+    
+    if (totalProfesores < totalAulas) {
+        alert('Debe asignar un profesor a cada aula');
+        return;
+    }
+    
+    // Confirmar
+    const totalAsignar = Object.values(aulasSeleccionadas).reduce((sum, val) => sum + val, 0);
+    
+    if (!confirm(
+        `¿Confirmar asignación?\n\n` +
+        `• Aulas: ${totalAulas}\n` +
+        `• Postulantes: ${totalAsignar}\n\n` +
+        `Se generarán las hojas automáticamente.`
+    )) {
+        return;
+    }
+    
+    // Mostrar loading
+    mostrarPaso(3);
+    
+    try {
+        // Obtener modo de generación
+        const modoGeneracion = document.querySelector('input[name="modoGeneracion"]:checked').value;
+        
+        // Preparar datos
+        const asignaciones = [];
+        
+        for (const [aulaId, cantidad] of Object.entries(aulasSeleccionadas)) {
+            asignaciones.push({
+                aula_id: parseInt(aulaId),
+                profesor_id: profesoresAsignados[aulaId],
+                cantidad: cantidad
+            });
+        }
+        
+        console.log('Modo de generación:', modoGeneracion);
+        console.log('Enviando asignaciones:', asignaciones);
+        
+        // Llamar al endpoint
+        const response = await fetch('/api/asignar-y-generar-hojas', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proceso_admision: '2025-2',
+                modo_generacion: modoGeneracion,
+                asignaciones: asignaciones
+            })
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(errorData.detail || 'Error al procesar');
+        }
+        
+        // Verificar tipo de respuesta CORRECTAMENTE
+        const contentType = response.headers.get('content-type');
+        const contentDisposition = response.headers.get('content-disposition');
+        
+        console.log('Content-Type:', contentType);
+        console.log('Content-Disposition:', contentDisposition);
+        
+        // ============================================================
+        // MODO ÚNICO: Descargar ZIP directamente
+        // ============================================================
+        if (contentDisposition && contentDisposition.includes('attachment')) {
+            console.log('Modo único: descargando ZIP...');
+            
+            const blob = await response.blob();
+            
+            if (blob.size === 0) {
+                throw new Error('El archivo ZIP está vacío');
+            }
+            
+            console.log('Tamaño del ZIP:', (blob.size / (1024*1024)).toFixed(2), 'MB');
+            
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            
+            // Extraer nombre del archivo del header
+            let filename = 'hojas.zip';
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    filename = filenameMatch[1].replace(/['"]/g, '');
                 }
             }
-            return;
+            
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            
+            // Limpiar
+            setTimeout(() => {
+                document.body.removeChild(a);
+                window.URL.revokeObjectURL(url);
+            }, 100);
+            
+            alert('✅ Hojas generadas exitosamente\n\nSe ha descargado el archivo ZIP con todas las aulas.');
+            
+            cerrarModalAsignacion();
+            
+            if (typeof verificarAsignaciones === 'function') {
+                await verificarAsignaciones();
+            }
+        }
+        // ============================================================
+        // MODO INDIVIDUAL: Mostrar enlaces de descarga
+        // ============================================================
+        else if (contentType && contentType.includes('application/json')) {
+            console.log('Modo individual: mostrando enlaces...');
+            
+            const data = await response.json();
+            
+            if (data.success && data.modo === 'individual') {
+                mostrarResultadosIndividuales(data);
+            } else {
+                throw new Error(data.message || 'Error desconocido');
+            }
+        }
+        else {
+            throw new Error('Respuesta inesperada del servidor');
         }
         
-        // NO tiene hojas - generar directamente
-        await ejecutarGeneracionAula(aulaId);
-        
     } catch (error) {
-        console.error('Error:', error);
-        alert('Error al generar hojas');
+        console.error('Error completo:', error);
+        alert('❌ Error al generar hojas:\n\n' + error.message);
+        mostrarPaso(2);
     }
 }
 
-async function ejecutarGeneracionAula(aulaId) {
-    try {
-        const response = await fetch(`/api/generar-hojas-aula/${aulaId}`);
-        const data = await response.json();
-        
-        if (data.success) {
-            alert(`✅ Hojas generadas exitosamente\n\nAula: ${data.aula.codigo}\nTotal: ${data.total_postulantes} hojas`);
-            cerrarModalHojasAula();
-        } else {
-            alert('❌ Error: ' + (data.mensaje || data.message));
-        }
-        
-    } catch (error) {
-        console.error('Error:', error);
-        alert('Error al generar hojas');
-    }
+// ============================================================================
+// NUEVA FUNCIÓN: Mostrar resultados en modo individual
+// ============================================================================
+
+function mostrarResultadosIndividuales(data) {
+    // Ocultar paso 3 (loading)
+    document.getElementById('paso3Container').style.display = 'none';
+    
+    // Crear HTML con enlaces de descarga
+    let html = `
+        <div style="padding: 30px; text-align: center;">
+            <div style="font-size: 3rem; margin-bottom: 20px;">✅</div>
+            <h2 style="color: white; margin-bottom: 10px;">Hojas Generadas Exitosamente</h2>
+            <p style="color: #94a3b8; margin-bottom: 30px;">
+                Total: ${data.total_hojas} hojas en ${data.total_aulas} archivos
+            </p>
+            
+            <div style="background: rgba(16, 185, 129, 0.1); border: 2px solid rgba(16, 185, 129, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #10b981; margin-bottom: 16px;">📦 Archivos Generados</h3>
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+    `;
+    
+    data.archivos.forEach(archivo => {
+        html += `
+            <a href="${archivo.url_descarga}" 
+               download="${archivo.archivo}"
+               style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 16px; display: flex; justify-content: space-between; align-items: center; text-decoration: none; transition: all 0.3s;"
+               onmouseover="this.style.background='rgba(255, 255, 255, 0.1)'"
+               onmouseout="this.style.background='rgba(255, 255, 255, 0.05)'">
+                <div style="text-align: left;">
+                    <div style="color: white; font-weight: 600; margin-bottom: 4px;">
+                        ${archivo.aula}
+                    </div>
+                    <div style="color: #94a3b8; font-size: 0.875rem;">
+                        ${archivo.cantidad} hojas · ${archivo.tamanio_mb} MB
+                    </div>
+                </div>
+                <div style="background: rgba(16, 185, 129, 0.2); color: #10b981; padding: 8px 16px; border-radius: 6px; font-weight: 600; font-size: 0.875rem;">
+                    📥 Descargar
+                </div>
+            </a>
+        `;
+    });
+    
+    html += `
+                </div>
+            </div>
+            
+            <div style="background: rgba(59, 130, 246, 0.1); border: 2px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 12px 16px; margin-bottom: 20px; font-size: 0.875rem; color: #60a5fa;">
+                💡 Tip: Cada archivo ZIP contiene las hojas de un aula. Entregar a cada profesor su archivo correspondiente.
+            </div>
+            
+            <button onclick="cerrarModalAsignacion(); if(typeof verificarAsignaciones === 'function') verificarAsignaciones();" 
+                    style="background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border: none; padding: 12px 32px; border-radius: 8px; cursor: pointer; font-weight: 700;">
+                Cerrar
+            </button>
+        </div>
+    `;
+    
+    // Mostrar resultados
+    document.getElementById('modalAsignacionAulas').querySelector('.modal-body').innerHTML = html;
 }
 </script>

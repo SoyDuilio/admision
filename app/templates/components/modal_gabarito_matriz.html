@@ -1,0 +1,1065 @@
+<!--
+    COMPONENTE: Modal Gabarito por Matriz (Guardar en BD)
+    app/templates/components/modal_gabarito_matriz.html
+    
+    Flujo: Paso 1 (Totales) → Paso 2 (Seleccionar números por letra) → Paso 3 (Vista previa) → Guardar en BD
+    
+    DIFERENCIA con modal_documento_oficial_gabarito.html:
+    - Este modal GUARDA en base de datos
+    - No genera PDF
+    
+    FORMATO: Igual que Fase 1 - Seleccionar números de pregunta para cada letra
+-->
+
+<!-- MODAL -->
+<div id="modalGabaritoMatriz" class="modal-gabarito-matriz">
+    <div class="modal-contenido-matriz">
+        
+        <!-- Header del modal -->
+        <div class="modal-header-matriz">
+            <h2>💾 Registrar Gabarito en Sistema</h2>
+            <button class="btn-cerrar-matriz" onclick="cerrarModalMatriz()">✕</button>
+        </div>
+        
+        <!-- Indicador de pasos -->
+        <div class="pasos-indicador-matriz">
+            <div class="paso-matriz active" id="indicadorPaso1Matriz">
+                <span class="numero-matriz">1</span>
+                <span class="texto-matriz">Totales por Letra</span>
+            </div>
+            <div class="paso-matriz" id="indicadorPaso2Matriz">
+                <span class="numero-matriz">2</span>
+                <span class="texto-matriz">Seleccionar Números</span>
+            </div>
+            <div class="paso-matriz" id="indicadorPaso3Matriz">
+                <span class="numero-matriz">3</span>
+                <span class="texto-matriz">Confirmar y Guardar</span>
+            </div>
+        </div>
+        
+        <!-- ============================================================ -->
+        <!-- PASO 1: INGRESAR TOTALES POR LETRA -->
+        <!-- ============================================================ -->
+        <div id="paso1Matriz" class="paso-contenido-matriz">
+            <div class="instrucciones-matriz">
+                <h3>📊 Paso 1: Ingrese los totales por cada letra</h3>
+                <p>Indique cuántas preguntas tienen cada letra como respuesta correcta.</p>
+                <p class="nota-matriz">La suma debe ser exactamente <strong>100</strong>.</p>
+            </div>
+            
+            <div class="totales-grid-matriz">
+                <div class="total-item-matriz">
+                    <label>Letra A</label>
+                    <input type="number" id="totalAMatriz" min="0" max="100" value="20" 
+                           oninput="validarTotalesMatriz()">
+                </div>
+                <div class="total-item-matriz">
+                    <label>Letra B</label>
+                    <input type="number" id="totalBMatriz" min="0" max="100" value="20" 
+                           oninput="validarTotalesMatriz()">
+                </div>
+                <div class="total-item-matriz">
+                    <label>Letra C</label>
+                    <input type="number" id="totalCMatriz" min="0" max="100" value="20" 
+                           oninput="validarTotalesMatriz()">
+                </div>
+                <div class="total-item-matriz">
+                    <label>Letra D</label>
+                    <input type="number" id="totalDMatriz" min="0" max="100" value="20" 
+                           oninput="validarTotalesMatriz()">
+                </div>
+                <div class="total-item-matriz">
+                    <label>Letra E</label>
+                    <input type="number" id="totalEMatriz" min="0" max="100" value="20" 
+                           oninput="validarTotalesMatriz()">
+                </div>
+            </div>
+            
+            <div class="suma-total-matriz" id="sumaTotalMatriz">
+                SUMA: <span id="sumaValorMatriz">100</span> / 100
+            </div>
+            
+            <div class="botones-paso-matriz">
+                <button class="btn-secundario-matriz" onclick="cerrarModalMatriz()">Cancelar</button>
+                <button class="btn-primario-matriz" id="btnSiguiente1Matriz" onclick="irPaso2Matriz()">
+                    Siguiente →
+                </button>
+            </div>
+        </div>
+        
+        <!-- ============================================================ -->
+        <!-- PASO 2: SELECCIONAR NÚMEROS POR LETRA (ESTILO FASE 1) -->
+        <!-- ============================================================ -->
+        <div id="paso2Matriz" class="paso-contenido-matriz" style="display: none;">
+            <div class="instrucciones-matriz">
+                <h3>🎯 Paso 2: Seleccione los Números de Pregunta</h3>
+                <p>Seleccione las <span id="metaActualMatriz">20</span> preguntas que se responden con <strong id="letraActualMatriz">A</strong></p>
+            </div>
+            
+            <!-- Indicador de letra actual -->
+            <div class="letra-indicador-matriz">
+                <span class="letra-grande-matriz" id="letraGrandeMatriz">A</span>
+                <span class="contador-letra-matriz">
+                    <span id="seleccionadosMatriz">0</span> / <span id="metaLetraMatriz">20</span>
+                </span>
+            </div>
+            
+            <!-- Grid de números 1-100 -->
+            <div class="numeros-grid-matriz" id="numerosGridMatriz">
+                <!-- Se genera con JavaScript -->
+            </div>
+            
+            <!-- Navegación entre letras -->
+            <div class="navegacion-letras-matriz">
+                <button class="btn-letra-matriz" id="btnLetraAMatriz" onclick="cambiarLetraMatriz('A')">A</button>
+                <button class="btn-letra-matriz" id="btnLetraBMatriz" onclick="cambiarLetraMatriz('B')">B</button>
+                <button class="btn-letra-matriz" id="btnLetraCMatriz" onclick="cambiarLetraMatriz('C')">C</button>
+                <button class="btn-letra-matriz" id="btnLetraDMatriz" onclick="cambiarLetraMatriz('D')">D</button>
+                <button class="btn-letra-matriz" id="btnLetraEMatriz" onclick="cambiarLetraMatriz('E')">E</button>
+            </div>
+            
+            <!-- Resumen de progreso -->
+            <div class="progreso-resumen-matriz">
+                <div class="progreso-item-matriz" id="progresoAMatriz">A: <span>0</span>/<span class="meta">20</span></div>
+                <div class="progreso-item-matriz" id="progresoBMatriz">B: <span>0</span>/<span class="meta">20</span></div>
+                <div class="progreso-item-matriz" id="progresoCMatriz">C: <span>0</span>/<span class="meta">20</span></div>
+                <div class="progreso-item-matriz" id="progresoDMatriz">D: <span>0</span>/<span class="meta">20</span></div>
+                <div class="progreso-item-matriz" id="progresoEMatriz">E: <span>0</span>/<span class="meta">20</span></div>
+                <div class="progreso-item-matriz total" id="progresoTotalMatriz">TOTAL: <span>0</span>/100</div>
+            </div>
+            
+            <div class="botones-paso-matriz">
+                <button class="btn-secundario-matriz" onclick="irPaso1Matriz()">← Anterior</button>
+                <button class="btn-primario-matriz" id="btnSiguiente2Matriz" onclick="irPaso3Matriz()" disabled>
+                    Siguiente →
+                </button>
+            </div>
+        </div>
+        
+        <!-- ============================================================ -->
+        <!-- PASO 3: VISTA PREVIA Y GUARDAR -->
+        <!-- ============================================================ -->
+        <div id="paso3Matriz" class="paso-contenido-matriz" style="display: none;">
+            <div class="instrucciones-matriz">
+                <h3>✅ Paso 3: Confirme y Guarde en Sistema</h3>
+                <p>Revise las respuestas antes de guardar en la base de datos.</p>
+            </div>
+            
+            <!-- Resumen estadístico -->
+            <div class="resumen-estadistico-matriz">
+                <h4>📊 Distribución de Respuestas</h4>
+                <div class="resumen-grid-matriz">
+                    <div class="resumen-item-matriz">
+                        <span class="letra-matriz">A</span>
+                        <span class="cantidad-matriz" id="resumenAMatriz">0</span>
+                    </div>
+                    <div class="resumen-item-matriz">
+                        <span class="letra-matriz">B</span>
+                        <span class="cantidad-matriz" id="resumenBMatriz">0</span>
+                    </div>
+                    <div class="resumen-item-matriz">
+                        <span class="letra-matriz">C</span>
+                        <span class="cantidad-matriz" id="resumenCMatriz">0</span>
+                    </div>
+                    <div class="resumen-item-matriz">
+                        <span class="letra-matriz">D</span>
+                        <span class="cantidad-matriz" id="resumenDMatriz">0</span>
+                    </div>
+                    <div class="resumen-item-matriz">
+                        <span class="letra-matriz">E</span>
+                        <span class="cantidad-matriz" id="resumenEMatriz">0</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Vista previa de respuestas -->
+            <div class="vista-previa-matriz">
+                <h4>📋 Vista Previa (100 preguntas)</h4>
+                <div class="preview-grid-matriz" id="previewGridMatriz">
+                    <!-- Se genera con JavaScript -->
+                </div>
+            </div>
+            
+            <div class="botones-paso-matriz">
+                <button class="btn-secundario-matriz" onclick="irPaso2Matriz()">← Anterior</button>
+                <button class="btn-guardar-matriz" id="btnGuardarMatriz" onclick="guardarGabaritoMatriz()">
+                    💾 Guardar en Sistema
+                </button>
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ESTILOS -->
+<!-- ============================================================ -->
+<style>
+/* Modal overlay */
+.modal-gabarito-matriz {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.9);
+    z-index: 10000;
+    overflow-y: auto;
+    padding: 20px;
+}
+
+.modal-gabarito-matriz.activo {
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+/* Contenido del modal */
+.modal-contenido-matriz {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 20px;
+    width: 100%;
+    max-width: 700px;
+    margin: 20px auto;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Header */
+.modal-header-matriz {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 24px 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.modal-header-matriz h2 {
+    color: white;
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+.btn-cerrar-matriz {
+    background: rgba(255, 255, 255, 0.1);
+    border: none;
+    color: white;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    font-size: 1.25rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-cerrar-matriz:hover {
+    background: #ef4444;
+}
+
+/* Indicador de pasos */
+.pasos-indicador-matriz {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.paso-matriz {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 20px;
+    border-radius: 30px;
+    background: rgba(255, 255, 255, 0.05);
+    opacity: 0.5;
+    transition: all 0.3s;
+}
+
+.paso-matriz.active {
+    opacity: 1;
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid #3b82f6;
+}
+
+.paso-matriz.completed {
+    opacity: 1;
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+}
+
+.numero-matriz {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #3b82f6;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    font-size: 0.875rem;
+}
+
+.paso-matriz.completed .numero-matriz {
+    background: #10b981;
+}
+
+.texto-matriz {
+    color: white;
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+/* Contenido de pasos */
+.paso-contenido-matriz {
+    padding: 30px;
+}
+
+.instrucciones-matriz {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.instrucciones-matriz h3 {
+    color: white;
+    margin-bottom: 10px;
+}
+
+.instrucciones-matriz p {
+    color: #94a3b8;
+    margin: 5px 0;
+}
+
+.nota-matriz {
+    background: rgba(245, 158, 11, 0.1);
+    border: 1px solid #f59e0b;
+    border-radius: 8px;
+    padding: 10px;
+    margin-top: 15px !important;
+    color: #fbbf24 !important;
+}
+
+/* Totales grid - Paso 1 */
+.totales-grid-matriz {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.total-item-matriz {
+    text-align: center;
+}
+
+.total-item-matriz label {
+    display: block;
+    color: #94a3b8;
+    margin-bottom: 8px;
+    font-weight: 600;
+}
+
+.total-item-matriz input {
+    width: 100%;
+    padding: 15px;
+    font-size: 1.5rem;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    color: white;
+    font-weight: bold;
+}
+
+.total-item-matriz input:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+/* Suma total */
+.suma-total-matriz {
+    text-align: center;
+    font-size: 1.5rem;
+    font-weight: bold;
+    padding: 20px;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 12px;
+    color: white;
+    margin-bottom: 20px;
+}
+
+.suma-total-matriz.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 2px solid #ef4444;
+    color: #ef4444;
+}
+
+.suma-total-matriz.success {
+    background: rgba(16, 185, 129, 0.1);
+    border: 2px solid #10b981;
+    color: #10b981;
+}
+
+/* ============================================================ */
+/* PASO 2: ESTILO FASE 1 - Selección de números */
+/* ============================================================ */
+
+.letra-indicador-matriz {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-bottom: 25px;
+}
+
+.letra-grande-matriz {
+    font-size: 4rem;
+    font-weight: 800;
+    color: #3b82f6;
+    line-height: 1;
+}
+
+.contador-letra-matriz {
+    font-size: 1.5rem;
+    color: white;
+    margin-top: 10px;
+}
+
+/* Grid de números 1-100 */
+.numeros-grid-matriz {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+    margin-bottom: 25px;
+}
+
+.numero-btn-matriz {
+    aspect-ratio: 1;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+}
+
+.numero-btn-matriz:hover:not(.ocupado):not(.seleccionado) {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: #3b82f6;
+}
+
+.numero-btn-matriz.seleccionado {
+    background: linear-gradient(135deg, #10b981, #059669);
+    border-color: #10b981;
+    color: white;
+}
+
+.numero-btn-matriz.ocupado {
+    background: rgba(100, 116, 139, 0.3);
+    border-color: rgba(100, 116, 139, 0.5);
+    color: #64748b;
+    cursor: not-allowed;
+}
+
+.numero-btn-matriz.ocupado::after {
+    content: attr(data-letra);
+    font-size: 0.6rem;
+    position: absolute;
+    bottom: 2px;
+    right: 4px;
+    color: #94a3b8;
+}
+
+/* Navegación entre letras */
+.navegacion-letras-matriz {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 20px;
+}
+
+.btn-letra-matriz {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.3);
+    color: white;
+    font-size: 1.25rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-letra-matriz:hover {
+    border-color: #3b82f6;
+    background: rgba(59, 130, 246, 0.2);
+}
+
+.btn-letra-matriz.active {
+    background: #3b82f6;
+    border-color: #3b82f6;
+}
+
+.btn-letra-matriz.completo {
+    background: #10b981;
+    border-color: #10b981;
+}
+
+/* Progreso resumen */
+.progreso-resumen-matriz {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.progreso-item-matriz {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 16px;
+    border-radius: 8px;
+    color: white;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+
+.progreso-item-matriz.completo {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+}
+
+.progreso-item-matriz.total {
+    background: rgba(59, 130, 246, 0.2);
+    border: 1px solid #3b82f6;
+}
+
+.progreso-item-matriz.total.completo {
+    background: rgba(16, 185, 129, 0.2);
+    border: 1px solid #10b981;
+}
+
+/* ============================================================ */
+/* PASO 3: Vista previa y guardar */
+/* ============================================================ */
+
+.resumen-estadistico-matriz {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.resumen-estadistico-matriz h4 {
+    color: white;
+    text-align: center;
+    margin-bottom: 15px;
+}
+
+.resumen-grid-matriz {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+.resumen-item-matriz {
+    text-align: center;
+    padding: 15px 25px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+}
+
+.resumen-item-matriz .letra-matriz {
+    display: block;
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: #3b82f6;
+}
+
+.resumen-item-matriz .cantidad-matriz {
+    display: block;
+    font-size: 1.25rem;
+    color: white;
+    margin-top: 5px;
+}
+
+/* Vista previa */
+.vista-previa-matriz {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.vista-previa-matriz h4 {
+    color: white;
+    margin-bottom: 15px;
+}
+
+.preview-grid-matriz {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.preview-item-matriz {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 8px;
+    border-radius: 6px;
+    text-align: center;
+    font-size: 0.75rem;
+}
+
+.preview-item-matriz .num-matriz {
+    color: #94a3b8;
+    display: block;
+}
+
+.preview-item-matriz .resp-matriz {
+    color: #10b981;
+    font-weight: bold;
+    font-size: 1rem;
+}
+
+/* Botones */
+.botones-paso-matriz {
+    display: flex;
+    justify-content: space-between;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.btn-secundario-matriz {
+    padding: 14px 28px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-secundario-matriz:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.btn-primario-matriz {
+    padding: 14px 28px;
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primario-matriz:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(59, 130, 246, 0.4);
+}
+
+.btn-primario-matriz:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-guardar-matriz {
+    padding: 16px 32px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-weight: 700;
+    font-size: 1.1rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-guardar-matriz:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 20px rgba(16, 185, 129, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .totales-grid-matriz {
+        grid-template-columns: repeat(3, 1fr);
+    }
+    
+    .pasos-indicador-matriz {
+        flex-direction: column;
+        align-items: center;
+    }
+    
+    .numeros-grid-matriz {
+        grid-template-columns: repeat(5, 1fr);
+    }
+    
+    .preview-grid-matriz {
+        grid-template-columns: repeat(5, 1fr);
+    }
+    
+    .resumen-grid-matriz {
+        flex-wrap: wrap;
+    }
+}
+</style>
+
+<!-- ============================================================ -->
+<!-- JAVASCRIPT -->
+<!-- ============================================================ -->
+<script>
+// Estado del gabarito
+let gabaritoMatrizState = {};  // {1: 'A', 2: 'B', ...}
+let metasMatriz = { A: 20, B: 20, C: 20, D: 20, E: 20 };
+let letraActualMatriz = 'A';
+
+// ============================================================
+// FUNCIONES DE NAVEGACIÓN
+// ============================================================
+
+function abrirModalMatriz() {
+    document.getElementById('modalGabaritoMatriz').classList.add('activo');
+    document.body.style.overflow = 'hidden';
+    
+    // Resetear estado
+    gabaritoMatrizState = {};
+    letraActualMatriz = 'A';
+    
+    // Ir a paso 1
+    mostrarPasoMatriz(1);
+    validarTotalesMatriz();
+}
+
+function cerrarModalMatriz() {
+    document.getElementById('modalGabaritoMatriz').classList.remove('activo');
+    document.body.style.overflow = 'auto';
+}
+
+function mostrarPasoMatriz(paso) {
+    // Ocultar todos los pasos
+    document.getElementById('paso1Matriz').style.display = 'none';
+    document.getElementById('paso2Matriz').style.display = 'none';
+    document.getElementById('paso3Matriz').style.display = 'none';
+    
+    // Mostrar paso actual
+    document.getElementById(`paso${paso}Matriz`).style.display = 'block';
+    
+    // Actualizar indicadores
+    for (let i = 1; i <= 3; i++) {
+        const indicador = document.getElementById(`indicadorPaso${i}Matriz`);
+        indicador.classList.remove('active', 'completed');
+        
+        if (i < paso) {
+            indicador.classList.add('completed');
+        } else if (i === paso) {
+            indicador.classList.add('active');
+        }
+    }
+}
+
+// ============================================================
+// PASO 1: VALIDAR TOTALES
+// ============================================================
+
+function validarTotalesMatriz() {
+    const totales = {
+        A: parseInt(document.getElementById('totalAMatriz').value) || 0,
+        B: parseInt(document.getElementById('totalBMatriz').value) || 0,
+        C: parseInt(document.getElementById('totalCMatriz').value) || 0,
+        D: parseInt(document.getElementById('totalDMatriz').value) || 0,
+        E: parseInt(document.getElementById('totalEMatriz').value) || 0
+    };
+    
+    const suma = totales.A + totales.B + totales.C + totales.D + totales.E;
+    
+    document.getElementById('sumaValorMatriz').textContent = suma;
+    
+    const sumaElement = document.getElementById('sumaTotalMatriz');
+    const btnSiguiente = document.getElementById('btnSiguiente1Matriz');
+    
+    if (suma === 100) {
+        sumaElement.classList.remove('error');
+        sumaElement.classList.add('success');
+        btnSiguiente.disabled = false;
+        metasMatriz = totales;
+    } else {
+        sumaElement.classList.remove('success');
+        sumaElement.classList.add('error');
+        btnSiguiente.disabled = true;
+    }
+}
+
+function irPaso1Matriz() {
+    mostrarPasoMatriz(1);
+}
+
+function irPaso2Matriz() {
+    // Guardar metas
+    metasMatriz = {
+        A: parseInt(document.getElementById('totalAMatriz').value) || 0,
+        B: parseInt(document.getElementById('totalBMatriz').value) || 0,
+        C: parseInt(document.getElementById('totalCMatriz').value) || 0,
+        D: parseInt(document.getElementById('totalDMatriz').value) || 0,
+        E: parseInt(document.getElementById('totalEMatriz').value) || 0
+    };
+    
+    // Generar grid de números
+    generarGridNumerosMatriz();
+    
+    // Iniciar con letra A
+    letraActualMatriz = 'A';
+    cambiarLetraMatriz('A');
+    
+    // Mostrar paso 2
+    mostrarPasoMatriz(2);
+    actualizarProgresoMatriz();
+}
+
+// ============================================================
+// PASO 2: SELECCIÓN DE NÚMEROS POR LETRA
+// ============================================================
+
+function generarGridNumerosMatriz() {
+    const grid = document.getElementById('numerosGridMatriz');
+    grid.innerHTML = '';
+    
+    for (let i = 1; i <= 100; i++) {
+        const btn = document.createElement('button');
+        btn.className = 'numero-btn-matriz';
+        btn.textContent = i;
+        btn.dataset.numero = i;
+        btn.onclick = () => toggleNumeroMatriz(i);
+        grid.appendChild(btn);
+    }
+}
+
+function cambiarLetraMatriz(letra) {
+    letraActualMatriz = letra;
+    
+    // Actualizar UI de letra actual
+    document.getElementById('letraActualMatriz').textContent = letra;
+    document.getElementById('letraGrandeMatriz').textContent = letra;
+    document.getElementById('metaActualMatriz').textContent = metasMatriz[letra];
+    document.getElementById('metaLetraMatriz').textContent = metasMatriz[letra];
+    
+    // Actualizar botones de navegación
+    ['A', 'B', 'C', 'D', 'E'].forEach(l => {
+        const btn = document.getElementById(`btnLetra${l}Matriz`);
+        btn.classList.remove('active', 'completo');
+        
+        if (l === letra) {
+            btn.classList.add('active');
+        }
+        
+        // Marcar como completo si ya tiene todos
+        const count = Object.values(gabaritoMatrizState).filter(v => v === l).length;
+        if (count === metasMatriz[l]) {
+            btn.classList.add('completo');
+        }
+    });
+    
+    // Actualizar grid de números
+    actualizarGridNumerosMatriz();
+    actualizarContadorLetraMatriz();
+}
+
+function actualizarGridNumerosMatriz() {
+    const botones = document.querySelectorAll('.numero-btn-matriz');
+    
+    botones.forEach(btn => {
+        const num = parseInt(btn.dataset.numero);
+        const letraAsignada = gabaritoMatrizState[num];
+        
+        btn.classList.remove('seleccionado', 'ocupado');
+        btn.removeAttribute('data-letra');
+        
+        if (letraAsignada === letraActualMatriz) {
+            btn.classList.add('seleccionado');
+        } else if (letraAsignada) {
+            btn.classList.add('ocupado');
+            btn.dataset.letra = letraAsignada;
+        }
+    });
+}
+
+function toggleNumeroMatriz(numero) {
+    const letraAsignada = gabaritoMatrizState[numero];
+    
+    // Si ya está asignado a la letra actual, deseleccionar
+    if (letraAsignada === letraActualMatriz) {
+        delete gabaritoMatrizState[numero];
+    }
+    // Si está asignado a otra letra, no hacer nada
+    else if (letraAsignada) {
+        return;
+    }
+    // Si no está asignado, verificar si podemos agregar más
+    else {
+        const countActual = Object.values(gabaritoMatrizState).filter(v => v === letraActualMatriz).length;
+        if (countActual >= metasMatriz[letraActualMatriz]) {
+            // Ya alcanzó el límite
+            return;
+        }
+        gabaritoMatrizState[numero] = letraActualMatriz;
+    }
+    
+    actualizarGridNumerosMatriz();
+    actualizarContadorLetraMatriz();
+    actualizarProgresoMatriz();
+}
+
+function actualizarContadorLetraMatriz() {
+    const count = Object.values(gabaritoMatrizState).filter(v => v === letraActualMatriz).length;
+    document.getElementById('seleccionadosMatriz').textContent = count;
+}
+
+function actualizarProgresoMatriz() {
+    let totalSeleccionado = 0;
+    let todosCompletos = true;
+    
+    ['A', 'B', 'C', 'D', 'E'].forEach(letra => {
+        const count = Object.values(gabaritoMatrizState).filter(v => v === letra).length;
+        totalSeleccionado += count;
+        
+        const progresoItem = document.getElementById(`progreso${letra}Matriz`);
+        progresoItem.querySelector('span').textContent = count;
+        progresoItem.querySelector('.meta').textContent = metasMatriz[letra];
+        
+        if (count === metasMatriz[letra]) {
+            progresoItem.classList.add('completo');
+        } else {
+            progresoItem.classList.remove('completo');
+            todosCompletos = false;
+        }
+        
+        // Actualizar botón de letra
+        const btnLetra = document.getElementById(`btnLetra${letra}Matriz`);
+        if (count === metasMatriz[letra]) {
+            btnLetra.classList.add('completo');
+        } else {
+            btnLetra.classList.remove('completo');
+        }
+    });
+    
+    // Total
+    const progresoTotal = document.getElementById('progresoTotalMatriz');
+    progresoTotal.querySelector('span').textContent = totalSeleccionado;
+    
+    if (totalSeleccionado === 100 && todosCompletos) {
+        progresoTotal.classList.add('completo');
+        document.getElementById('btnSiguiente2Matriz').disabled = false;
+    } else {
+        progresoTotal.classList.remove('completo');
+        document.getElementById('btnSiguiente2Matriz').disabled = true;
+    }
+}
+
+// ============================================================
+// PASO 3: VISTA PREVIA Y GUARDAR
+// ============================================================
+
+function irPaso3Matriz() {
+    // Generar vista previa
+    generarVistaPreviaMatriz();
+    
+    // Actualizar resumen
+    ['A', 'B', 'C', 'D', 'E'].forEach(letra => {
+        const count = Object.values(gabaritoMatrizState).filter(v => v === letra).length;
+        document.getElementById(`resumen${letra}Matriz`).textContent = count;
+    });
+    
+    mostrarPasoMatriz(3);
+}
+
+function generarVistaPreviaMatriz() {
+    const grid = document.getElementById('previewGridMatriz');
+    grid.innerHTML = '';
+    
+    for (let i = 1; i <= 100; i++) {
+        const item = document.createElement('div');
+        item.className = 'preview-item-matriz';
+        item.innerHTML = `
+            <span class="num-matriz">${i}</span>
+            <span class="resp-matriz">${gabaritoMatrizState[i] || '-'}</span>
+        `;
+        grid.appendChild(item);
+    }
+}
+
+async function guardarGabaritoMatriz() {
+    const btn = document.getElementById('btnGuardarMatriz');
+    const textoOriginal = btn.innerHTML;
+    
+    try {
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Guardando...';
+        
+        // Preparar datos (convertir a formato {numero: letra})
+        const respuestas = {};
+        for (let i = 1; i <= 100; i++) {
+            respuestas[i] = gabaritoMatrizState[i];
+        }
+        
+        // Verificar si existe gabarito
+        const verificar = await fetch('/api/verificar-gabarito/2025-2');
+        const existe = await verificar.json();
+        
+        if (existe.existe && existe.completo) {
+            const confirmar = confirm(
+                '⚠️ Ya existe un gabarito para este proceso.\n\n' +
+                '¿Desea REEMPLAZAR el gabarito existente?'
+            );
+            
+            if (!confirmar) {
+                btn.disabled = false;
+                btn.innerHTML = textoOriginal;
+                return;
+            }
+        }
+        
+        // Guardar
+        const response = await fetch('/api/guardar-gabarito', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                proceso: '2025-2',
+                respuestas: respuestas
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Error al guardar');
+        }
+        
+        const result = await response.json();
+        
+        alert(`✅ ${result.message}\n\nTotal guardado: ${result.total_registrado}`);
+        
+        cerrarModalMatriz();
+        
+        // Recargar página si es necesario
+        if (window.location.pathname.includes('gabarito')) {
+            window.location.reload();
+        }
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al guardar:\n' + error.message);
+        btn.disabled = false;
+        btn.innerHTML = textoOriginal;
+    }
+}
+</script>

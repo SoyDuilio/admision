@@ -1,0 +1,937 @@
+<!-- 
+Modal de Documento Oficial de Gabarito
+app/templates/components/modal_documento_oficial_gabarito.html
+
+Flujo:
+1. Ingresar totales por alternativa
+2. Seleccionar números en matriz 10x10
+3. Vista previa
+4. Generar PDF
+-->
+
+<div id="modalDocumentoOficialGabarito" class="modal-overlay" style="display: none;">
+    <div class="modal-container" style="max-width: 900px;">
+        
+        <!-- Header -->
+        <div class="modal-header">
+            <h2>📄 Documento Oficial de Gabarito</h2>
+            <button class="modal-close" onclick="cerrarModalDocumentoOficial()">✕</button>
+        </div>
+
+        <div class="modal-body">
+            
+            <!-- ====================================================== -->
+            <!-- PASO 1: TOTALES POR ALTERNATIVA -->
+            <!-- ====================================================== -->
+            <div id="paso1DocOficial" class="paso-container">
+                <div class="paso-header">
+                    <h3>📊 Paso 1: Totales por Alternativa</h3>
+                    <p>Ingrese cuántas preguntas se responden con cada alternativa</p>
+                </div>
+
+                <div class="totales-grid">
+                    <div class="total-item">
+                        <label>
+                            <span class="letra-badge" style="background: #3b82f6;">A</span>
+                            <span class="label-text">Cantidad de A:</span>
+                        </label>
+                        <input type="number" id="totalA" min="0" max="100" value="0" 
+                               class="input-total" onchange="validarTotales()">
+                    </div>
+
+                    <div class="total-item">
+                        <label>
+                            <span class="letra-badge" style="background: #10b981;">B</span>
+                            <span class="label-text">Cantidad de B:</span>
+                        </label>
+                        <input type="number" id="totalB" min="0" max="100" value="0" 
+                               class="input-total" onchange="validarTotales()">
+                    </div>
+
+                    <div class="total-item">
+                        <label>
+                            <span class="letra-badge" style="background: #f59e0b;">C</span>
+                            <span class="label-text">Cantidad de C:</span>
+                        </label>
+                        <input type="number" id="totalC" min="0" max="100" value="0" 
+                               class="input-total" onchange="validarTotales()">
+                    </div>
+
+                    <div class="total-item">
+                        <label>
+                            <span class="letra-badge" style="background: #8b5cf6;">D</span>
+                            <span class="label-text">Cantidad de D:</span>
+                        </label>
+                        <input type="number" id="totalD" min="0" max="100" value="0" 
+                               class="input-total" onchange="validarTotales()">
+                    </div>
+
+                    <div class="total-item">
+                        <label>
+                            <span class="letra-badge" style="background: #ef4444;">E</span>
+                            <span class="label-text">Cantidad de E:</span>
+                        </label>
+                        <input type="number" id="totalE" min="0" max="100" value="0" 
+                               class="input-total" onchange="validarTotales()">
+                    </div>
+                </div>
+
+                <div id="resultadoValidacion" class="validacion-result">
+                    <div class="suma-display">
+                        <span>Total:</span>
+                        <span id="sumaTotal" class="suma-numero">0</span>
+                        <span class="suma-meta">/ 100</span>
+                    </div>
+                    <div id="mensajeValidacion" class="mensaje-validacion"></div>
+                </div>
+
+                <div class="paso-actions">
+                    <button class="btn-secondary" onclick="cerrarModalDocumentoOficial()">
+                        Cancelar
+                    </button>
+                    <button id="btnContinuarPaso2" class="btn-primary" onclick="irAPaso2()" disabled>
+                        Continuar →
+                    </button>
+                </div>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- PASO 2: SELECCIÓN EN MATRIZ -->
+            <!-- ====================================================== -->
+            <div id="paso2DocOficial" class="paso-container" style="display: none;">
+                <div class="paso-header">
+                    <h3>🎯 Paso 2: Seleccione los Números de Pregunta</h3>
+                    <p id="instruccionActual">Seleccione las preguntas que se responden con <strong>A</strong></p>
+                </div>
+
+                <!-- Alternativa actual -->
+                <div class="alternativa-actual">
+                    <div class="alternativa-badge">
+                        <span id="letraActual" class="letra-grande">A</span>
+                        <span id="contadorSeleccion" class="contador">0 / 20</span>
+                    </div>
+                </div>
+
+                <!-- Matriz 10x10 -->
+                <div class="matriz-container">
+                    <div id="matrizNumeros" class="matriz-grid">
+                        <!-- Se genera dinámicamente con JavaScript -->
+                    </div>
+                </div>
+
+                <div class="paso-actions">
+                    <button class="btn-secondary" onclick="volverAPaso1()">
+                        ← Volver
+                    </button>
+                    <button id="btnSiguienteAlternativa" class="btn-primary" onclick="siguienteAlternativa()" disabled>
+                        Siguiente Alternativa →
+                    </button>
+                    <button id="btnIrVistaPrevia" class="btn-success" onclick="irAVistaPrevia()" style="display: none;">
+                        Ver Vista Previa →
+                    </button>
+                </div>
+            </div>
+
+            <!-- ====================================================== -->
+            <!-- PASO 3: VISTA PREVIA -->
+            <!-- ====================================================== -->
+            <div id="paso3DocOficial" class="paso-container" style="display: none;">
+                <div class="paso-header">
+                    <h3>👁️ Paso 3: Vista Previa del Gabarito</h3>
+                    <p>Revise que todas las respuestas sean correctas antes de generar el PDF</p>
+                </div>
+
+                <!-- Tabla de vista previa -->
+                <div class="vista-previa-container">
+                    <div id="tablaVistaPrevia" class="tabla-gabarito">
+                        <!-- Se genera dinámicamente -->
+                    </div>
+                </div>
+
+                <div class="paso-actions">
+                    <button class="btn-secondary" onclick="volverAPaso2()">
+                        ← Editar
+                    </button>
+                    <button class="btn-success" onclick="generarPDFOficial()">
+                        📄 Generar PDF Oficial
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<style>
+/* ============================================================================
+   ESTILOS BASE DEL MODAL - PRIORIDAD MÁXIMA
+============================================================================ */
+
+#modalDocumentoOficialGabarito {
+    display: none !important;
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    background: rgba(0, 0, 0, 0.85) !important;
+    z-index: 10000 !important;
+    justify-content: center !important;
+    align-items: center !important;
+    overflow-y: auto !important;
+    padding: 20px !important;
+}
+
+#modalDocumentoOficialGabarito[style*="display: flex"],
+#modalDocumentoOficialGabarito[style*="display:flex"] {
+    display: flex !important;
+}
+
+/* Contenedor principal del modal */
+#modalDocumentoOficialGabarito .modal-container {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%) !important;
+    border: 2px solid rgba(59, 130, 246, 0.3) !important;
+    border-radius: 16px !important;
+    max-width: 900px !important;
+    width: 100% !important;
+    max-height: 90vh !important;
+    overflow: hidden !important;
+    box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5) !important;
+    position: relative !important;
+    display: flex !important;
+    flex-direction: column !important;
+}
+
+/* Header del modal */
+#modalDocumentoOficialGabarito .modal-header {
+    background: linear-gradient(135deg, #1e40af, #1e3a8a) !important;
+    padding: 20px !important;
+    display: flex !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    border-bottom: 2px solid rgba(59, 130, 246, 0.3) !important;
+}
+
+#modalDocumentoOficialGabarito .modal-header h2 {
+    color: white !important;
+    margin: 0 !important;
+    font-size: 1.5rem !important;
+}
+
+#modalDocumentoOficialGabarito .modal-close {
+    background: rgba(239, 68, 68, 0.2) !important;
+    border: 2px solid rgba(239, 68, 68, 0.4) !important;
+    color: #ef4444 !important;
+    width: 40px !important;
+    height: 40px !important;
+    border-radius: 8px !important;
+    font-size: 1.5rem !important;
+    cursor: pointer !important;
+    transition: all 0.3s !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+}
+
+#modalDocumentoOficialGabarito .modal-close:hover {
+    background: rgba(239, 68, 68, 0.3) !important;
+    transform: scale(1.1) !important;
+}
+
+/* Body del modal */
+#modalDocumentoOficialGabarito .modal-body {
+    overflow-y: auto !important;
+    max-height: calc(90vh - 80px) !important;
+    padding: 0 !important;
+}
+
+/* ============================================================================
+   ESTILOS DEL MODAL
+============================================================================ */
+
+.paso-container {
+    padding: 20px;
+}
+
+.paso-header {
+    margin-bottom: 24px;
+    text-align: center;
+}
+
+.paso-header h3 {
+    color: white;
+    margin-bottom: 8px;
+}
+
+.paso-header p {
+    color: #94a3b8;
+    font-size: 0.95rem;
+}
+
+/* Totales Grid */
+.totales-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+}
+
+.total-item label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+    color: white;
+}
+
+.letra-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 6px;
+    color: white;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.label-text {
+    font-size: 0.9rem;
+}
+
+.input-total {
+    width: 100%;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: white;
+    font-size: 1.2rem;
+    text-align: center;
+    font-weight: 600;
+}
+
+.input-total:focus {
+    outline: none;
+    border-color: #3b82f6;
+}
+
+/* Validación */
+.validacion-result {
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.suma-display {
+    text-align: center;
+    font-size: 1.5rem;
+    color: white;
+    margin-bottom: 12px;
+}
+
+.suma-numero {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: #60a5fa;
+    margin: 0 8px;
+}
+
+.suma-numero.correcto {
+    color: #10b981;
+}
+
+.suma-numero.incorrecto {
+    color: #ef4444;
+}
+
+.suma-meta {
+    color: #94a3b8;
+}
+
+.mensaje-validacion {
+    text-align: center;
+    padding: 12px;
+    border-radius: 8px;
+    font-weight: 600;
+}
+
+.mensaje-validacion.correcto {
+    background: rgba(16, 185, 129, 0.2);
+    color: #10b981;
+}
+
+.mensaje-validacion.incorrecto {
+    background: rgba(239, 68, 68, 0.2);
+    color: #ef4444;
+}
+
+/* Alternativa Actual */
+.alternativa-actual {
+    text-align: center;
+    margin-bottom: 24px;
+}
+
+.alternativa-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 32px;
+    background: rgba(59, 130, 246, 0.1);
+    border: 2px solid rgba(59, 130, 246, 0.3);
+    border-radius: 12px;
+}
+
+.letra-grande {
+    font-size: 3rem;
+    font-weight: 700;
+    color: #60a5fa;
+}
+
+.contador {
+    font-size: 1.5rem;
+    color: white;
+}
+
+/* Matriz de Números */
+.matriz-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.matriz-grid {
+    display: grid;
+    grid-template-columns: repeat(10, 1fr);
+    gap: 8px;
+    max-width: 600px;
+    margin: 0 auto;
+}
+
+.numero-celda {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #94a3b8;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.numero-celda:hover:not(.usado):not(.seleccionado) {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.3);
+    transform: scale(1.05);
+}
+
+.numero-celda.seleccionado {
+    background: rgba(59, 130, 246, 0.3);
+    border-color: #3b82f6;
+    color: #60a5fa;
+    font-weight: 700;
+}
+
+.numero-celda.usado {
+    background: rgba(0, 0, 0, 0.3);
+    border-color: rgba(255, 255, 255, 0.05);
+    color: rgba(148, 163, 184, 0.3);
+    cursor: not-allowed;
+}
+
+/* Vista Previa */
+.vista-previa-container {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+    padding: 20px;
+    max-height: 500px;
+    overflow-y: auto;
+    margin-bottom: 24px;
+}
+
+.tabla-gabarito {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.item-gabarito {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.item-numero {
+    color: #94a3b8;
+    font-weight: 600;
+    min-width: 30px;
+}
+
+.item-respuesta {
+    background: rgba(59, 130, 246, 0.2);
+    color: #60a5fa;
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-weight: 700;
+}
+
+/* Acciones */
+.paso-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.btn-primary, .btn-secondary, .btn-success {
+    padding: 12px 32px;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #3b82f6, #2563eb);
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.btn-secondary {
+    background: rgba(148, 163, 184, 0.2);
+    color: white;
+    border: 2px solid rgba(148, 163, 184, 0.3);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+}
+
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 20px rgba(16, 185, 129, 0.3);
+}
+</style>
+
+<script>
+// ============================================================================
+// VARIABLES GLOBALES
+// ============================================================================
+
+let totalesPorAlternativa = {
+    A: 0, B: 0, C: 0, D: 0, E: 0
+};
+
+let alternativaActual = 'A';
+let indexAlternativaActual = 0;
+const alternativas = ['A', 'B', 'C', 'D', 'E'];
+
+// Almacena qué números están asignados a cada alternativa
+let respuestasGabarito = {
+    A: [], B: [], C: [], D: [], E: []
+};
+
+// Números ya usados (para deshabilitar en matriz)
+let numerosUsados = new Set();
+
+// ============================================================================
+// FUNCIONES PRINCIPALES
+// ============================================================================
+
+function abrirModalDocumentoOficial() {
+    document.getElementById('modalDocumentoOficialGabarito').style.display = 'flex';
+    resetearModal();
+}
+
+function cerrarModalDocumentoOficial() {
+    document.getElementById('modalDocumentoOficialGabarito').style.display = 'none';
+}
+
+function resetearModal() {
+    // Resetear paso 1
+    document.getElementById('totalA').value = 0;
+    document.getElementById('totalB').value = 0;
+    document.getElementById('totalC').value = 0;
+    document.getElementById('totalD').value = 0;
+    document.getElementById('totalE').value = 0;
+    
+    // Resetear variables
+    totalesPorAlternativa = { A: 0, B: 0, C: 0, D: 0, E: 0 };
+    respuestasGabarito = { A: [], B: [], C: [], D: [], E: [] };
+    numerosUsados = new Set();
+    alternativaActual = 'A';
+    indexAlternativaActual = 0;
+    
+    // Mostrar solo paso 1
+    document.getElementById('paso1DocOficial').style.display = 'block';
+    document.getElementById('paso2DocOficial').style.display = 'none';
+    document.getElementById('paso3DocOficial').style.display = 'none';
+    
+    validarTotales();
+}
+
+// ============================================================================
+// PASO 1: VALIDACIÓN DE TOTALES
+// ============================================================================
+
+function validarTotales() {
+    const totalA = parseInt(document.getElementById('totalA').value) || 0;
+    const totalB = parseInt(document.getElementById('totalB').value) || 0;
+    const totalC = parseInt(document.getElementById('totalC').value) || 0;
+    const totalD = parseInt(document.getElementById('totalD').value) || 0;
+    const totalE = parseInt(document.getElementById('totalE').value) || 0;
+    
+    const suma = totalA + totalB + totalC + totalD + totalE;
+    
+    // Actualizar display
+    const sumaElement = document.getElementById('sumaTotal');
+    sumaElement.textContent = suma;
+    
+    const mensajeElement = document.getElementById('mensajeValidacion');
+    const btnContinuar = document.getElementById('btnContinuarPaso2');
+    
+    if (suma === 100) {
+        sumaElement.classList.add('correcto');
+        sumaElement.classList.remove('incorrecto');
+        mensajeElement.textContent = '✅ Correcto - Puede continuar';
+        mensajeElement.classList.add('correcto');
+        mensajeElement.classList.remove('incorrecto');
+        btnContinuar.disabled = false;
+        
+        // Guardar totales
+        totalesPorAlternativa = { A: totalA, B: totalB, C: totalC, D: totalD, E: totalE };
+    } else if (suma > 100) {
+        sumaElement.classList.add('incorrecto');
+        sumaElement.classList.remove('correcto');
+        mensajeElement.textContent = `❌ Excede por ${suma - 100} pregunta(s)`;
+        mensajeElement.classList.add('incorrecto');
+        mensajeElement.classList.remove('correcto');
+        btnContinuar.disabled = true;
+    } else if (suma > 0) {
+        sumaElement.classList.add('incorrecto');
+        sumaElement.classList.remove('correcto');
+        mensajeElement.textContent = `⚠️ Faltan ${100 - suma} pregunta(s)`;
+        mensajeElement.classList.add('incorrecto');
+        mensajeElement.classList.remove('correcto');
+        btnContinuar.disabled = true;
+    } else {
+        sumaElement.classList.remove('correcto', 'incorrecto');
+        mensajeElement.textContent = '';
+        mensajeElement.classList.remove('correcto', 'incorrecto');
+        btnContinuar.disabled = true;
+    }
+}
+
+// ============================================================================
+// CONTINUACIÓN DEL SCRIPT DEL MODAL
+// Agregar después del código anterior en modal_documento_oficial_gabarito.html
+// ============================================================================
+
+// ============================================================================
+// PASO 2: IR A SELECCIÓN EN MATRIZ
+// ============================================================================
+
+function irAPaso2() {
+    // Ocultar paso 1, mostrar paso 2
+    document.getElementById('paso1DocOficial').style.display = 'none';
+    document.getElementById('paso2DocOficial').style.display = 'block';
+    
+    // Resetear índice
+    alternativaActual = 'A';
+    indexAlternativaActual = 0;
+    
+    // Generar matriz
+    generarMatriz();
+    
+    // Actualizar UI
+    actualizarUIAlternativaActual();
+}
+
+function generarMatriz() {
+    const matrizContainer = document.getElementById('matrizNumeros');
+    matrizContainer.innerHTML = '';
+    
+    // Generar 100 celdas (1-100)
+    for (let i = 1; i <= 100; i++) {
+        const celda = document.createElement('div');
+        celda.className = 'numero-celda';
+        celda.textContent = i;
+        celda.dataset.numero = i;
+        
+        // Si ya está usado, deshabilitar
+        if (numerosUsados.has(i)) {
+            celda.classList.add('usado');
+        } else {
+            celda.addEventListener('click', () => toggleNumero(i, celda));
+        }
+        
+        matrizContainer.appendChild(celda);
+    }
+}
+
+function toggleNumero(numero, celda) {
+    if (numerosUsados.has(numero)) return;
+    
+    const yaSeleccionado = respuestasGabarito[alternativaActual].includes(numero);
+    
+    if (yaSeleccionado) {
+        // Deseleccionar
+        respuestasGabarito[alternativaActual] = respuestasGabarito[alternativaActual].filter(n => n !== numero);
+        celda.classList.remove('seleccionado');
+    } else {
+        // Verificar si ya llegó al límite
+        if (respuestasGabarito[alternativaActual].length >= totalesPorAlternativa[alternativaActual]) {
+            alert(`Ya seleccionó las ${totalesPorAlternativa[alternativaActual]} preguntas para la alternativa ${alternativaActual}`);
+            return;
+        }
+        
+        // Seleccionar
+        respuestasGabarito[alternativaActual].push(numero);
+        celda.classList.add('seleccionado');
+    }
+    
+    actualizarContador();
+    verificarCompletitud();
+}
+
+function actualizarUIAlternativaActual() {
+    const letra = alternativaActual;
+    const total = totalesPorAlternativa[letra];
+    
+    document.getElementById('letraActual').textContent = letra;
+    document.getElementById('instruccionActual').innerHTML = 
+        `Seleccione las <strong>${total}</strong> preguntas que se responden con <strong>${letra}</strong>`;
+    
+    // Colores por alternativa
+    const colores = {
+        A: '#3b82f6',
+        B: '#10b981',
+        C: '#f59e0b',
+        D: '#8b5cf6',
+        E: '#ef4444'
+    };
+    
+    document.getElementById('letraActual').style.color = colores[letra];
+    
+    actualizarContador();
+}
+
+function actualizarContador() {
+    const seleccionados = respuestasGabarito[alternativaActual].length;
+    const total = totalesPorAlternativa[alternativaActual];
+    
+    document.getElementById('contadorSeleccion').textContent = `${seleccionados} / ${total}`;
+}
+
+function verificarCompletitud() {
+    const seleccionados = respuestasGabarito[alternativaActual].length;
+    const total = totalesPorAlternativa[alternativaActual];
+    
+    const btnSiguiente = document.getElementById('btnSiguienteAlternativa');
+    const btnVistaPrevia = document.getElementById('btnIrVistaPrevia');
+    
+    if (seleccionados === total) {
+        // Alternativa completa
+        if (indexAlternativaActual < alternativas.length - 1) {
+            // Aún hay más alternativas
+            btnSiguiente.disabled = false;
+            btnSiguiente.style.display = 'inline-block';
+            btnVistaPrevia.style.display = 'none';
+        } else {
+            // Es la última alternativa
+            btnSiguiente.style.display = 'none';
+            btnVistaPrevia.style.display = 'inline-block';
+        }
+    } else {
+        btnSiguiente.disabled = true;
+        btnVistaPrevia.style.display = 'none';
+    }
+}
+
+function siguienteAlternativa() {
+    // Marcar números como usados
+    respuestasGabarito[alternativaActual].forEach(num => {
+        numerosUsados.add(num);
+    });
+    
+    // Avanzar a siguiente alternativa
+    indexAlternativaActual++;
+    alternativaActual = alternativas[indexAlternativaActual];
+    
+    // Regenerar matriz
+    generarMatriz();
+    
+    // Actualizar UI
+    actualizarUIAlternativaActual();
+}
+
+function volverAPaso1() {
+    if (!confirm('¿Está seguro? Se perderá el progreso de selección.')) {
+        return;
+    }
+    
+    // Resetear y volver
+    respuestasGabarito = { A: [], B: [], C: [], D: [], E: [] };
+    numerosUsados = new Set();
+    alternativaActual = 'A';
+    indexAlternativaActual = 0;
+    
+    document.getElementById('paso2DocOficial').style.display = 'none';
+    document.getElementById('paso1DocOficial').style.display = 'block';
+}
+
+// ============================================================================
+// PASO 3: VISTA PREVIA
+// ============================================================================
+
+function irAVistaPrevia() {
+    // Marcar últimos números como usados
+    respuestasGabarito[alternativaActual].forEach(num => {
+        numerosUsados.add(num);
+    });
+    
+    // Ocultar paso 2, mostrar paso 3
+    document.getElementById('paso2DocOficial').style.display = 'none';
+    document.getElementById('paso3DocOficial').style.display = 'block';
+    
+    // Generar vista previa
+    generarVistaPrevia();
+}
+
+function generarVistaPrevia() {
+    const container = document.getElementById('tablaVistaPrevia');
+    container.innerHTML = '';
+    
+    // Crear array ordenado de 1 a 100 con sus respuestas
+    const gabaritoCompleto = [];
+    
+    for (let i = 1; i <= 100; i++) {
+        let respuesta = '';
+        
+        for (const [letra, numeros] of Object.entries(respuestasGabarito)) {
+            if (numeros.includes(i)) {
+                respuesta = letra;
+                break;
+            }
+        }
+        
+        gabaritoCompleto.push({ numero: i, respuesta });
+    }
+    
+    // Renderizar
+    gabaritoCompleto.forEach(item => {
+        const div = document.createElement('div');
+        div.className = 'item-gabarito';
+        div.innerHTML = `
+            <span class="item-numero">${item.numero}.</span>
+            <span class="item-respuesta">${item.respuesta}</span>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function volverAPaso2() {
+    // Quitar del Set los números de la alternativa actual
+    respuestasGabarito[alternativaActual].forEach(num => {
+        numerosUsados.delete(num);
+    });
+    
+    // Volver a la última alternativa
+    if (indexAlternativaActual > 0) {
+        indexAlternativaActual--;
+        alternativaActual = alternativas[indexAlternativaActual];
+    }
+    
+    document.getElementById('paso3DocOficial').style.display = 'none';
+    document.getElementById('paso2DocOficial').style.display = 'block';
+    
+    generarMatriz();
+    actualizarUIAlternativaActual();
+}
+
+// ============================================================================
+// GENERAR PDF
+// ============================================================================
+
+async function generarPDFOficial() {
+    try {
+        // Crear objeto con el gabarito completo
+        const gabaritoCompleto = {};
+        
+        for (let i = 1; i <= 100; i++) {
+            let respuesta = '';
+            
+            for (const [letra, numeros] of Object.entries(respuestasGabarito)) {
+                if (numeros.includes(i)) {
+                    respuesta = letra;
+                    break;
+                }
+            }
+            
+            gabaritoCompleto[i] = respuesta;
+        }
+        
+        console.log('Enviando gabarito:', gabaritoCompleto);
+        
+        // Llamar al endpoint
+        const response = await fetch('/api/generar-documento-oficial-gabarito', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                proceso_admision: '2025-2',
+                gabarito: gabaritoCompleto,
+                totales: totalesPorAlternativa
+            })
+        });
+        
+        if (!response.ok) {
+            throw new Error('Error al generar PDF');
+        }
+        
+        // Descargar PDF
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `gabarito_oficial_${new Date().getTime()}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+        
+        alert('✅ Documento oficial generado exitosamente\n\nImprima, firme y lacre el documento.');
+        
+        cerrarModalDocumentoOficial();
+        
+    } catch (error) {
+        console.error('Error:', error);
+        alert('❌ Error al generar el documento: ' + error.message);
+    }
+}
+</script>
+
+<!-- FIN DEL MODAL -->
