@@ -22,6 +22,12 @@ from app.api.generar_hojas_aula import router as hojas_aula_router
 from app.api.dashboard import router as dashboard_router
 from app.api.generar_hoja_individual import router as hoja_individual_router
 
+from app.api import reversion_asignaciones
+from app.api import documento_oficial_gabarito
+
+from app.routers import admin
+
+
 # ============================================================================
 # CREAR CARPETAS NECESARIAS
 # ============================================================================
@@ -86,6 +92,31 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 templates = Jinja2Templates(directory="app/templates")
 
+def format_number(value):
+    """Formatear número con separador de miles"""
+    try:
+        return f"{int(value):,}".replace(",", ",")
+    except (ValueError, TypeError):
+        return value
+
+def format_decimal(value, decimals=2):
+    """Formatear decimal"""
+    try:
+        return f"{float(value):.{decimals}f}"
+    except (ValueError, TypeError):
+        return value
+
+def format_percentage(value, decimals=1):
+    """Formatear porcentaje"""
+    try:
+        return f"{float(value):.{decimals}f}%"
+    except (ValueError, TypeError):
+        return value
+
+templates.env.filters['format_number'] = format_number
+templates.env.filters['format_decimal'] = format_decimal
+templates.env.filters['format_percentage'] = format_percentage
+
 # ============================================================================
 # IMPORTAR Y REGISTRAR ROUTERS
 # ============================================================================
@@ -105,17 +136,35 @@ from app.api import (
 app.include_router(pages_router)
 
 # APIs (con prefijo /api y tags para documentación)
+# ============================================================================
+# REGISTRO DE ROUTERS
+# ============================================================================
+
+# Generación de hojas
 app.include_router(generacion_router, prefix="/api", tags=["Generación"])
-app.include_router(captura_router, prefix="/api", tags=["Captura"])
+app.include_router(hojas_aula_router, prefix="/api", tags=["Generación Hojas"])
+app.include_router(hoja_individual_router, prefix="/api", tags=["Hojas Individual"])
+
+# Gabarito
 app.include_router(gabarito_router, prefix="/api", tags=["Gabarito"])
+app.include_router(documento_oficial_gabarito.router, prefix="/api", tags=["Gabarito"])
+
+# Captura y calificación
+app.include_router(captura_router, prefix="/api", tags=["Captura"])
 app.include_router(calificacion_router, prefix="/api", tags=["Calificación"])
+
+# Resultados y revisión
 app.include_router(resultados_router, prefix="/api", tags=["Resultados"])
 app.include_router(revision_router, prefix="/api", tags=["Revisión"])
-app.include_router(asignacion_router, prefix="/api", tags=["Asignación"])
-app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
-app.include_router(hojas_aula_router, prefix="/api", tags=["Generación Hojas"])
+
+# Gestión y administración
+app.include_router(reversion_asignaciones.router, prefix="/api", tags=["Gestión"])
 app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
-app.include_router(hoja_individual_router, prefix="/api", tags=["Hojas Individual"])
+
+# Documentos oficiales
+app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
+
+app.include_router(admin.router)
 
 # ============================================================================
 # HEALTH CHECK
