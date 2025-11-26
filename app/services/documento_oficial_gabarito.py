@@ -22,7 +22,7 @@ templates = Jinja2Templates(directory="app/templates")
 @router.get("/documento-oficial-gabarito", response_class=HTMLResponse)
 async def documento_oficial_gabarito(
     request: Request,
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     preview: bool = False,
     db: Session = Depends(get_db)
 ):
@@ -105,7 +105,7 @@ async def documento_oficial_gabarito(
 @router.get("/documento-oficial-gabarito-desde-bd")
 async def documento_oficial_desde_bd(
     request: Request,
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """

@@ -1,30 +1,55 @@
 """
-Servicios de la aplicación POSTULANDO
-Ubicación: app/services/__init__.py
+POSTULANDO - Services __init__.py
+app/services/__init__.py
+
+Exporta todos los servicios para fácil importación
 """
 
-# GENERACIÓN DE PDFs
-from app.services.pdf_generator_v3 import generar_hoja_respuestas_v3 as generar_hoja_respuestas_pdf
+# ============================================================================
+# SERVICIOS DE AUTENTICACIÓN
+# ============================================================================
+try:
+    from app.services.auth_admin import (
+        verificar_sesion_admin,
+        crear_sesion_admin,
+        cerrar_sesion_admin,
+        obtener_usuario_actual
+    )
+except ImportError:
+    pass
 
-# PROCESAMIENTO DE IMÁGENES
-from app.services.vision_service_v2 import (  # ← CAMBIO AQUÍ
-    procesar_con_api_seleccionada,
-    extraer_con_openai,
-    extraer_con_claude,
-    extraer_con_google_vision
-)
+# ============================================================================
+# SERVICIOS DE CALIFICACIÓN
+# ============================================================================
+try:
+    from app.services.calificacion import CalificacionService
+except ImportError:
+    pass
 
-#from app.services.image_preprocessor_v2 import ImagePreprocessorV2
+# ============================================================================
+# FUNCIONES LEGACY (para compatibilidad con código existente)
+# ============================================================================
+try:
+    # Si necesitas mantener las funciones antiguas, créalas como wrappers
+    from sqlalchemy.orm import Session
+    
+    def calcular_calificacion(db: Session, hoja_id: int, proceso: str):
+        """Wrapper legacy para CalificacionService"""
+        servicio = CalificacionService(db)
+        return servicio.calificar_hoja(hoja_id, proceso)
+    
+    def gabarito_existe(db: Session, proceso: str) -> bool:
+        """Wrapper legacy para verificar gabarito"""
+        servicio = CalificacionService(db)
+        return servicio.verificar_gabarito_completo(proceso)
+    
+except ImportError:
+    pass
 
-# VALIDACIÓN Y CALIFICACIÓN
-from app.services.validacion import validar_codigos
-from app.services.calificacion import calcular_calificacion, gabarito_existe
-
-__all__ = [
-    'generar_hoja_respuestas_pdf',
-    'procesar_con_api_seleccionada',
-    'validar_codigos',
-    'calcular_calificacion',
-    'gabarito_existe',
-    'ImagePreprocessor'
-]
+# ============================================================================
+# OTROS SERVICIOS (mantén tus importaciones existentes)
+# ============================================================================
+# Ejemplo:
+# from app.services.pdf_generator import generar_pdf
+# from app.services.vision import procesar_imagen
+# etc.
