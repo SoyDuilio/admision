@@ -286,7 +286,7 @@ async def procesar_hoja_completa(
         # Si no hay gabarito del proceso específico, buscar el general
         if not gabarito:
             gabarito = db.query(ClaveRespuesta).filter(
-                ClaveRespuesta.proceso_admision == "ADMISION_2025_2"
+                ClaveRespuesta.proceso_admision == "2025-2"
             ).first()
         
         calificacion_data = None
@@ -465,6 +465,4 @@ async def marcar_hoja_revision(
     return {
         "success": True,
         "message": "Hoja marcada para revisión" if requiere_revision_manual else "Hoja marcada como OK"
-
     }
-

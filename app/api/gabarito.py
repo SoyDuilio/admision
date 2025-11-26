@@ -16,7 +16,7 @@ import shutil
 from sqlalchemy import text, func
 from pydantic import BaseModel
 from typing import Dict, List, Optional
-from datetime import datetime
+from datetime import datetime, timezone
 
 from app.database import get_db
 from app.models import ClaveRespuesta
@@ -94,7 +94,7 @@ async def procesar_gabarito_manual(
     """
     
     respuestas = data.get('respuestas', {})
-    proceso = data.get('proceso', 'ADMISION_2025_2')
+    proceso = data.get('proceso', '2025-2')
     
     # Validar que sean exactamente 100 respuestas
     if len(respuestas) != 100:
@@ -169,7 +169,7 @@ async def procesar_gabarito_manual(
 async def procesar_gabarito_imagen(
     file: UploadFile = File(...),
     api: str = Form("google"),
-    proceso: str = Form("ADMISION_2025_2"),
+    proceso: str = Form("2025-2"),
     db: Session = Depends(get_db)
 ):
     """
@@ -257,46 +257,215 @@ async def confirmar_gabarito(
 ):
     """
     Guarda el gabarito confirmado en la base de datos.
+    
+    Crea 100 registros en clave_respuestas (uno por pregunta).
+    
+    Body esperado:
+    {
+        "proceso": "2025-2",
+        "respuestas": {
+            "1": "A",
+            "2": "B",
+            ...
+            "100": "E"
+        },
+        "observaciones": "opcional"
+    }
     """
     
-    proceso = data.get('proceso')
-    respuestas = data.get('respuestas', {})
-    nombre = data.get('nombre')
-    observaciones = data.get('observaciones')
+    try:
+        proceso = data.get('proceso', '2025-2')
+        respuestas = data.get('respuestas', {})
+        observaciones = data.get('observaciones', '')
+        
+        print(f"\n{'='*70}")
+        print(f"💾 GUARDANDO GABARITO EN BASE DE DATOS")
+        print(f"{'='*70}")
+        print(f"Proceso: {proceso}")
+        print(f"Total respuestas recibidas: {len(respuestas)}")
+        
+        # ================================================================
+        # VALIDACIONES
+        # ================================================================
+        
+        # Validar que tenga 100 respuestas
+        if len(respuestas) != 100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El gabarito debe tener exactamente 100 respuestas. Recibido: {len(respuestas)}"
+            )
+        
+        # Validar que todos los números del 1 al 100 estén presentes
+        numeros_esperados = set(str(i) for i in range(1, 101))
+        numeros_recibidos = set(respuestas.keys())
+        
+        if numeros_esperados != numeros_recibidos:
+            faltantes = numeros_esperados - numeros_recibidos
+            raise HTTPException(
+                status_code=400,
+                detail=f"Faltan las preguntas: {sorted([int(x) for x in faltantes])[:10]}..."
+            )
+        
+        # Validar que todas las respuestas sean A-E
+        respuestas_validas = {'A', 'B', 'C', 'D', 'E'}
+        for num, resp in respuestas.items():
+            if resp.upper() not in respuestas_validas:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Respuesta inválida en pregunta {num}: '{resp}'. Solo se permiten A, B, C, D, E"
+                )
+        
+        # ================================================================
+        # VERIFICAR SI YA EXISTE GABARITO
+        # ================================================================
+        
+        existe = db.query(ClaveRespuesta).filter(
+            ClaveRespuesta.proceso_admision == proceso
+        ).first()
+        
+        if existe:
+            # Preguntar si desea reemplazar (el frontend debe manejar esto)
+            # Por ahora, devolvemos error con flag para que el frontend pregunte
+            raise HTTPException(
+                status_code=409,  # Conflict
+                detail={
+                    "tipo": "gabarito_existente",
+                    "mensaje": f"Ya existe un gabarito para el proceso {proceso}.",
+                    "proceso": proceso,
+                    "pregunta": "¿Desea reemplazar el gabarito existente?"
+                }
+            )
+        
+        # ================================================================
+        # GUARDAR EN BASE DE DATOS
+        # ================================================================
+        
+        registros_creados = 0
+        
+        for numero_str, respuesta in respuestas.items():
+            numero = int(numero_str)
+            
+            clave = ClaveRespuesta(
+                numero_pregunta=numero,
+                respuesta_correcta=respuesta.upper(),
+                proceso_admision=proceso,
+                observaciones=observaciones if numero == 1 else None,  # Solo en la primera
+                api_usada="manual"
+            )
+            
+            db.add(clave)
+            registros_creados += 1
+        
+        db.commit()
+        
+        print(f"✅ Gabarito guardado: {registros_creados} registros creados")
+        
+        return {
+            "success": True,
+            "proceso": proceso,
+            "total_respuestas": registros_creados,
+            "message": f"Gabarito guardado correctamente ({registros_creados} respuestas)"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ ERROR al guardar gabarito: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/gabarito/reemplazar")
+async def reemplazar_gabarito(
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Reemplaza un gabarito existente.
     
-    # Verificar si ya existe gabarito para este proceso
-    existe = db.query(ClaveRespuesta).filter(
-        ClaveRespuesta.proceso_admision == proceso
-    ).first()
+    Primero elimina el gabarito anterior, luego crea el nuevo.
+    """
     
-    if existe:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Ya existe un gabarito para el proceso {proceso}. Use la opción de editar."
-        )
-    
-    # Crear gabarito
-    gabarito = ClaveRespuesta(
-        proceso_admision=proceso,
-        nombre=nombre or f"Gabarito {proceso}",
-        respuestas_json=json.dumps(respuestas),
-        observaciones=observaciones
-    )
-    
-    db.add(gabarito)
-    db.commit()
-    db.refresh(gabarito)
-    
-    # TODO: Implementar tabla respuestas_correctas si es necesaria
-    # Por ahora solo usamos ClaveRespuesta con JSON
-    
-    return {
-        "success": True,
-        "gabarito_id": gabarito.id,
-        "proceso": proceso,
-        "total_respuestas": len(respuestas),
-        "message": "Gabarito guardado correctamente"
-    }
+    try:
+        proceso = data.get('proceso', '2025-2')
+        respuestas = data.get('respuestas', {})
+        observaciones = data.get('observaciones', '')
+        
+        print(f"\n{'='*70}")
+        print(f"🔄 REEMPLAZANDO GABARITO")
+        print(f"{'='*70}")
+        print(f"Proceso: {proceso}")
+        
+        # ================================================================
+        # VALIDACIONES (igual que confirmar)
+        # ================================================================
+        
+        if len(respuestas) != 100:
+            raise HTTPException(
+                status_code=400,
+                detail=f"El gabarito debe tener exactamente 100 respuestas."
+            )
+        
+        respuestas_validas = {'A', 'B', 'C', 'D', 'E'}
+        for num, resp in respuestas.items():
+            if resp.upper() not in respuestas_validas:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Respuesta inválida en pregunta {num}: '{resp}'"
+                )
+        
+        # ================================================================
+        # ELIMINAR GABARITO ANTERIOR
+        # ================================================================
+        
+        eliminados = db.query(ClaveRespuesta).filter(
+            ClaveRespuesta.proceso_admision == proceso
+        ).delete()
+        
+        print(f"🗑️ Registros eliminados: {eliminados}")
+        
+        # ================================================================
+        # CREAR NUEVO GABARITO
+        # ================================================================
+        
+        registros_creados = 0
+        
+        for numero_str, respuesta in respuestas.items():
+            numero = int(numero_str)
+            
+            clave = ClaveRespuesta(
+                numero_pregunta=numero,
+                respuesta_correcta=respuesta.upper(),
+                proceso_admision=proceso,
+                observaciones=observaciones if numero == 1 else None,
+                api_usada="manual"
+            )
+            
+            db.add(clave)
+            registros_creados += 1
+        
+        db.commit()
+        
+        print(f"✅ Gabarito reemplazado: {registros_creados} registros creados")
+        
+        return {
+            "success": True,
+            "proceso": proceso,
+            "eliminados": eliminados,
+            "creados": registros_creados,
+            "message": f"Gabarito reemplazado correctamente"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"❌ ERROR al reemplazar gabarito: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/gabarito/{proceso}")

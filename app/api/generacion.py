@@ -20,8 +20,8 @@ import os
 from datetime import datetime
 
 from app.database import get_db
-from app.models import Postulante, HojaRespuesta, Profesor, Aula
-from app.services.pdf_generator_v2 import generar_hoja_respuestas_v2
+from app.models import Postulante, HojaRespuesta, Profesor, Aula, AsignacionExamen
+from app.services.pdf_generator_v3 import generar_hoja_respuestas_v3 as generar_hoja_respuestas_v2
 from app.utils import generar_codigo_hoja_unico
 
 router = APIRouter()
@@ -388,8 +388,6 @@ async def obtener_progreso_generacion(
     Útil para mostrar en frontend cuántas faltan.
     """
     
-    from app.models import AsignacionExamen
-    
     # Total de asignaciones
     total_asignaciones = db.query(AsignacionExamen).filter(
         AsignacionExamen.proceso_admision == proceso
@@ -487,8 +485,6 @@ async def generar_hojas_desde_asignaciones(
         "solo_pendientes": true
     }
     """
-    
-    from app.models import AsignacionExamen
     
     proceso = data.get('proceso_admision', '2025-2')
     solo_pendientes = data.get('solo_pendientes', True)
@@ -719,3 +715,322 @@ async def generar_hojas_desde_asignaciones(
             "X-Errores": str(len(errores))
         }
     )
+
+
+"""
+Endpoints para Generación Individual y Reimpresión
+Agregar a app/api/generacion.py o crear nuevo archivo
+"""
+
+@router.post("/buscar-postulante-para-hoja")
+async def buscar_postulante_para_hoja(
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Busca un postulante por DNI o Código de Hoja.
+    Retorna datos del postulante y hoja existente (si tiene).
+    
+    Body:
+    {
+        "tipo_busqueda": "dni" | "codigo",
+        "valor": "12345678" | "ABC123XY",
+        "proceso_admision": "2025-2"
+    }
+    """
+    
+    try:
+        tipo = data.get('tipo_busqueda')
+        valor = data.get('valor', '').strip()
+        proceso = data.get('proceso_admision', '2025-2')
+        
+        if not valor:
+            raise HTTPException(status_code=400, detail="Debe proporcionar un valor de búsqueda")
+        
+        postulante = None
+        hoja = None
+        
+        # ================================================================
+        # BUSCAR POR DNI
+        # ================================================================
+        if tipo == 'dni':
+            postulante = db.query(Postulante).filter(
+                Postulante.dni == valor,
+                Postulante.activo == True,
+                Postulante.proceso_admision == proceso
+            ).first()
+            
+            if not postulante:
+                return {
+                    "success": False,
+                    "message": f"No se encontró postulante con DNI {valor}"
+                }
+            
+            # Buscar hoja existente
+            hoja = db.query(HojaRespuesta).filter(
+                HojaRespuesta.postulante_id == postulante.id,
+                HojaRespuesta.proceso_admision == proceso
+            ).order_by(HojaRespuesta.created_at.desc()).first()
+        
+        # ================================================================
+        # BUSCAR POR CÓDIGO DE HOJA
+        # ================================================================
+        elif tipo == 'codigo':
+            hoja = db.query(HojaRespuesta).filter(
+                HojaRespuesta.codigo_hoja == valor,
+                HojaRespuesta.proceso_admision == proceso
+            ).first()
+            
+            if not hoja:
+                return {
+                    "success": False,
+                    "message": f"No se encontró hoja con código {valor}"
+                }
+            
+            # Obtener postulante
+            postulante = db.query(Postulante).filter(
+                Postulante.id == hoja.postulante_id
+            ).first()
+        
+        else:
+            raise HTTPException(status_code=400, detail="Tipo de búsqueda inválido")
+        
+        # ================================================================
+        # CONSTRUIR RESPUESTA
+        # ================================================================
+        
+        postulante_data = {
+            "id": postulante.id,
+            "dni": postulante.dni,
+            "nombre_completo": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
+            "programa": postulante.programa_educativo
+        }
+        
+        hoja_data = None
+        if hoja:
+            hoja_data = {
+                "id": hoja.id,
+                "codigo_hoja": hoja.codigo_hoja,
+                "codigo_aula": hoja.codigo_aula,
+                "dni_profesor": hoja.dni_profesor,
+                "estado": hoja.estado,
+                "created_at": hoja.created_at.isoformat() if hoja.created_at else None
+            }
+        
+        return {
+            "success": True,
+            "postulante": postulante_data,
+            "hoja_existente": hoja_data
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error en buscar_postulante_para_hoja: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reimprimir-hoja")
+async def reimprimir_hoja(
+    data: dict,
+    db: Session = Depends(get_db)
+):
+    """
+    Reimprime una hoja de respuesta.
+    
+    FLUJO:
+    1. Valida que exista hoja anterior
+    2. Genera NUEVO código único
+    3. Registra anulación en log_anulacion_hojas
+    4. Actualiza hoja_respuesta con nuevo código
+    5. Actualiza AsignacionExamen con datos de reimpresión
+    6. Genera PDF con nuevo código
+    7. Retorna PDF
+    
+    Body:
+    {
+        "postulante_id": 123,
+        "hoja_anterior_id": 456,
+        "motivo": "deterioro" | "extravio" | "error_marcacion" | "ilegible" | "otro",
+        "hoja_original_devuelta": true | false,
+        "solicitado_por": "Nombre completo",
+        "observaciones": "Texto opcional",
+        "proceso_admision": "2025-2"
+    }
+    """
+    
+    from app.models.log_anulacion import LogAnulacionHoja
+    from app.services.pdf_generator_v3 import generar_hoja_respuestas_v3
+    from app.utils import generar_codigo_hoja_unico
+    from fastapi.responses import FileResponse
+    import tempfile
+    import os
+    
+    try:
+        postulante_id = data.get('postulante_id')
+        hoja_anterior_id = data.get('hoja_anterior_id')
+        motivo = data.get('motivo')
+        hoja_devuelta = data.get('hoja_original_devuelta', False)
+        solicitado_por = data.get('solicitado_por', '')
+        observaciones = data.get('observaciones', '')
+        proceso = data.get('proceso_admision', '2025-2')
+        
+        print(f"\n{'='*70}")
+        print(f"🔄 REIMPRESIÓN DE HOJA")
+        print(f"{'='*70}")
+        print(f"Postulante ID: {postulante_id}")
+        print(f"Hoja anterior ID: {hoja_anterior_id}")
+        print(f"Motivo: {motivo}")
+        
+        # ================================================================
+        # 1. VALIDAR DATOS
+        # ================================================================
+        
+        if not all([postulante_id, hoja_anterior_id, motivo, solicitado_por]):
+            raise HTTPException(status_code=400, detail="Faltan datos obligatorios")
+        
+        # Obtener hoja anterior
+        hoja_anterior = db.query(HojaRespuesta).filter_by(id=hoja_anterior_id).first()
+        if not hoja_anterior:
+            raise HTTPException(status_code=404, detail="Hoja anterior no encontrada")
+        
+        codigo_anterior = hoja_anterior.codigo_hoja
+        
+        # Obtener postulante
+        postulante = db.query(Postulante).filter_by(id=postulante_id).first()
+        if not postulante:
+            raise HTTPException(status_code=404, detail="Postulante no encontrado")
+        
+        # Obtener asignación
+        
+        asignacion = db.query(AsignacionExamen).filter_by(
+            postulante_id=postulante_id,
+            proceso_admision=proceso
+        ).first()
+        
+        if not asignacion:
+            raise HTTPException(
+                status_code=404,
+                detail="No se encontró asignación para este postulante"
+            )
+        
+        # Obtener aula y profesor
+        aula = asignacion.aula
+        profesor = db.query(Profesor).filter_by(id=asignacion.profesor_id).first()
+        
+        if not aula or not profesor:
+            raise HTTPException(
+                status_code=404,
+                detail="Datos incompletos de aula o profesor"
+            )
+        
+        # ================================================================
+        # 2. GENERAR NUEVO CÓDIGO
+        # ================================================================
+        
+        nuevo_codigo = generar_codigo_hoja_unico()
+        
+        intentos = 0
+        while db.query(HojaRespuesta).filter_by(codigo_hoja=nuevo_codigo).first():
+            nuevo_codigo = generar_codigo_hoja_unico()
+            intentos += 1
+            if intentos > 10:
+                raise Exception("No se pudo generar código único")
+        
+        print(f"✅ Código anterior: {codigo_anterior}")
+        print(f"✅ Código nuevo: {nuevo_codigo}")
+        
+        # ================================================================
+        # 3. REGISTRAR ANULACIÓN
+        # ================================================================
+        
+        log_anulacion = LogAnulacionHoja(
+            hoja_respuesta_id=hoja_anterior_id,
+            codigo_hoja=codigo_anterior,
+            postulante_id=postulante_id,
+            motivo=motivo,
+            tipo_anulacion='reimpresion',
+            anulado_por=solicitado_por,
+            cargo='Solicitante',
+            nuevo_codigo_hoja=nuevo_codigo,
+            observaciones=observaciones
+        )
+        db.add(log_anulacion)
+        db.flush()
+        
+        print(f"✅ Anulación registrada (ID: {log_anulacion.id})")
+        
+        # ================================================================
+        # 4. ACTUALIZAR HOJA CON NUEVO CÓDIGO
+        # ================================================================
+        
+        hoja_anterior.codigo_hoja = nuevo_codigo
+        hoja_anterior.estado = "generada"
+        hoja_anterior.observaciones = f"REIMPRESIÓN: {motivo}"
+        hoja_anterior.updated_at = datetime.now()
+        
+        # Actualizar referencia en log
+        log_anulacion.nueva_hoja_id = hoja_anterior_id
+        
+        # ================================================================
+        # 5. ACTUALIZAR ASIGNACIÓN
+        # ================================================================
+        
+        asignacion.motivo_reimpresion = motivo
+        asignacion.hoja_original_devuelta = hoja_devuelta
+        asignacion.reimpresion_solicitada_por = solicitado_por
+        
+        # ================================================================
+        # 6. COMMIT
+        # ================================================================
+        
+        try:
+            db.commit()
+            print(f"✅ Cambios guardados en BD")
+        except Exception as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Error al guardar: {str(e)}")
+        
+        # ================================================================
+        # 7. GENERAR PDF
+        # ================================================================
+        
+        temp_dir = tempfile.mkdtemp()
+        filename = f"hoja_{postulante.dni}_{nuevo_codigo}.pdf"
+        filepath = os.path.join(temp_dir, filename)
+        
+        generar_hoja_respuestas_v3(
+            output_path=filepath,
+            dni_postulante=postulante.dni,
+            codigo_aula=aula.codigo,
+            dni_profesor=profesor.dni,
+            codigo_hoja=nuevo_codigo,
+            proceso=proceso
+        )
+        
+        print(f"✅ PDF generado: {filename}\n")
+        
+        # ================================================================
+        # 8. RETORNAR PDF
+        # ================================================================
+        
+        return FileResponse(
+            path=filepath,
+            filename=filename,
+            media_type='application/pdf',
+            headers={
+                "X-Codigo-Anterior": codigo_anterior,
+                "X-Codigo-Nuevo": nuevo_codigo
+            }
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        print(f"\n❌ ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))

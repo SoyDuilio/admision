@@ -224,7 +224,7 @@ async def calificar_hojas_pendientes(
 
 @router.post("/calificar-hojas")
 async def calificar_hojas_masivo(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """
@@ -287,7 +287,7 @@ async def calificar_hoja_endpoint(
     # Si no se especifica gabarito, usar el activo
     if not gabarito_id:
         gabarito = db.query(ClaveRespuesta).filter(
-            ClaveRespuesta.proceso_admision == "ADMISION_2025_2"
+            ClaveRespuesta.proceso_admision == "2025-2"
         ).first()
         
         if not gabarito:

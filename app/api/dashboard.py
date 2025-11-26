@@ -27,7 +27,7 @@ router = APIRouter()
 
 @router.get("/dashboard/estadisticas")
 async def obtener_estadisticas_dashboard(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """
@@ -199,7 +199,7 @@ async def obtener_estadisticas_dashboard(
 
 @router.get("/dashboard/resumen-proceso")
 async def resumen_proceso(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """
@@ -250,7 +250,7 @@ async def resumen_proceso(
 
 @router.get("/dashboard/alertas")
 async def obtener_alertas(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """

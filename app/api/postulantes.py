@@ -118,7 +118,7 @@ async def registrar_postulante(
     numero_operacion: Optional[str] = Form(None),
     
     # Proceso
-    proceso_admision: str = Form("ADMISION_2025_2"),
+    proceso_admision: str = Form("2025-2"),
     
     db: Session = Depends(get_db)
 ):
@@ -292,7 +292,7 @@ async def registrar_postulante(
 
 @router.get("/postulantes/lista")
 async def listar_postulantes(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     programa: Optional[str] = None,
     estado: Optional[str] = None,
     buscar: Optional[str] = None,
@@ -430,7 +430,7 @@ async def obtener_postulante(
 
 @router.get("/postulantes/sin-certificado")
 async def postulantes_sin_certificado_minedu(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """
@@ -469,7 +469,7 @@ async def postulantes_sin_certificado_minedu(
 
 @router.get("/postulantes/estadisticas")
 async def estadisticas_postulantes(
-    proceso: str = "ADMISION_2025_2",
+    proceso: str = "2025-2",
     db: Session = Depends(get_db)
 ):
     """

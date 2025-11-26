@@ -56,7 +56,7 @@ async def corregir_respuesta_individual(
     
     # Recalcular si es correcta (comparar con gabarito)
     gabarito = db.query(ClaveRespuesta).filter(
-        ClaveRespuesta.proceso_admision == "ADMISION_2025_2"
+        ClaveRespuesta.proceso_admision == "2025-2"
     ).first()
     
     if gabarito:
@@ -90,7 +90,7 @@ async def corregir_respuestas_masivo(
     
     # Obtener gabarito
     gabarito = db.query(ClaveRespuesta).filter(
-        ClaveRespuesta.proceso_admision == "ADMISION_2025_2"
+        ClaveRespuesta.proceso_admision == "2025-2"
     ).first()
     
     respuestas_correctas = {}

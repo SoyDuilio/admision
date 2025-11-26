@@ -191,7 +191,7 @@ async def obtener_detalle_hoja(
             ORDER BY r.numero_pregunta
         """)
         
-        proceso = hoja_row[15] or 'ADMISION_2025_2'
+        proceso = hoja_row[15] or '2025-2'
         
         result_resp = db.execute(query_respuestas, {
             "hoja_id": hoja_id,
