@@ -218,10 +218,9 @@ async def dashboard_coordinador(request: Request, db: Session, usuario: dict, pr
             (SELECT COUNT(*) FROM postulantes WHERE proceso_admision = :proceso) as total_postulantes,
             (SELECT COUNT(*) FROM aulas WHERE activo = true) as total_aulas,
             (SELECT COUNT(*) FROM profesores WHERE activo = true) as total_profesores,
-            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND estado IN ('PROCESADO', 'procesado')) as hojas_procesadas,
+            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND estado IN ('PROCESADO', 'procesado', 'completado', 'calificado')) as hojas_procesadas,
             (SELECT COUNT(*) FROM clave_respuestas WHERE proceso_admision = :proceso) as gabarito_count,
             (SELECT SUM(vacantes) FROM programas_educativos WHERE activo = true) as total_vacantes,
-            (SELECT COUNT(*) FROM aulas a JOIN asignacion_profesor_aula apa ON a.id = apa.aula_id WHERE apa.proceso_admision = :proceso) as aulas_con_profesor,
             (SELECT COUNT(*) FROM postulantes WHERE proceso_admision = :proceso AND aula_id IS NOT NULL) as postulantes_asignados
     """), {"proceso": proceso}).fetchone()
     
@@ -232,10 +231,33 @@ async def dashboard_coordinador(request: Request, db: Session, usuario: dict, pr
         "hojas_procesadas": result.hojas_procesadas or 0,
         "gabarito_cargado": (result.gabarito_count or 0) == 100,
         "total_vacantes": result.total_vacantes or 0,
-        "aulas_con_profesor": result.aulas_con_profesor or 0,
-        "postulantes_asignados": result.postulantes_asignados or 0,
-        "fecha_examen": None  # Obtener de configuracion_proceso si existe
+        "postulantes_asignados": result.postulantes_asignados or 0
     }
+    
+    # Obtener lista de programas educativos
+    programas_result = db.execute(text("""
+        SELECT DISTINCT programa_educativo 
+        FROM postulantes 
+        WHERE proceso_admision = :proceso AND programa_educativo IS NOT NULL
+        ORDER BY programa_educativo
+    """), {"proceso": proceso}).fetchall()
+    programas = [p[0] for p in programas_result]
+    
+    # Si no hay programas en postulantes, obtener de la tabla programas_educativos si existe
+    if not programas:
+        try:
+            programas_result = db.execute(text("""
+                SELECT nombre FROM programas_educativos WHERE activo = true ORDER BY nombre
+            """)).fetchall()
+            programas = [p[0] for p in programas_result]
+        except:
+            programas = []
+    
+    # Obtener aulas para el selector de listados
+    aulas = db.execute(text("""
+        SELECT id, codigo, nombre FROM aulas WHERE activo = true ORDER BY codigo
+    """)).fetchall()
+    aulas_list = [{"id": a.id, "codigo": a.codigo, "nombre": a.nombre} for a in aulas]
     
     return templates.TemplateResponse(
         "admin/dashboard_coordinador.html",
@@ -243,7 +265,9 @@ async def dashboard_coordinador(request: Request, db: Session, usuario: dict, pr
             "request": request,
             "usuario": usuario,
             "proceso_actual": proceso,
-            "stats": stats
+            "stats": stats,
+            "programas": programas,
+            "aulas": aulas_list
         }
     )
 
