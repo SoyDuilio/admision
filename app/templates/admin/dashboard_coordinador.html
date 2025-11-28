@@ -3,299 +3,550 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard Coordinador | I.S.T. Pedro A. del Águila H.</title>
+    <title>Panel Coordinador | POSTULANDO</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: 'Inter', sans-serif;
-            background: #f0f4f8;
-            min-height: 100vh;
-        }
-        
-        .header {
-            background: linear-gradient(135deg, #1e3a5f 0%, #2d5a87 100%);
-            color: white;
-            padding: 20px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        
-        .header-left h1 { font-size: 1.5rem; margin-bottom: 4px; }
-        .header-left span { font-size: 0.85rem; opacity: 0.8; }
-        
-        .header-right { display: flex; align-items: center; gap: 16px; }
-        
-        .user-badge {
-            background: rgba(255,255,255,0.15);
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 0.9rem;
-        }
-        
-        .btn-logout {
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.3);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 8px;
-            text-decoration: none;
-            font-size: 0.85rem;
-            transition: all 0.3s;
-        }
-        
-        .btn-logout:hover { background: rgba(255,255,255,0.2); }
-        
-        .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
-        
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-        
-        .stat-card {
-            background: white;
-            border-radius: 12px;
-            padding: 20px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        
-        .stat-card .icon { font-size: 2rem; margin-bottom: 8px; }
-        .stat-card .value { font-size: 2rem; font-weight: 700; color: #1e3a5f; }
-        .stat-card .label { font-size: 0.85rem; color: #64748b; }
-        
-        .section {
-            background: white;
-            border-radius: 12px;
-            padding: 24px;
-            margin-bottom: 24px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-        }
-        
-        .section-title {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #1e3a5f;
-            margin-bottom: 16px;
-            padding-bottom: 12px;
-            border-bottom: 2px solid #e2e8f0;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .options-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 16px;
-        }
-        
-        .option-card {
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            padding: 20px;
-            text-decoration: none;
-            color: inherit;
-            transition: all 0.3s;
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-        }
-        
-        .option-card:hover {
-            border-color: #3b82f6;
-            background: #f8fafc;
-            transform: translateY(-2px);
-        }
-        
-        .option-card .icon { font-size: 2rem; }
-        .option-card h3 { font-size: 1rem; font-weight: 600; color: #1e3a5f; }
-        .option-card p { font-size: 0.85rem; color: #64748b; line-height: 1.4; }
-        
-        .option-card .badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 12px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-        
-        .badge-success { background: #dcfce7; color: #166534; }
-        .badge-warning { background: #fef3c7; color: #92400e; }
-        .badge-info { background: #dbeafe; color: #1e40af; }
-        
-        .alert {
-            padding: 16px 20px;
-            border-radius: 10px;
-            margin-bottom: 24px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-        
-        .alert-info {
-            background: #eff6ff;
-            border: 1px solid #bfdbfe;
-            color: #1e40af;
-        }
-        
-        @media (max-width: 768px) {
-            .header { flex-direction: column; gap: 16px; text-align: center; }
-            .options-grid { grid-template-columns: 1fr; }
-        }
-    </style>
+    <link rel="stylesheet" href="/static/css/admin/base.css">
+    <link rel="stylesheet" href="/static/css/admin/dashboard_coordinador.css">
 </head>
 <body>
+    <!-- ============================================================ -->
+    <!-- HEADER FIJO -->
+    <!-- ============================================================ -->
     <header class="header">
         <div class="header-left">
-            <h1>📊 Panel de Coordinador</h1>
+            <h1>📊 Panel del Coordinador</h1>
             <span>I.S.T. Pedro A. del Águila H. | Proceso: {{ proceso_actual }}</span>
         </div>
         <div class="header-right">
             <span class="user-badge">👤 {{ usuario.nombres }} {{ usuario.apellidos }}</span>
+            <a href="/" class="btn-logout">🏠 Sistema</a>
             <a href="/admin/logout" class="btn-logout">🚪 Salir</a>
         </div>
     </header>
+
+    <!-- ============================================================ -->
+    <!-- NAVEGACIÓN POR PESTAÑAS -->
+    <!-- ============================================================ -->
+    <nav class="tabs-nav">
+        <button class="tab-btn active" data-tab="tab-postulantes">
+            👥 Postulantes
+            <span class="badge" id="badgePostulantes">{{ stats.total_postulantes or 0 }}</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-aulas">
+            🏫 Aulas
+            <span class="badge" id="badgeAulas">{{ stats.total_aulas or 0 }}</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-profesores">
+            👨‍🏫 Profesores
+            <span class="badge" id="badgeProfesores">{{ stats.total_profesores or 0 }}</span>
+        </button>
+        <button class="tab-btn" data-tab="tab-listados">
+            📄 Listados
+        </button>
+    </nav>
+
+    <!-- ============================================================ -->
+    <!-- CONTENEDOR PRINCIPAL -->
+    <!-- ============================================================ -->
+    <main class="main-container">
+        <div class="container">
+            
+            <!-- ======================================================== -->
+            <!-- TAB: POSTULANTES -->
+            <!-- ======================================================== -->
+            <div id="tab-postulantes" class="tab-content active">
+                
+                <!-- Estadísticas rápidas -->
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="icon">👥</div>
+                        <div class="value">{{ stats.total_postulantes or 0 }}</div>
+                        <div class="label">Total Postulantes</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon">✅</div>
+                        <div class="value">{{ stats.postulantes_asignados or 0 }}</div>
+                        <div class="label">Con Aula Asignada</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="icon">📝</div>
+                        <div class="value">{{ stats.hojas_procesadas or 0 }}</div>
+                        <div class="label">Exámenes Procesados</div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📝 Registrar Postulante</h3>
+                        <button class="btn btn-outline" onclick="document.getElementById('seccionCargaMasiva').classList.toggle('hidden')">
+                            📤 Carga Masiva
+                        </button>
+                    </div>
+                    
+                    <!-- Formulario de registro individual -->
+                    <form id="formPostulante" onsubmit="registrarPostulante(event)" class="form-postulante">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">DNI *</label>
+                                <input type="text" name="dni" class="form-control" maxlength="8" pattern="\d{8}" required placeholder="12345678">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Nombres *</label>
+                                <input type="text" name="nombres" class="form-control" required placeholder="Juan Carlos">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Apellido Paterno *</label>
+                                <input type="text" name="apellido_paterno" class="form-control" required placeholder="García">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Apellido Materno *</label>
+                                <input type="text" name="apellido_materno" class="form-control" required placeholder="López">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Programa Educativo *</label>
+                                <select name="programa_educativo" class="form-control" required>
+                                    <option value="">-- Seleccione --</option>
+                                    {% for programa in programas %}
+                                    <option value="{{ programa }}">{{ programa }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-lg">💾 Registrar Postulante</button>
+                            <button type="reset" class="btn btn-outline">🔄 Limpiar</button>
+                        </div>
+                    </form>
+                    
+                    <!-- Sección de carga masiva (oculta por defecto) -->
+                    <div id="seccionCargaMasiva" class="hidden" style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--border-light);">
+                        <h4 style="margin-bottom: 16px;">📤 Carga Masiva de Postulantes</h4>
+                        <form id="formCargaMasiva" onsubmit="cargarPostulantesMasivo(event)">
+                            <div class="upload-zone" id="uploadPostulantes">
+                                <input type="file" id="archivoPostulantes" name="archivo" accept=".xlsx,.xls,.csv">
+                                <div class="icon">📁</div>
+                                <h3>Arrastra tu archivo aquí</h3>
+                                <p>o haz clic para seleccionar</p>
+                                <div class="upload-formats">
+                                    <span class="upload-format">📊 Excel (.xlsx)</span>
+                                    <span class="upload-format">📄 CSV (.csv)</span>
+                                </div>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-success">📤 Cargar Archivo</button>
+                                <button type="button" class="btn btn-outline" onclick="descargarPlantilla('postulantes')">📥 Descargar Plantilla</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Lista de postulantes -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 Lista de Postulantes</h3>
+                    </div>
+                    
+                    <!-- Filtros -->
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>DNI</label>
+                            <input type="text" id="filtroDni" class="form-control" placeholder="Buscar DNI..." maxlength="8">
+                        </div>
+                        <div class="filter-group">
+                            <label>Apellidos</label>
+                            <input type="text" id="filtroApellidos" class="form-control" placeholder="Buscar apellidos...">
+                        </div>
+                        <div class="filter-group">
+                            <label>Programa</label>
+                            <select id="filtroPrograma" class="form-control" onchange="filtrarPostulantes()">
+                                <option value="">Todos</option>
+                                {% for programa in programas %}
+                                <option value="{{ programa }}">{{ programa }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>&nbsp;</label>
+                            <button class="btn btn-primary" onclick="filtrarPostulantes()">🔍 Buscar</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Tabla de postulantes -->
+                    <div id="listaPostulantes">
+                        <div class="text-center" style="padding: 40px;">
+                            <div class="spinner"></div>
+                            <p style="margin-top: 10px; color: var(--text-muted);">Cargando postulantes...</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Paginación -->
+                    <div id="paginacionPostulantes"></div>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- TAB: AULAS -->
+            <!-- ======================================================== -->
+            <div id="tab-aulas" class="tab-content">
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">🏫 Registrar Aula</h3>
+                    </div>
+                    
+                    <!-- Configuración de prefijo -->
+                    <div class="prefix-config">
+                        <label>Prefijo de código:</label>
+                        <select id="prefijoAula" name="prefijo" class="form-control" style="width: auto;">
+                            <option value="AU">AU (AU-001)</option>
+                            <option value="A">A (A-001)</option>
+                            <option value="AULA">AULA (AULA-001)</option>
+                            <option value="S">S (S-001)</option>
+                        </select>
+                        <span>Siguiente código:</span>
+                        <span class="prefix-preview" id="previewCodigo">AU-001</span>
+                    </div>
+                    
+                    <form id="formAula" onsubmit="registrarAula(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Nombre del Aula</label>
+                                <input type="text" name="nombre" class="form-control" placeholder="Aula Magna, Lab. Cómputo 1...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Programa / Facultad</label>
+                                <select name="programa" class="form-control">
+                                    <option value="">-- General --</option>
+                                    {% for programa in programas %}
+                                    <option value="{{ programa }}">{{ programa }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Pabellón / Edificio</label>
+                                <input type="text" name="pabellon" class="form-control" placeholder="A, B, Principal...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Piso</label>
+                                <input type="text" name="piso" class="form-control" placeholder="1, 2, 3...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Número Original</label>
+                                <input type="text" name="numero" class="form-control" placeholder="101, 202...">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Capacidad *</label>
+                                <input type="number" name="capacidad" class="form-control" min="1" max="100" required placeholder="30">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-lg">💾 Registrar Aula</button>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- Lista de aulas -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 Aulas Registradas</h3>
+                    </div>
+                    <div id="listaAulas">
+                        <div class="text-center" style="padding: 40px;">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- TAB: PROFESORES -->
+            <!-- ======================================================== -->
+            <div id="tab-profesores" class="tab-content">
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">👨‍🏫 Registrar Profesor / Vigilante</h3>
+                        <button class="btn btn-outline" onclick="document.getElementById('seccionCargaProfesores').classList.toggle('hidden')">
+                            📤 Carga Masiva
+                        </button>
+                    </div>
+                    
+                    <form id="formProfesor" onsubmit="registrarProfesor(event)">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">DNI *</label>
+                                <input type="text" name="dni" class="form-control" maxlength="8" pattern="\d{8}" required placeholder="12345678">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Nombres *</label>
+                                <input type="text" name="nombres" class="form-control" required placeholder="María Elena">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Apellido Paterno *</label>
+                                <input type="text" name="apellido_paterno" class="form-control" required placeholder="Rodríguez">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Apellido Materno</label>
+                                <input type="text" name="apellido_materno" class="form-control" placeholder="Sánchez">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label class="form-label">Condición *</label>
+                                <select name="condicion" class="form-control" required>
+                                    <option value="DOCENTE">Docente de la institución</option>
+                                    <option value="ADMINISTRATIVO">Personal administrativo</option>
+                                    <option value="EXTERNO">Externo (contratado)</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Email</label>
+                                <input type="email" name="email" class="form-control" placeholder="correo@ejemplo.com">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Teléfono</label>
+                                <input type="text" name="telefono" class="form-control" placeholder="999888777">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn btn-primary btn-lg">💾 Registrar Profesor</button>
+                        </div>
+                    </form>
+                    
+                    <!-- Carga masiva de profesores -->
+                    <div id="seccionCargaProfesores" class="hidden" style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--border-light);">
+                        <h4 style="margin-bottom: 16px;">📤 Carga Masiva de Profesores</h4>
+                        <form id="formCargaProfesores" onsubmit="cargarProfesoresMasivo(event)">
+                            <div class="upload-zone" id="uploadProfesores">
+                                <input type="file" id="archivoProfesores" name="archivo" accept=".xlsx,.xls,.csv">
+                                <div class="icon">📁</div>
+                                <h3>Arrastra tu archivo aquí</h3>
+                                <p>Columnas: DNI, Nombres, Apellidos, Condición, Email, Teléfono</p>
+                            </div>
+                            <div class="form-actions">
+                                <button type="submit" class="btn btn-success">📤 Cargar Archivo</button>
+                                <button type="button" class="btn btn-outline" onclick="descargarPlantilla('profesores')">📥 Descargar Plantilla</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Lista de profesores -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📋 Profesores / Vigilantes Registrados</h3>
+                    </div>
+                    <div id="listaProfesores">
+                        <div class="text-center" style="padding: 40px;">
+                            <div class="spinner"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ======================================================== -->
+            <!-- TAB: LISTADOS -->
+            <!-- ======================================================== -->
+            <div id="tab-listados" class="tab-content">
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📄 Generar Listados</h3>
+                    </div>
+                    
+                    <div class="listados-options">
+                        <div class="listado-option selected" data-listado="alfabetico" onclick="seleccionarTipoListado('alfabetico')">
+                            <div class="icon">📋</div>
+                            <h3>Lista Alfabética General</h3>
+                            <p>Todos los postulantes ordenados alfabéticamente con su aula asignada</p>
+                        </div>
+                        <div class="listado-option" data-listado="por-aula" onclick="seleccionarTipoListado('por-aula')">
+                            <div class="icon">🏫</div>
+                            <h3>Lista por Aula</h3>
+                            <p>Postulantes de un aula específica para control del profesor vigilante</p>
+                        </div>
+                        <div class="listado-option" data-listado="por-programa" onclick="seleccionarTipoListado('por-programa')">
+                            <div class="icon">📚</div>
+                            <h3>Lista por Programa</h3>
+                            <p>Postulantes agrupados por programa educativo</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Configuración adicional para lista por aula -->
+                    <div id="config-por-aula" class="hidden" style="margin-top: 20px;">
+                        <div class="form-group">
+                            <label class="form-label">Seleccione el Aula</label>
+                            <select id="listadoAula" class="form-control">
+                                <option value="">-- Seleccione --</option>
+                                {% for aula in aulas %}
+                                <option value="{{ aula.id }}">{{ aula.codigo }} - {{ aula.nombre or 'Sin nombre' }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div class="form-actions" style="margin-top: 20px;">
+                        <button id="btnGenerarListado" class="btn btn-primary btn-lg" onclick="generarListado(document.querySelector('.listado-option.selected')?.dataset.listado || 'alfabetico')">
+                            📄 Generar Listado
+                        </button>
+                        <button class="btn btn-success btn-lg" onclick="imprimirListado()">🖨️ Imprimir</button>
+                    </div>
+                </div>
+
+                <!-- Vista previa del listado -->
+                <div class="card hidden" id="previewListadoCard">
+                    <div class="card-header">
+                        <h3 class="card-title">👁️ Vista Previa</h3>
+                        <div>
+                            <button class="btn btn-outline" onclick="imprimirListado()">🖨️ Imprimir</button>
+                            <button class="btn btn-success" onclick="descargarListadoPDF()">📥 Descargar PDF</button>
+                        </div>
+                    </div>
+                    <div id="previewListado" class="listado-preview"></div>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <!-- ============================================================ -->
+    <!-- FOOTER FIJO -->
+    <!-- ============================================================ -->
+    <footer class="footer">
+        <div class="footer-stats">
+            <div class="footer-stat">
+                <span>👥</span>
+                <span>Postulantes:</span>
+                <span class="footer-stat-value" id="footerPostulantes">{{ stats.total_postulantes or 0 }}</span>
+            </div>
+            <div class="footer-stat">
+                <span>🏫</span>
+                <span>Aulas:</span>
+                <span class="footer-stat-value" id="footerAulas">{{ stats.total_aulas or 0 }}</span>
+            </div>
+            <div class="footer-stat">
+                <span>👨‍🏫</span>
+                <span>Profesores:</span>
+                <span class="footer-stat-value" id="footerProfesores">{{ stats.total_profesores or 0 }}</span>
+            </div>
+        </div>
+        <div>
+            <span>Proceso: <strong>{{ proceso_actual }}</strong></span>
+        </div>
+    </footer>
+
+    <!-- ============================================================ -->
+    <!-- MODALES -->
+    <!-- ============================================================ -->
     
-    <div class="container">
-        <div class="alert alert-info">
-            <span style="font-size: 1.5rem;">📋</span>
-            <div><strong>Proceso activo:</strong> {{ proceso_actual }}</div>
-        </div>
-        
-        <div class="stats-row">
-            <div class="stat-card">
-                <div class="icon">👥</div>
-                <div class="value">{{ stats.total_postulantes or 0 }}</div>
-                <div class="label">Postulantes</div>
+    <!-- Modal Editar Postulante -->
+    <div id="modalEditarPostulante" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">✏️ Editar Postulante</h3>
+                <button class="modal-close" onclick="cerrarModal('modalEditarPostulante')">×</button>
             </div>
-            <div class="stat-card">
-                <div class="icon">🏫</div>
-                <div class="value">{{ stats.total_aulas or 0 }}</div>
-                <div class="label">Aulas</div>
-            </div>
-            <div class="stat-card">
-                <div class="icon">👨‍🏫</div>
-                <div class="value">{{ stats.total_profesores or 0 }}</div>
-                <div class="label">Profesores</div>
-            </div>
-            <div class="stat-card">
-                <div class="icon">📄</div>
-                <div class="value">{{ stats.hojas_procesadas or 0 }}</div>
-                <div class="label">Hojas Procesadas</div>
-            </div>
-            <div class="stat-card">
-                <div class="icon">🎯</div>
-                <div class="value">{{ stats.total_vacantes or '-' }}</div>
-                <div class="label">Vacantes</div>
-            </div>
-        </div>
-        
-        <!-- Sistema Principal -->
-        <div class="section">
-            <h2 class="section-title">🚀 Sistema Principal</h2>
-            <div class="options-grid">
-                <a href="/" class="option-card">
-                    <div class="icon">🏠</div>
-                    <h3>Ir al Sistema Principal</h3>
-                    <p>Dashboard con todas las funcionalidades operativas</p>
-                    <span class="badge badge-info">Ir →</span>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Gestión Administrativa -->
-        <div class="section">
-            <h2 class="section-title">⚙️ Gestión Administrativa</h2>
-            <div class="options-grid">
-                <a href="/postulantes/registrar" class="option-card">
-                    <div class="icon">📝</div>
-                    <h3>Registrar Postulante</h3>
-                    <p>Inscripción individual de postulantes</p>
-                    <span class="badge badge-success">✓ Disponible</span>
-                </a>
-                
-                <a href="/postulantes/lista" class="option-card">
-                    <div class="icon">📋</div>
-                    <h3>Lista de Postulantes</h3>
-                    <p>Ver y gestionar postulantes inscritos</p>
-                    {% if stats.total_postulantes > 0 %}
-                    <span class="badge badge-info">{{ stats.total_postulantes }} inscritos</span>
-                    {% else %}
-                    <span class="badge badge-warning">Sin postulantes</span>
-                    {% endif %}
-                </a>
-                
-                <a href="/gestion-aulas-profesores" class="option-card">
-                    <div class="icon">🏫</div>
-                    <h3>Aulas y Profesores</h3>
-                    <p>Configurar aulas, profesores y asignaciones</p>
-                    <span class="badge badge-success">✓ Disponible</span>
-                </a>
-                
-                <a href="/verificacion/certificados" class="option-card">
-                    <div class="icon">🔍</div>
-                    <h3>Verificación MINEDU</h3>
-                    <p>Validar certificados de estudios</p>
-                    <span class="badge badge-warning">⚠️ Pendiente</span>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Proceso de Evaluación -->
-        <div class="section">
-            <h2 class="section-title">🎯 Proceso de Evaluación</h2>
-            <div class="options-grid">
-                <a href="/" class="option-card">
-                    <div class="icon">📦</div>
-                    <h3>Generar Hojas de Respuesta</h3>
-                    <p>Generar PDFs por aula o individual</p>
-                    <span class="badge badge-info">Sistema Principal</span>
-                </a>
-                
-                <a href="/capturar-hojas" class="option-card">
-                    <div class="icon">📷</div>
-                    <h3>Capturar Exámenes</h3>
-                    <p>Procesar hojas con IA de visión artificial</p>
-                    <span class="badge badge-success">⚡ Activo</span>
-                </a>
-                
-                <a href="/registrar-gabarito" class="option-card">
-                    <div class="icon">📝</div>
-                    <h3>Registrar Gabarito</h3>
-                    <p>Ingresar respuestas correctas (4 métodos)</p>
-                    {% if stats.gabarito_cargado %}
-                    <span class="badge badge-success">✓ Cargado</span>
-                    {% else %}
-                    <span class="badge badge-warning">Pendiente</span>
-                    {% endif %}
-                </a>
-                
-                <a href="/resultados" target="_blank" class="option-card">
-                    <div class="icon">🏆</div>
-                    <h3>Ver Resultados</h3>
-                    <p>Ranking con estadísticas</p>
-                    <span class="badge badge-info">Ver →</span>
-                </a>
-            </div>
-        </div>
-        
-        <!-- Reportes -->
-        <div class="section">
-            <h2 class="section-title">📈 Reportes</h2>
-            <div class="options-grid">
-                <a href="/estadisticas" class="option-card">
-                    <div class="icon">📊</div>
-                    <h3>Estadísticas Generales</h3>
-                    <p>Análisis detallado del proceso</p>
-                    <span class="badge badge-info">Ver →</span>
-                </a>
-            </div>
+            <form onsubmit="guardarEdicionPostulante(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="editId" name="id">
+                    <div class="form-group">
+                        <label class="form-label">DNI</label>
+                        <input type="text" id="editDni" name="dni" class="form-control" maxlength="8" required>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Nombres</label>
+                            <input type="text" id="editNombres" name="nombres" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Apellido Paterno</label>
+                            <input type="text" id="editApellidoPaterno" name="apellido_paterno" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Apellido Materno</label>
+                            <input type="text" id="editApellidoMaterno" name="apellido_materno" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Programa</label>
+                            <select id="editPrograma" name="programa_educativo" class="form-control">
+                                {% for programa in programas %}
+                                <option value="{{ programa }}">{{ programa }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="cerrarModal('modalEditarPostulante')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Guardar Cambios</button>
+                </div>
+            </form>
         </div>
     </div>
+
+    <!-- Modal Editar Aula -->
+    <div id="modalEditarAula" class="modal-overlay">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">✏️ Editar Aula</h3>
+                <button class="modal-close" onclick="cerrarModal('modalEditarAula')">×</button>
+            </div>
+            <form onsubmit="guardarEdicionAula(event)">
+                <div class="modal-body">
+                    <input type="hidden" id="editAulaId" name="id">
+                    <div class="form-group">
+                        <label class="form-label">Nombre</label>
+                        <input type="text" id="editAulaNombre" name="nombre" class="form-control">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Programa</label>
+                            <input type="text" id="editAulaPrograma" name="programa" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Pabellón</label>
+                            <input type="text" id="editAulaPabellon" name="pabellon" class="form-control">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label class="form-label">Piso</label>
+                            <input type="text" id="editAulaPiso" name="piso" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Número</label>
+                            <input type="text" id="editAulaNumero" name="numero" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label class="form-label">Capacidad</label>
+                            <input type="number" id="editAulaCapacidad" name="capacidad" class="form-control" min="1">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="cerrarModal('modalEditarAula')">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Guardar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- SCRIPTS -->
+    <!-- ============================================================ -->
+    <script src="/static/js/admin/base.js"></script>
+    <script src="/static/js/admin/dashboard_coordinador.js"></script>
 </body>
 </html>
