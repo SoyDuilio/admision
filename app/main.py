@@ -25,7 +25,7 @@ from app.api.generar_hoja_individual import router as hoja_individual_router
 from app.api import reversion_asignaciones
 from app.api import documento_oficial_gabarito
 
-from app.routers import admin
+from app.routers import admin, api_coordinador
 
 
 # ============================================================================
@@ -165,6 +165,7 @@ app.include_router(dashboard_router, prefix="/api", tags=["Dashboard"])
 app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
 
 app.include_router(admin.router)
+app.include_router(api_coordinador.router)
 
 # ============================================================================
 # HEALTH CHECK
