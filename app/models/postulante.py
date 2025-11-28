@@ -3,7 +3,7 @@ Modelo de Postulante
 Representa a cada estudiante que rinde el examen
 """
 
-from sqlalchemy import Column, Integer, String, DateTime, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, ForeignKey
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -37,6 +37,8 @@ class Postulante(Base):
     telefono = Column(String(15), nullable=True)
     programa_educativo = Column(String(200), nullable=True)  # Carrera a la que postula
     proceso_admision = Column(String(10), default="2025-2", index=True)
+    aula_id = Column(Integer, ForeignKey("aulas.id"), nullable=True)
+    turno = Column(String(20), default="MAÑANA")
     
     # Estado
     activo = Column(Boolean, default=True)
@@ -54,6 +56,7 @@ class Postulante(Base):
     asignacion = relationship("PostulanteAsignacion", back_populates="postulante", uselist=False)
     asignacion_examen = relationship("AsignacionExamen", back_populates="postulante", uselist=False)
     logs_anulacion_hojas = relationship("LogAnulacionHoja", back_populates="postulante", cascade="all, delete-orphan")
+    aula = relationship("Aula", back_populates="postulantes")
 
     @property
     def nombre_completo(self):

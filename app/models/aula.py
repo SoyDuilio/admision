@@ -19,7 +19,9 @@ class Aula(Base):
 
     # Relaciones
     asignaciones = relationship("PostulanteAsignacion", back_populates="aula")
-    asignaciones_examen = relationship("AsignacionExamen", back_populates="aula")  # ← AGREGAR
+    asignaciones_examen = relationship("AsignacionExamen", back_populates="aula")
+    postulantes = relationship("Postulante", back_populates="aula")
+
     
     def __repr__(self):
         return f"<Aula {self.codigo} - {self.nombre}>"
