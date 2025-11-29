@@ -237,7 +237,8 @@ async function fetchAPI(url, options = {}) {
     const defaultOptions = {
         headers: {
             'Content-Type': 'application/json'
-        }
+        },
+        credentials: 'same-origin'  // Asegurar que envíe cookies
     };
     
     const config = { ...defaultOptions, ...options };
@@ -248,6 +249,29 @@ async function fetchAPI(url, options = {}) {
     
     try {
         const response = await fetch(url, config);
+        
+        // Detectar redirect a login (sesión expirada)
+        if (response.redirected && response.url.includes('/login')) {
+            showToast('Sesión expirada. Redirigiendo al login...', 'warning');
+            setTimeout(() => window.location.href = '/admin/login', 1500);
+            throw new Error('Sesión expirada');
+        }
+        
+        // Verificar si la respuesta es JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            console.error('Respuesta NO es JSON:', { url, status: response.status, contentType });
+            
+            // Si es redirect a login
+            if (response.status === 307 || response.status === 302) {
+                showToast('Sesión expirada. Redirigiendo...', 'warning');
+                setTimeout(() => window.location.href = '/admin/login', 1500);
+                throw new Error('Sesión expirada');
+            }
+            
+            throw new Error(`Respuesta inesperada del servidor (${response.status})`);
+        }
+        
         const data = await response.json();
         
         if (!response.ok) {
