@@ -617,19 +617,36 @@ async def guardar_gabarito(
         # Calificar automáticamente
         hojas_calificadas = 0
         try:
+            # Calificar todas las hojas (retorna tabla con estadísticas)
             result = db.execute(
-                text("SELECT fn_calificar_todas_las_hojas(:proceso)"),
+                text("SELECT * FROM fn_calificar_todas_las_hojas(:proceso::VARCHAR)"),
                 {"proceso": data.proceso}
             )
-            hojas_calificadas = result.scalar() or 0
+            stats = result.fetchone()
             
-            db.execute(
-                text("SELECT fn_calcular_ranking(:proceso)"),
+            if stats:
+                hojas_calificadas = stats[0]  # total_hojas
+                print(f"✅ Calificación completada:")
+                print(f"   - Hojas calificadas: {stats[0]}")
+                print(f"   - Promedio: {stats[1]}")
+                print(f"   - Nota máxima: {stats[2]}")
+                print(f"   - Nota mínima: {stats[3]}")
+            
+            # Calcular ranking
+            result_ranking = db.execute(
+                text("SELECT fn_calcular_ranking(:proceso::VARCHAR)"),
                 {"proceso": data.proceso}
             )
+            total_rankeados = result_ranking.scalar() or 0
+            print(f"✅ Ranking calculado: {total_rankeados} postulantes")
+            
             db.commit()
+            
         except Exception as e:
-            print(f"Error en calificación automática: {e}")
+            print(f"⚠️ Error en calificación automática: {e}")
+            import traceback
+            traceback.print_exc()
+            # No hacer rollback aquí, solo capturar el error
         
         # Contar distribución
         result = db.execute(text("""
