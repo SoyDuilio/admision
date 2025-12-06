@@ -36,17 +36,20 @@ class HojaRespuesta(Base):
     __tablename__ = "hojas_respuestas"
     
     id = Column(Integer, primary_key=True, index=True)
-    postulante_id = Column(Integer, ForeignKey('postulantes.id', ondelete='CASCADE'), nullable=False)
+    postulante_id = Column(Integer, ForeignKey('postulantes.id', ondelete='CASCADE'), nullable=True)
     
     # Validación y códigos
     dni_profesor = Column(String(8), index=True)
     codigo_aula = Column(String(20), index=True)
     codigo_hoja = Column(String(20), unique=True, index=True)
     proceso_admision = Column(String(10), default="2025-2", index=True)
+
+    numero_hoja = Column(Integer, nullable=True)
+    orden_aula = Column(Integer, nullable=True)
     
     # Imagen
     imagen_url = Column(String(500))
-    imagen_original_nombre = Column(String(200))
+    imagen_original_nombre = Column(String(200))    
     
     # Procesamiento
     api_utilizada = Column(String(20))
