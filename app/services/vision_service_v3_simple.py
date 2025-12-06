@@ -8,8 +8,7 @@ Detecta:
 
 import re
 from typing import Dict, List
-from google.cloud import vision
-import os
+from datetime import datetime
 
 # Inicializar cliente Google Vision
 try:
@@ -58,6 +57,8 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         }
     
     try:
+        from google.cloud import vision
+        
         # Leer imagen
         with open(imagen_path, 'rb') as image_file:
             content = image_file.read()
@@ -81,18 +82,25 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         full_text = response.full_text_annotation.text if response.full_text_annotation else ""
         
         print(f"\n📄 Texto detectado ({len(full_text)} caracteres)")
+        print(f"📋 TEXTO COMPLETO:")
+        print(f"{full_text}")
+        print(f"\n" + "="*70)
         
         # Detectar código de hoja (impreso, fácil)
         codigo_hoja = detectar_codigo_hoja(full_text)
         
-        # Detectar DNI manuscrito (en zona de rectángulos)
-        dni_postulante = detectar_dni_manuscrito(response, full_text)
+        # Detectar DNI manuscrito (OPCIONAL)
+        try:
+            dni_postulante = detectar_dni_manuscrito(response, full_text)
+        except Exception as e:
+            print(f"  ⚠️ Error detectando DNI: {str(e)}")
+            dni_postulante = ""
         
         # Detectar 100 respuestas
         respuestas = detectar_respuestas_manuscritas(response, full_text)
         
-        print(f"✅ Código hoja: {codigo_hoja}")
-        print(f"✅ DNI: {dni_postulante}")
+        print(f"\n✅ Código hoja: {codigo_hoja}")
+        print(f"✅ DNI: {dni_postulante if dni_postulante else '(no detectado)'}")
         print(f"✅ Respuestas: {len(respuestas)}/100")
         
         return {
@@ -109,6 +117,8 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         
     except Exception as e:
         print(f"❌ Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {
             "success": False,
             "error": str(e)
@@ -261,7 +271,6 @@ async def procesar_y_guardar_respuestas(hoja_respuesta_id: int, resultado_api: D
     Guarda las 100 respuestas individuales en la tabla 'respuestas'
     """
     from app.models import Respuesta
-    from datetime import datetime
     
     respuestas_array = resultado_api.get("respuestas", [])
     
@@ -278,29 +287,25 @@ async def procesar_y_guardar_respuestas(hoja_respuesta_id: int, resultado_api: D
         
         # Categorizar
         if not respuesta_upper:
-            categoria = "vacia"
             stats["vacias"] += 1
         elif respuesta_upper in ['A', 'B', 'C', 'D', 'E']:
-            categoria = "valida"
             stats["validas"] += 1
         else:
-            categoria = "letra_invalida"
             stats["letra_invalida"] += 1
         
-        # Guardar respuesta
         # Guardar respuesta
         respuesta_obj = Respuesta(
             hoja_respuesta_id=hoja_respuesta_id,
             numero_pregunta=i,
             respuesta_marcada=respuesta_upper if respuesta_upper else None,
             confianza=90.0,
-            requiere_revision=(categoria != "valida" and categoria != "vacia"),
+            requiere_revision=(respuesta_upper not in ['A', 'B', 'C', 'D', 'E', '']),
             created_at=datetime.now()
         )
         
         db.add(respuesta_obj)
         
-        if categoria not in ["valida", "vacia"]:
+        if respuesta_upper and respuesta_upper not in ['A', 'B', 'C', 'D', 'E']:
             stats["requieren_revision"] += 1
     
     db.flush()
@@ -315,22 +320,31 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
     """
     Califica las respuestas comparándolas con el gabarito
     """
-    from app.models import Respuesta, ClaveRespuesta
+    from app.models import Respuesta
+    from sqlalchemy import text
     
     # Obtener respuestas del postulante
     respuestas = db.query(Respuesta).filter(
         Respuesta.hoja_respuesta_id == hoja_respuesta_id
     ).order_by(Respuesta.numero_pregunta).all()
     
-    # Obtener gabarito
-    gabarito = db.query(ClaveRespuesta).filter(
-        ClaveRespuesta.id == gabarito_id
-    ).first()
+    # Obtener gabarito desde clave_respuestas (una fila por pregunta)
+    query_gabarito = text("""
+        SELECT numero_pregunta, respuesta_correcta
+        FROM clave_respuestas
+        WHERE proceso_admision = (
+            SELECT proceso_admision FROM hojas_respuestas WHERE id = :hoja_id
+        )
+        ORDER BY numero_pregunta
+    """)
     
-    if not gabarito or not gabarito.clave_json:
-        raise Exception("Gabarito no disponible")
+    gabarito_resp = db.execute(query_gabarito, {"hoja_id": hoja_respuesta_id}).fetchall()
     
-    clave = gabarito.clave_json
+    if not gabarito_resp:
+        raise Exception("Gabarito no disponible para este proceso")
+    
+    # Crear dict del gabarito
+    clave = {str(g.numero_pregunta): g.respuesta_correcta.upper() for g in gabarito_resp}
     
     # Calificar
     correctas = 0
@@ -340,7 +354,7 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
     for resp in respuestas:
         num = str(resp.numero_pregunta)
         respuesta_correcta = clave.get(num, "").upper()
-        respuesta_alumno = (resp.respuesta_detectada or "").upper()
+        respuesta_alumno = (resp.respuesta_marcada or "").upper()
         
         if not respuesta_alumno:
             no_calificables += 1
@@ -369,7 +383,3 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
 
 async def generar_reporte_detallado(*args, **kwargs):
     """Placeholder para compatibilidad"""
-
-    return {}
-
-
