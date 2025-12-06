@@ -140,7 +140,7 @@ async def procesar_hoja_completa(
             )
         
         # Validar estado
-        if hoja.estado in ["procesado", "calificado"]:
+        if hoja.estado in ["completado", "calificado"]:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -217,6 +217,7 @@ async def procesar_hoja_completa(
         hoja.imagen_url = imagen_url
         hoja.imagen_original_nombre = file.filename
         hoja.estado = "completado"
+        hoja.fecha_captura = datetime.now()
         
         # Mapear API usada a valores permitidos por el constraint
         apis_usadas = resultado_vision.get("apis_usadas", [])
@@ -233,13 +234,14 @@ async def procesar_hoja_completa(
                 "gpt-4o": "openai",
                 "gpt-4o-mini": "openai",
                 "claude": "anthropic",
-                "gemini": "google"
+                "gemini": "google",
+                "document_text_detection": "google"
             }
             
-            hoja.api_utilizada = api_map.get(api_name, "openai")
+            hoja.api_utilizada = api_map.get(api_name, "google")
         else:
             # Fallback al valor antiguo si existe
-            hoja.api_utilizada = resultado_vision.get("api", "openai")
+            hoja.api_utilizada = "google"
 
         
         hoja.tiempo_procesamiento = tiempo_procesamiento
@@ -260,25 +262,25 @@ async def procesar_hoja_completa(
         # VALIDAR DNI EN BACKGROUND
         # ================================================================
         
-        #dni_detectado = datos_vision.get("dni_postulante")
+        dni_detectado = datos_vision.get("dni_postulante")
         
-        #if dni_detectado:
-        #    print(f"\n🔍 Registrando validación de DNI en background...")
+        if dni_detectado:
+            print(f"\n🔍 Registrando validación de DNI en background...")
             
-        #    from app.services.validacion_dni import registrar_validacion_dni
+            from app.services.validacion_dni import registrar_validacion_dni
             
-        #    try:
-        #        await registrar_validacion_dni(
-        #            hoja_respuesta_id=hoja.id,
-        #            dni=dni_detectado,
-        #            db=db
-        #        )
-        #        print(f"✅ Validación de DNI programada: {dni_detectado}")
-        #    except Exception as e:
-        #        print(f"⚠️ Error programando validación DNI: {str(e)}")
+            try:
+                await registrar_validacion_dni(
+                    hoja_respuesta_id=hoja.id,
+                    dni=dni_detectado,
+                    db=db
+                )
+                print(f"✅ Validación de DNI programada: {dni_detectado}")
+            except Exception as e:
+                print(f"⚠️ Error programando validación DNI: {str(e)}")
                 # No es crítico, continuar
-        #else:
-        #    print(f"⚠️ No se detectó DNI manuscrito en la hoja")
+        else:
+            print(f"⚠️ No se detectó DNI manuscrito en la hoja")
 
         
         # ================================================================
@@ -496,5 +498,5 @@ async def marcar_hoja_revision(
     return {
         "success": True,
         "message": "Hoja marcada para revisión" if requiere_revision_manual else "Hoja marcada como OK"
-
     }
+
