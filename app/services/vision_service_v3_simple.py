@@ -13,8 +13,16 @@ import os
 
 # Inicializar cliente Google Vision
 try:
-    vision_client = vision.ImageAnnotatorClient()
-    VISION_AVAILABLE = True
+    from app.services.google_vision import google_vision_service
+    
+    if google_vision_service.is_available():
+        vision_client = google_vision_service.client
+        VISION_AVAILABLE = True
+    else:
+        print(f"⚠️ Google Vision no disponible")
+        VISION_AVAILABLE = False
+        vision_client = None
+        
 except Exception as e:
     print(f"⚠️ Google Vision no disponible: {str(e)}")
     VISION_AVAILABLE = False
@@ -343,4 +351,5 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
 
 async def generar_reporte_detallado(*args, **kwargs):
     """Placeholder para compatibilidad"""
+
     return {}
