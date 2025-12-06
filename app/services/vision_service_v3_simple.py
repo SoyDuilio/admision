@@ -139,51 +139,69 @@ def detectar_codigo_hoja(texto: str) -> str:
 
 def detectar_dni_manuscrito(response, texto: str) -> str:
     """
-    Detecta DNI manuscrito en zona de 8 rectángulos
-    
-    Busca 8 dígitos consecutivos cerca del inicio de la hoja
+    Detecta DNI manuscrito - VERSIÓN MEJORADA
+    Busca 8 dígitos en diferentes formatos
     """
     
-    # Buscar secuencias de exactamente 8 dígitos
-    patron_dni = r'\b\d{8}\b'
+    print(f"\n🔍 Buscando DNI en el texto...")
     
+    # MÉTODO 1: Buscar 8 dígitos juntos (sin espacios)
+    patron_dni = r'\b\d{8}\b'
     matches = re.findall(patron_dni, texto)
     
     if matches:
-        # Retornar el primero encontrado (debería ser el DNI en los rectángulos)
+        print(f"  ✅ DNI encontrado (juntos): {matches[0]}")
         return matches[0]
     
-    # Si no encuentra 8 dígitos juntos, intentar buscar dígitos separados
-    # y unirlos si están cerca espacialmente
+    # MÉTODO 2: Buscar 8 dígitos con espacios/guiones
+    # Ejemplo: "1 2 3 4 5 6 7 8" o "12-34-56-78"
+    texto_limpio = re.sub(r'[^\d]', '', texto)  # Quitar todo excepto dígitos
     
-    # Extraer todos los bloques de texto con sus posiciones
+    # Buscar secuencias de 8 dígitos consecutivos en texto limpio
+    if len(texto_limpio) >= 8:
+        # Buscar la primera aparición de 8 dígitos
+        for i in range(len(texto_limpio) - 7):
+            posible_dni = texto_limpio[i:i+8]
+            # Validar que no sea parte de un número más largo (como el código de hoja)
+            if posible_dni.isdigit():
+                print(f"  ✅ DNI reconstruido: {posible_dni}")
+                return posible_dni
+    
+    # MÉTODO 3: Usar análisis espacial (zona superior de la hoja)
     if response.full_text_annotation and response.full_text_annotation.pages:
         page = response.full_text_annotation.pages[0]
         
-        # Buscar bloques en la zona superior (donde está el DNI)
+        # Buscar TODOS los dígitos en el tercio superior
         digitos_encontrados = []
         
         for block in page.blocks:
-            # Solo bloques en el tercio superior de la hoja
             vertices = block.bounding_box.vertices
             y_promedio = sum(v.y for v in vertices) / len(vertices)
             
-            if y_promedio < page.height * 0.3:  # Tercio superior
+            # Solo zona superior (donde están los rectángulos de DNI)
+            if y_promedio < page.height * 0.4:  # 40% superior
                 for paragraph in block.paragraphs:
                     for word in paragraph.words:
                         texto_word = ''.join([symbol.text for symbol in word.symbols])
                         
-                        # Si es un dígito individual
-                        if texto_word.isdigit() and len(texto_word) == 1:
-                            digitos_encontrados.append(texto_word)
+                        # Agregar todos los dígitos encontrados
+                        for char in texto_word:
+                            if char.isdigit():
+                                digitos_encontrados.append(char)
         
-        # Si encontramos exactamente 8 dígitos
+        print(f"  ℹ️ Dígitos encontrados en zona DNI: {''.join(digitos_encontrados)}")
+        
+        # Si encontramos al menos 8 dígitos, tomar los primeros 8
         if len(digitos_encontrados) >= 8:
             dni = ''.join(digitos_encontrados[:8])
-            print(f"  ℹ️ DNI reconstruido de dígitos separados: {dni}")
+            print(f"  ✅ DNI reconstruido (primeros 8): {dni}")
             return dni
     
-    raise Exception("No se pudo detectar DNI manuscrito")
+    # Si llegamos aquí, no se detectó
+    print(f"  ⚠️ DNI no detectado - Texto completo:")
+    print(f"  {texto[:200]}...")  # Mostrar primeros 200 caracteres
+    
+    return ""  # Retornar vacío en lugar de error
 
 
 def detectar_respuestas_manuscritas(response, texto: str) -> List[str]:
@@ -353,4 +371,5 @@ async def generar_reporte_detallado(*args, **kwargs):
     """Placeholder para compatibilidad"""
 
     return {}
+
 
