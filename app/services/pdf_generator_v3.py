@@ -24,17 +24,19 @@ def generar_hoja_respuestas_v3(
     codigo_aula: str,
     dni_profesor: str,
     codigo_hoja: str,
-    proceso: str = "2025-2"
+    proceso: str = "2025-2",
+    orden_aula: int = None  # ← NUEVO PARÁMETRO (opcional para no romper código existente)
 ):
     """
     Genera PDF OPTIMIZADO V3 con rectángulos para mejor detección OCR.
+    VERSIÓN 3.1: Incluye N° Orden en círculo
     """
     
     c = canvas.Canvas(output_path, pagesize=A4)
     width, height = A4
     
     # ========================================================================
-    # MÁRGENES Y ÁREA ÚTIL
+    # MÁRGENES Y ÁREA ÚTIL (sin cambios)
     # ========================================================================
     margen_externo = 1.5 * cm
     
@@ -55,7 +57,7 @@ def generar_hoja_respuestas_v3(
     c.setLineWidth(3)
     c.rect(area_x, area_y, area_width, area_height)
     
-    # Marcas L en esquinas
+    # Marcas L en esquinas (sin cambios)
     marca_size = 0.8 * cm
     c.setLineWidth(3)
     
@@ -86,7 +88,7 @@ def generar_hoja_respuestas_v3(
     content_width = area_width - 2*padding
     
     # ------------------------------------------------------------------------
-    # ENCABEZADO
+    # ENCABEZADO (sin cambios)
     # ------------------------------------------------------------------------
     c.setFont("Helvetica-Bold", 12)
     c.drawCentredString(width/2, y, "I. S. T. Pedro A. Del Águila H.")
@@ -101,7 +103,7 @@ def generar_hoja_respuestas_v3(
     y -= 0.6*cm
     
     # ------------------------------------------------------------------------
-    # CÓDIGOS - LÍNEA 1: DNI, Aula, DNI Profesor
+    # CÓDIGOS - LÍNEA 1: DNI, Aula, DNI Profesor (sin cambios)
     # ------------------------------------------------------------------------
     col_width = content_width / 3
     
@@ -124,16 +126,47 @@ def generar_hoja_respuestas_v3(
     y -= 0.9*cm
     
     # ------------------------------------------------------------------------
-    # LÍNEA 2: CÓDIGO DE HOJA (SIN ESPACIOS, CENTRADO)
+    # ✨ NUEVO: N° ORDEN EN CÍRCULO + CÓDIGO DE HOJA
     # ------------------------------------------------------------------------
-    c.setFont("Helvetica-Bold", 8)
-    c.drawCentredString(width/2, y, "CÓDIGO DE HOJA:")
-    y -= 0.6*cm
     
-    # Código SIN espacios
-    c.setFont("Courier-Bold", 20)
-    c.drawCentredString(width/2, y, codigo_hoja)  # Sin espacios: "UXJ545X"
-    y -= 0.8*cm
+    # Calcular posiciones
+    if orden_aula:
+        # Con N° Orden: dividir espacio en 2 columnas
+        col_orden_x = x_start + content_width * 0.25
+        col_codigo_x = x_start + content_width * 0.75
+        
+        # N° Orden (izquierda)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(col_orden_x, y, "N° Orden")
+        y_circulo = y - 0.6*cm
+        
+        # Dibujar círculo
+        circulo_radio = 0.45*cm
+        c.setLineWidth(2.5)
+        c.setStrokeColor(colors.black)
+        c.circle(col_orden_x, y_circulo, circulo_radio, fill=0)
+        
+        # Número dentro del círculo
+        c.setFont("Helvetica-Bold", 20)
+        c.drawCentredString(col_orden_x, y_circulo - 0.22*cm, str(orden_aula))
+        
+        # Código de hoja (derecha)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(col_codigo_x, y, "CÓDIGO DE HOJA:")
+        c.setFont("Courier-Bold", 20)
+        c.drawCentredString(col_codigo_x, y - 0.6*cm, codigo_hoja)
+        
+        y -= 1.2*cm
+        
+    else:
+        # Sin N° Orden: código centrado como antes (retrocompatibilidad)
+        c.setFont("Helvetica-Bold", 8)
+        c.drawCentredString(width/2, y, "CÓDIGO DE HOJA:")
+        y -= 0.6*cm
+        
+        c.setFont("Courier-Bold", 20)
+        c.drawCentredString(width/2, y, codigo_hoja)
+        y -= 0.8*cm
     
     # Línea gruesa separadora
     c.setLineWidth(2)
@@ -141,7 +174,7 @@ def generar_hoja_respuestas_v3(
     y -= 0.6*cm
     
     # ------------------------------------------------------------------------
-    # INSTRUCCIONES MEJORADAS
+    # INSTRUCCIONES MEJORADAS (sin cambios)
     # ------------------------------------------------------------------------
     c.setFillColor(colors.grey)
     c.setFont("Helvetica-Bold", 8)
@@ -157,7 +190,7 @@ def generar_hoja_respuestas_v3(
     c.setFillColor(colors.black)
     
     # ------------------------------------------------------------------------
-    # RESPUESTAS: 5 COLUMNAS × 20 FILAS = 100 CON RECTÁNGULOS
+    # RESPUESTAS: 5 COLUMNAS × 20 FILAS = 100 CON RECTÁNGULOS (sin cambios)
     # ------------------------------------------------------------------------
     
     # Calcular espacio disponible
@@ -171,8 +204,8 @@ def generar_hoja_respuestas_v3(
     col_ancho = content_width / 5.2
     
     # Dimensiones del rectángulo
-    rect_ancho = 0.9*cm  # ~35px
-    rect_alto = 0.55*cm  # ~22px
+    rect_ancho = 0.9*cm
+    rect_alto = 0.55*cm
     
     pregunta_num = 1
     
@@ -183,22 +216,16 @@ def generar_hoja_respuestas_v3(
             if pregunta_num <= 100:
                 # Número de pregunta
                 c.setFont("Helvetica-Bold", 11)
-                num_y = y + (rect_alto / 2) - 0.15*cm  # Centrado vertical
+                num_y = y + (rect_alto / 2) - 0.15*cm
                 c.drawString(x, num_y, f"{pregunta_num}.")
                 
-                # RECTÁNGULO en lugar de paréntesis
+                # RECTÁNGULO
                 rect_x = x + 0.7*cm
                 rect_y = y - 0.05*cm
                 
                 c.setLineWidth(1.2)
                 c.setStrokeColor(colors.black)
                 c.rect(rect_x, rect_y, rect_ancho, rect_alto, fill=0)
-                
-                # Letra de ejemplo MUY tenue (opcional)
-                # c.setFillColorRGB(0.95, 0.95, 0.95)
-                # c.setFont("Helvetica", 14)
-                # c.drawString(rect_x + 0.25*cm, rect_y + 0.12*cm, "A")
-                # c.setFillColor(colors.black)
                 
                 pregunta_num += 1
             
@@ -207,7 +234,7 @@ def generar_hoja_respuestas_v3(
         y -= altura_por_fila
     
     # ------------------------------------------------------------------------
-    # PIE DE PÁGINA
+    # PIE DE PÁGINA (sin cambios)
     # ------------------------------------------------------------------------
     y = area_y + padding + 0.4*cm
     
@@ -233,8 +260,9 @@ def generar_hoja_respuestas_v3(
         "success": True,
         "codigo_hoja": codigo_hoja,
         "filepath": output_path,
-        "version": "v3_rectangulos"
+        "version": "v3.1_con_orden"
     }
+
 
 
 # ============================================================================
