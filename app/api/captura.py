@@ -41,7 +41,8 @@ async def procesar_hoja_completa(
     7. Retorna resultado completo
     """
     
-    from app.services.vision_service_v3 import (
+    #from app.services.vision_service_v3 import (
+    from app.services.vision_service_v3_simple import (
         procesar_hoja_completa_v3,
         procesar_y_guardar_respuestas,
         calificar_hoja_con_gabarito,
@@ -249,6 +250,36 @@ async def procesar_hoja_completa(
         db.flush()
         
         print(f"\n💾 Hoja actualizada correctamente")
+
+
+        # ================================================================
+        # VALIDAR DNI EN BACKGROUND
+        # ================================================================
+        
+        # ================================================================
+        # VALIDAR DNI EN BACKGROUND
+        # ================================================================
+        
+        dni_detectado = datos_vision.get("dni_postulante")
+        
+        if dni_detectado:
+            print(f"\n🔍 Registrando validación de DNI en background...")
+            
+            from app.services.validacion_dni import registrar_validacion_dni
+            
+            try:
+                await registrar_validacion_dni(
+                    hoja_respuesta_id=hoja.id,
+                    dni=dni_detectado,
+                    db=db
+                )
+                print(f"✅ Validación de DNI programada: {dni_detectado}")
+            except Exception as e:
+                print(f"⚠️ Error programando validación DNI: {str(e)}")
+                # No es crítico, continuar
+        else:
+            print(f"⚠️ No se detectó DNI manuscrito en la hoja")
+
         
         # ================================================================
         # 6. GUARDAR 100 RESPUESTAS

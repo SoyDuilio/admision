@@ -612,14 +612,27 @@ async def guardar_gabarito(
                 "proceso": data.proceso
             })
         
+        # COMMIT DEL GABARITO (independiente de la calificación)
         db.commit()
+        print("✅ Gabarito guardado correctamente")
         
-        # Calificar automáticamente
+        # Contar distribución (ANTES de intentar calificar)
+        result = db.execute(text("""
+            SELECT respuesta_correcta, COUNT(*) as cantidad
+            FROM clave_respuestas
+            WHERE proceso_admision = :proceso
+            GROUP BY respuesta_correcta
+            ORDER BY respuesta_correcta
+        """), {"proceso": data.proceso})
+        
+        conteo = {row[0]: row[1] for row in result}
+        
+        # Calificar automáticamente (en transacción separada)
         hojas_calificadas = 0
         try:
-            # Calificar todas las hojas (retorna tabla con estadísticas)
+            # Calificar todas las hojas
             result = db.execute(
-                text("SELECT * FROM fn_calificar_todas_las_hojas(:proceso::VARCHAR)"),
+                text("SELECT * FROM fn_calificar_todas_las_hojas(:proceso)"),
                 {"proceso": data.proceso}
             )
             stats = result.fetchone()
@@ -634,7 +647,7 @@ async def guardar_gabarito(
             
             # Calcular ranking
             result_ranking = db.execute(
-                text("SELECT fn_calcular_ranking(:proceso::VARCHAR)"),
+                text("SELECT fn_calcular_ranking(:proceso)"),
                 {"proceso": data.proceso}
             )
             total_rankeados = result_ranking.scalar() or 0
@@ -643,21 +656,12 @@ async def guardar_gabarito(
             db.commit()
             
         except Exception as e:
+            # Si falla la calificación, hacer rollback SOLO de la calificación
+            db.rollback()
             print(f"⚠️ Error en calificación automática: {e}")
             import traceback
             traceback.print_exc()
-            # No hacer rollback aquí, solo capturar el error
-        
-        # Contar distribución
-        result = db.execute(text("""
-            SELECT respuesta_correcta, COUNT(*) as cantidad
-            FROM clave_respuestas
-            WHERE proceso_admision = :proceso
-            GROUP BY respuesta_correcta
-            ORDER BY respuesta_correcta
-        """), {"proceso": data.proceso})
-        
-        conteo = {row[0]: row[1] for row in result}
+            # El gabarito ya fue guardado, así que continuamos
         
         return {
             "success": True,
@@ -676,6 +680,7 @@ async def guardar_gabarito(
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
+
 
 
 # ============================================================================
