@@ -298,7 +298,7 @@ async def procesar_y_guardar_respuestas(hoja_respuesta_id: int, resultado_api: D
             hoja_respuesta_id=hoja_respuesta_id,
             numero_pregunta=i,
             respuesta_marcada=respuesta_upper if respuesta_upper else None,
-            confianza=90.0,
+            confianza=0.90,  # ← CAMBIAR de 90.0 a 0.90
             requiere_revision=(respuesta_upper not in ['A', 'B', 'C', 'D', 'E', '']),
             created_at=datetime.now()
         )
@@ -383,3 +383,4 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
 
 async def generar_reporte_detallado(*args, **kwargs):
     """Placeholder para compatibilidad"""
+
