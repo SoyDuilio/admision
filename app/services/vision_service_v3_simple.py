@@ -270,12 +270,12 @@ async def procesar_y_guardar_respuestas(hoja_respuesta_id: int, resultado_api: D
             stats["letra_invalida"] += 1
         
         # Guardar respuesta
+        # Guardar respuesta
         respuesta_obj = Respuesta(
             hoja_respuesta_id=hoja_respuesta_id,
             numero_pregunta=i,
-            respuesta_detectada=respuesta_upper if respuesta_upper else None,
-            confianza=90.0,  # Placeholder
-            categoria=categoria,
+            respuesta_marcada=respuesta_upper if respuesta_upper else None,
+            confianza=90.0,
             requiere_revision=(categoria != "valida" and categoria != "vacia"),
             created_at=datetime.now()
         )
@@ -353,3 +353,4 @@ async def generar_reporte_detallado(*args, **kwargs):
     """Placeholder para compatibilidad"""
 
     return {}
+
