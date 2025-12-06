@@ -8,11 +8,16 @@ Solo contiene:
 - Health check
 """
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request, Depends
+from fastapi.responses import HTMLResponse
+
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.middleware.cors import CORSMiddleware
 from pathlib import Path
+
+from sqlalchemy.orm import Session
+from app.database import get_db
 
 from app.database import engine, Base
 from app.config import settings
@@ -24,6 +29,8 @@ from app.api.generar_hoja_individual import router as hoja_individual_router
 
 from app.api import reversion_asignaciones
 from app.api import documento_oficial_gabarito
+from app.api import generar_hojas_simple
+from app.api import resultados_publicos
 
 from app.routers import admin, api_coordinador
 
@@ -167,6 +174,8 @@ app.include_router(documento_router, prefix="/api", tags=["Documento Oficial"])
 app.include_router(admin.router)
 app.include_router(api_coordinador.router)
 
+app.include_router(resultados_publicos.router, tags=["resultados"])
+app.include_router(generar_hojas_simple.router, tags=["generacion"])
 # ============================================================================
 # HEALTH CHECK
 # ============================================================================
@@ -199,6 +208,34 @@ async def health_check():
         }
     finally:
         db.close()
+
+# ============================================================================
+# PÁGINA DE GENERAR HOJAS SIMPLES
+# ============================================================================
+
+@app.get("/admin/generar-simple", response_class=HTMLResponse)
+async def generar_simple_page(request: Request, db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    
+    # Contar postulantes por proceso
+    query_count = text("""
+        SELECT 
+            proceso_admision,
+            COUNT(*) as total
+        FROM postulantes
+        GROUP BY proceso_admision
+        ORDER BY proceso_admision DESC
+    """)
+    
+    procesos = db.execute(query_count).fetchall()
+    
+    # Crear dict con totales
+    totales_por_proceso = {p.proceso_admision: p.total for p in procesos}
+    
+    return templates.TemplateResponse("admin/generar_simple.html", {
+        "request": request,
+        "totales_por_proceso": totales_por_proceso
+    })
 
 # ============================================================================
 # PUNTO DE ENTRADA
