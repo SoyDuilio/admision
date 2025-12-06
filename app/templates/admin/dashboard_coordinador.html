@@ -40,8 +40,15 @@
             👨‍🏫 Profesores
             <span class="badge" id="badgeProfesores">{{ stats.total_profesores or 0 }}</span>
         </button>
+        <button class="tab-btn" data-tab="tab-generacion">
+            📄 Generar Hojas
+        </button>
         <button class="tab-btn" data-tab="tab-listados">
             📄 Listados
+        </button>
+        <button class="tab-btn" data-tab="tab-asistencia">
+            ✅ Asistencia
+            <span class="badge" id="badgeAsistencia">0</span>
         </button>
     </nav>
 
@@ -352,6 +359,135 @@
                 </div>
             </div>
 
+
+            <!-- ======================================================== -->
+            <!-- TAB: GENERAR HOJAS (NUEVO) -->
+            <!-- ======================================================== -->
+            <div id="tab-generacion" class="tab-content">
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">📄 Generación de Hojas con Asignación Alfabética</h3>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <span class="alert-icon">ℹ️</span>
+                        <div>
+                            <h4>Sistema Integrado V2.0</h4>
+                            <p>Este proceso realiza automáticamente:</p>
+                            <ul>
+                                <li>✓ Asignación alfabética de postulantes a aulas</li>
+                                <li>✓ Asignación de profesores</li>
+                                <li>✓ Generación de hojas con N° de orden</li>
+                                <li>✓ Registro en base de datos</li>
+                            </ul>
+                        </div>
+                    </div>
+                    
+                    <!-- Stats previos -->
+                    <div class="stats-row" style="margin-bottom: 24px;">
+                        <div class="stat-card">
+                            <div class="icon">👥</div>
+                            <div class="value" id="statPostulantesGen">{{ stats.total_postulantes or 0 }}</div>
+                            <div class="label">Postulantes Activos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">🏫</div>
+                            <div class="value" id="statAulasGen">{{ stats.total_aulas or 0 }}</div>
+                            <div class="label">Aulas Disponibles</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">👨‍🏫</div>
+                            <div class="value" id="statProfesoresGen">{{ stats.total_profesores or 0 }}</div>
+                            <div class="label">Profesores Activos</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="icon">📋</div>
+                            <div class="value" id="statAsignadosGen">{{ stats.postulantes_asignados or 0 }}</div>
+                            <div class="label">Ya Asignados</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Opciones de generación -->
+                    <form id="formGenerarHojas" onsubmit="ejecutarGeneracionCompleta(event)">
+                        <div class="form-group">
+                            <label class="form-label">Modo de Generación</label>
+                            <div class="radio-group">
+                                <label class="radio-option">
+                                    <input type="radio" name="modo_generacion" value="unico" checked>
+                                    <span class="radio-label">
+                                        <strong>ZIP Único</strong>
+                                        <small>Un solo archivo con todas las hojas (recomendado)</small>
+                                    </span>
+                                </label>
+                                <label class="radio-option">
+                                    <input type="radio" name="modo_generacion" value="individual">
+                                    <span class="radio-label">
+                                        <strong>ZIP por Aula</strong>
+                                        <small>Un archivo ZIP por cada aula</small>
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label class="form-label">Proceso de Admisión</label>
+                            <input type="text" name="proceso_admision" class="form-control" value="{{ proceso_actual }}" readonly>
+                        </div>
+                        
+                        <div class="alert alert-warning">
+                            <span class="alert-icon">⚠️</span>
+                            <div>
+                                <h4>Advertencia Importante</h4>
+                                <p>Esta acción:</p>
+                                <ul>
+                                    <li>• Eliminará asignaciones existentes del proceso {{ proceso_actual }}</li>
+                                    <li>• Reasignará alfabéticamente TODOS los postulantes activos</li>
+                                    <li>• Generará nuevas hojas con N° de orden</li>
+                                    <li>• No se puede deshacer fácilmente</li>
+                                </ul>
+                            </div>
+                        </div>
+                        
+                        <div class="form-actions">
+                            <button type="button" class="btn btn-danger" onclick="limpiarProceso()">
+                                🗑️ Limpiar Proceso
+                            </button>
+                            <button type="button" class="btn btn-outline" onclick="verificarPreRequisitos()">
+                                🔍 Verificar Pre-requisitos
+                            </button>
+                            <button type="submit" class="btn btn-success btn-lg" id="btnGenerar">
+                                🚀 Ejecutar Asignación y Generación
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <!-- Resultado -->
+                    <div id="resultadoGeneracion" class="hidden" style="margin-top: 24px;">
+                        <h4>📊 Resultado de la Generación</h4>
+                        <div id="resultadoContenido"></div>
+                    </div>
+
+                    <!-- ============================================ -->
+                    <!-- NUEVO: OPCIONES POST-GENERACIÓN -->
+                    <!-- ============================================ -->
+                    <div id="opcionesPostGeneracion" class="hidden" style="margin-top: 24px; padding-top: 24px; border-top: 2px solid var(--border-light);">
+                        <h4>📋 Listas de Control Generadas</h4>
+                        <p style="color: var(--text-muted); margin-bottom: 16px;">
+                            Descargue las listas de control para cada aula (para los profesores vigilantes).
+                        </p>
+                        
+                        <div id="listasControlAulasGeneracion"></div>
+                        
+                        <button class="btn btn-primary" onclick="descargarTodasLasListas()" style="margin-top: 16px;">
+                            📥 Descargar Todas las Listas
+                        </button>
+                    </div>
+
+                </div>
+                
+            </div>
+
             <!-- ======================================================== -->
             <!-- TAB: LISTADOS -->
             <!-- ======================================================== -->
@@ -363,20 +499,28 @@
                     </div>
                     
                     <div class="listados-options">
-                        <div class="listado-option selected" data-listado="alfabetico" onclick="seleccionarTipoListado('alfabetico')">
+                        <div class="listado-option selected" data-listado="alfabetico">
                             <div class="icon">📋</div>
                             <h3>Lista Alfabética General</h3>
                             <p>Todos los postulantes ordenados alfabéticamente con su aula asignada</p>
                         </div>
-                        <div class="listado-option" data-listado="por-aula" onclick="seleccionarTipoListado('por-aula')">
+                        
+                        <div class="listado-option" data-listado="por-aula">
                             <div class="icon">🏫</div>
                             <h3>Lista por Aula</h3>
                             <p>Postulantes de un aula específica para control del profesor vigilante</p>
                         </div>
-                        <div class="listado-option" data-listado="por-programa" onclick="seleccionarTipoListado('por-programa')">
+                        
+                        <div class="listado-option" data-listado="por-programa">
                             <div class="icon">📚</div>
                             <h3>Lista por Programa</h3>
                             <p>Postulantes agrupados por programa educativo</p>
+                        </div>
+                        
+                        <div class="listado-option" data-listado="control-profesores">
+                            <div class="icon">✅</div>
+                            <h3>Listas de Control (Profesores)</h3>
+                            <p>Para marcar asistencia el día del examen</p>
                         </div>
                     </div>
                     
@@ -390,6 +534,36 @@
                                 <option value="{{ aula.id }}">{{ aula.codigo }} - {{ aula.nombre or 'Sin nombre' }}</option>
                                 {% endfor %}
                             </select>
+                        </div>
+                    </div>
+                    
+                    <!-- ============================================ -->
+                    <!-- NUEVO: SECCIÓN DE LISTAS DE CONTROL -->
+                    <!-- ============================================ -->
+                    <div id="config-control-profesores" class="hidden" style="margin-top: 20px;">
+                        <div class="alert alert-info" style="margin-bottom: 16px;">
+                            <span class="alert-icon">ℹ️</span>
+                            <div>
+                                <h4>Listas de Control para Profesores Vigilantes</h4>
+                                <p>Estas listas incluyen checkbox para marcar postulantes ausentes (NO ASISTIÓ).</p>
+                                <p><strong>Imprima una lista por cada aula antes del día del examen.</strong></p>
+                            </div>
+                        </div>
+                        
+                        <div id="listasControlAulas" style="margin: 16px 0;">
+                            <p style="text-align: center; color: #6c757d;">
+                                <span style="font-size: 2rem;">⏳</span><br>
+                                Cargando aulas con asignaciones...
+                            </p>
+                        </div>
+                        
+                        <div style="display: flex; gap: 12px; margin-top: 16px;">
+                            <button class="btn btn-primary" onclick="abrirTodasLasListasControl()">
+                                📥 Abrir Todas las Listas
+                            </button>
+                            <button class="btn btn-outline" onclick="cargarListasControl()">
+                                🔄 Recargar
+                            </button>
                         </div>
                     </div>
                     
@@ -412,6 +586,61 @@
                     </div>
                     <div id="previewListado" class="listado-preview"></div>
                 </div>
+            </div>
+
+
+            <!-- ======================================================== -->
+            <!-- TAB: ASISTENCIA -->
+            <!-- ======================================================== -->
+            <div id="tab-asistencia" class="tab-content">
+                
+                <div class="card">
+                    <div class="card-header">
+                        <h3 class="card-title">✅ Registro de Asistencia por Aula</h3>
+                    </div>
+                    
+                    <div class="alert alert-info">
+                        <span class="alert-icon">ℹ️</span>
+                        <div>
+                            <h4>Instrucciones</h4>
+                            <p>Seleccione el aula y marque únicamente los postulantes <strong>AUSENTES</strong>.</p>
+                            <p>Por defecto, todos están marcados como <strong>PRESENTES</strong>.</p>
+                        </div>
+                    </div>
+                    
+                    <!-- Selector de Aula -->
+                    <div class="form-group">
+                        <label class="form-label">Seleccione el Aula</label>
+                        <select id="aulaAsistencia" class="form-control" onchange="cargarPostulantesAsistencia()">
+                            <option value="">-- Seleccione un aula --</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Contenedor de postulantes -->
+                    <div id="contenedorAsistencia" class="hidden" style="margin-top: 20px;">
+                        
+                        <div id="infoAulaAsistencia" style="background: #e9ecef; padding: 12px; border-radius: 4px; margin-bottom: 16px;">
+                            <!-- Info dinámica del aula -->
+                        </div>
+                        
+                        <div id="listaPostulantesAsistencia">
+                            <!-- Lista dinámica de postulantes -->
+                        </div>
+                        
+                        <div class="form-actions" style="margin-top: 20px;">
+                            <button type="button" class="btn btn-success btn-lg" onclick="guardarAsistencia()">
+                                💾 Guardar Asistencia
+                            </button>
+                            <button type="button" class="btn btn-outline" onclick="marcarTodosPresentes()">
+                                ✅ Marcar Todos Presentes
+                            </button>
+                            <button type="button" class="btn btn-outline" onclick="cargarPostulantesAsistencia()">
+                                🔄 Recargar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                
             </div>
 
         </div>
@@ -546,7 +775,340 @@
     <!-- ============================================================ -->
     <!-- SCRIPTS -->
     <!-- ============================================================ -->
+
+<!-- ============================================================ -->
+    <!-- SCRIPTS -->
+    <!-- ============================================================ -->
+
+    <script>
+        // ============================================================================
+        // VERIFICAR PRE-REQUISITOS
+        // ============================================================================
+        
+        async function verificarPreRequisitos() {
+            try {
+                const response = await fetch('/api/verificar-asignaciones-completas?proceso={{ proceso_actual }}');
+                const data = await response.json();
+                
+                let mensaje = '📊 PRE-REQUISITOS:\n\n';
+                mensaje += `✓ Postulantes activos: ${data.total_postulantes}\n`;
+                mensaje += `✓ Aulas disponibles: ${data.total_aulas}\n`;
+                mensaje += `✓ Profesores activos: ${data.total_profesores}\n`;
+                mensaje += `\n`;
+                
+                if (data.total_postulantes === 0) {
+                    mensaje += `❌ ERROR: No hay postulantes activos`;
+                    alert(mensaje);
+                    return;
+                }
+                
+                if (data.total_aulas === 0) {
+                    mensaje += `❌ ERROR: No hay aulas disponibles`;
+                    alert(mensaje);
+                    return;
+                }
+                
+                if (data.total_profesores === 0) {
+                    mensaje += `❌ ERROR: No hay profesores activos`;
+                    alert(mensaje);
+                    return;
+                }
+                
+                mensaje += `✅ Todo listo para generar hojas`;
+                alert(mensaje);
+                
+            } catch (error) {
+                alert('Error al verificar: ' + error.message);
+            }
+        }
+
+        // ============================================================================
+        // EJECUTAR GENERACIÓN COMPLETA
+        // ============================================================================
+        
+        async function ejecutarGeneracionCompleta(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
+            const modo = formData.get('modo_generacion');
+            const proceso = formData.get('proceso_admision');
+            
+            if (!confirm(`¿CONFIRMAR GENERACIÓN?\n\nModo: ${modo === 'unico' ? 'ZIP Único' : 'ZIP por Aula'}\nProceso: ${proceso}\n\nEsto reasignará TODOS los postulantes alfabéticamente.`)) {
+                return;
+            }
+            
+            const btn = document.getElementById('btnGenerar');
+            btn.disabled = true;
+            btn.innerHTML = '⏳ Procesando... (puede tomar varios minutos)';
+            
+            document.getElementById('resultadoGeneracion').classList.remove('hidden');
+            document.getElementById('resultadoContenido').innerHTML = '<p>🔄 Iniciando...</p>';
+            
+            try {
+                const response = await fetch('/api/asignar-y-generar-hojas', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        proceso_admision: proceso,
+                        modo_generacion: modo
+                    })
+                });
+                
+                if (modo === 'unico') {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `hojas_${proceso}_${new Date().getTime()}.zip`;
+                    a.click();
+                    
+                    const totalHojas = response.headers.get('X-Total-Hojas') || '?';
+                    
+                    document.getElementById('resultadoContenido').innerHTML = `
+                        <div class="alert alert-success">
+                            <h4>✅ Generación Completada</h4>
+                            <p><strong>Total hojas generadas:</strong> ${totalHojas}</p>
+                            <p><strong>Archivo:</strong> Descargado automáticamente</p>
+                        </div>
+                    `;
+                } else {
+                    const data = await response.json();
+                    let html = `
+                        <div class="alert alert-success">
+                            <h4>✅ Generación Completada</h4>
+                            <p><strong>Total hojas:</strong> ${data.total_hojas}</p>
+                            <p><strong>Total aulas:</strong> ${data.total_aulas}</p>
+                        </div>
+                        <h5>Archivos por Aula:</h5>
+                        <ul>
+                    `;
+                    data.archivos.forEach(archivo => {
+                        html += `
+                            <li>
+                                <strong>${archivo.aula}</strong>: ${archivo.cantidad} hojas 
+                                <a href="${archivo.url_descarga}" class="btn btn-sm btn-primary" download>📥 Descargar</a>
+                            </li>
+                        `;
+                    });
+                    html += '</ul>';
+                    document.getElementById('resultadoContenido').innerHTML = html;
+                }
+                
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Ejecutar Asignación y Generación';
+                mostrarOpcionesListas();
+                
+            } catch (error) {
+                document.getElementById('resultadoContenido').innerHTML = `
+                    <div class="alert alert-danger">
+                        <h4>❌ Error</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+                btn.disabled = false;
+                btn.innerHTML = '🚀 Ejecutar Asignación y Generación';
+            }
+        }
+
+        // ============================================================================
+        // MOSTRAR OPCIONES DE LISTAS POST-GENERACIÓN
+        // ============================================================================
+        
+        async function mostrarOpcionesListas() {
+            try {
+                const response = await fetch('/api/verificar-asignaciones-completas?proceso={{ proceso_actual }}');
+                const data = await response.json();
+                
+                if (data.total_asignaciones > 0) {
+                    const responseAulas = await fetch('/api/aulas-con-asignaciones?proceso={{ proceso_actual }}&formato=simple');
+                    const aulas = await responseAulas.json();
+                    
+                    let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px;">';
+                    
+                    aulas.forEach(aula => {
+                        html += `
+                            <a href="/api/lista-control-aula/${aula.id}?proceso={{ proceso_actual }}" 
+                               target="_blank"
+                               class="btn btn-outline"
+                               style="display: flex; align-items: center; justify-content: space-between; text-decoration: none;">
+                                <span>🏫 ${aula.codigo}</span>
+                                <span style="font-size: 0.85em; opacity: 0.7;">${aula.total} alumnos</span>
+                            </a>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    
+                    document.getElementById('listasControlAulasGeneracion').innerHTML = html;
+                    document.getElementById('opcionesPostGeneracion').classList.remove('hidden');
+                }
+            } catch (error) {
+                console.error('Error cargando listas:', error);
+            }
+        }
+
+        // ============================================================================
+        // DESCARGAR TODAS LAS LISTAS
+        // ============================================================================
+        
+        function descargarTodasLasListas() {
+            alert('Esta función abrirá todas las listas en pestañas separadas.\n\nUse Ctrl+P en cada una para imprimir.');
+            
+            fetch('/api/aulas-con-asignaciones?proceso={{ proceso_actual }}&formato=simple')
+                .then(res => res.json())
+                .then(aulas => {
+                    aulas.forEach((aula, index) => {
+                        setTimeout(() => {
+                            window.open(`/api/lista-control-aula/${aula.id}?proceso={{ proceso_actual }}`, '_blank');
+                        }, index * 500);
+                    });
+                });
+        }
+
+        // ============================================================================
+        // LIMPIAR PROCESO
+        // ============================================================================
+        
+        async function limpiarProceso() {
+            const proceso = '{{ proceso_actual }}';
+            
+            try {
+                const response = await fetch(`/api/verificar-asignaciones-completas?proceso=${proceso}`);
+                const data = await response.json();
+                
+                if (data.total_asignaciones === 0) {
+                    alert('No hay datos para limpiar en el proceso ' + proceso);
+                    return;
+                }
+                
+                const mensaje = `⚠️ ADVERTENCIA: LIMPIEZA DE PROCESO ${proceso}
+
+Esta acción eliminará:
+- ${data.total_asignaciones} asignaciones
+- Todas las hojas generadas
+- Todas las respuestas capturadas
+
+Esta operación NO SE PUEDE DESHACER.
+
+¿Está seguro de continuar?`;
+                
+                if (!confirm(mensaje)) {
+                    return;
+                }
+                
+                const confirmacion = prompt('Para confirmar, escriba: ELIMINAR');
+                if (confirmacion !== 'ELIMINAR') {
+                    alert('Limpieza cancelada');
+                    return;
+                }
+                
+                const btnLimpiar = document.querySelector('button[onclick="limpiarProceso()"]');
+                if (btnLimpiar) {
+                    btnLimpiar.disabled = true;
+                    btnLimpiar.innerHTML = '⏳ Limpiando...';
+                }
+                
+                const responseLimpieza = await fetch('/api/limpiar-proceso', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        proceso_admision: proceso,
+                        confirmar: true
+                    })
+                });
+                
+                if (!responseLimpieza.ok) {
+                    const error = await responseLimpieza.json();
+                    throw new Error(error.detail || 'Error en la limpieza');
+                }
+                
+                const resultado = await responseLimpieza.json();
+                
+                alert(`✅ Limpieza completada
+
+Eliminados:
+- ${resultado.eliminados.asignaciones} asignaciones
+- ${resultado.eliminados.hojas} hojas
+- ${resultado.eliminados.respuestas} respuestas
+
+Ahora puede generar nuevamente.`);
+                
+                if (btnLimpiar) {
+                    btnLimpiar.disabled = false;
+                    btnLimpiar.innerHTML = '🗑️ Limpiar Proceso';
+                }
+                
+                setTimeout(() => location.reload(), 1500);
+                
+            } catch (error) {
+                console.error('Error en limpieza:', error);
+                alert('❌ Error: ' + error.message);
+                
+                const btnLimpiar = document.querySelector('button[onclick="limpiarProceso()"]');
+                if (btnLimpiar) {
+                    btnLimpiar.disabled = false;
+                    btnLimpiar.innerHTML = '🗑️ Limpiar Proceso';
+                }
+            }
+        }
+
+
+        // ============================================================================
+        // INICIALIZACIÓN AUTOMÁTICA AL CARGAR LA PÁGINA
+        // ============================================================================
+        
+        console.log('🚀 Script cargado, esperando DOM...');
+        
+        // Función de inicialización
+        function inicializarEventosListados() {
+            console.log('🎯 Inicializando eventos de listados...');
+            
+            const opciones = document.querySelectorAll('.listado-option');
+            console.log(`📋 Opciones encontradas: ${opciones.length}`);
+            
+            if (opciones.length === 0) {
+                console.error('❌ No se encontraron opciones de listado');
+                return;
+            }
+            
+            // Agregar click a cada opción
+            opciones.forEach((opcion, index) => {
+                const tipo = opcion.getAttribute('data-listado');
+                console.log(`  ${index + 1}. Agregando listener a: ${tipo}`);
+                
+               opcion.addEventListener('click', function(e) {
+                    console.log(`🖱️ CLICK DETECTADO en: ${tipo}`);
+                    console.log('⏳ Ejecutando seleccionarTipoListado...');
+                    
+                    try {
+                        seleccionarTipoListado(tipo);
+                        console.log('✅ seleccionarTipoListado ejecutado correctamente');
+                    } catch (error) {
+                        console.error('❌ ERROR al ejecutar seleccionarTipoListado:', error);
+                        console.error('Detalles:', error.message);
+                        console.error('Stack:', error.stack);
+                    }
+                });
+
+            });
+            
+            console.log('✅ Eventos de listados inicializados correctamente');
+        }
+        
+        // Ejecutar cuando el DOM esté listo
+        if (document.readyState === 'loading') {
+            console.log('⏳ DOM aún cargando, esperando...');
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('✅ DOM cargado, inicializando...');
+                inicializarEventosListados();
+            });
+        } else {
+            console.log('✅ DOM ya cargado, inicializando inmediatamente...');
+            inicializarEventosListados();
+        }
+    </script>
+
     <script src="/static/js/admin/base.js"></script>
-    <script src="/static/js/admin/dashboard_coordinador.js"></script>
+    <script src="/static/js/admin/dashboard_coordinador.js?v=3"></script>
 </body>
 </html>
