@@ -335,18 +335,207 @@ async function toggleHabilitacion(id, nuevoEstado) {
 // LISTADOS
 // ============================================================
 
+// ============================================================================
+// GESTIÓN DE LISTADOS
+// ============================================================================
+
 function seleccionarTipoListado(tipo) {
-    document.querySelectorAll('.listado-option').forEach(o => o.classList.remove('selected'));
-    document.querySelector(`[data-listado="${tipo}"]`)?.classList.add('selected');
+    console.log('🎯 INICIO - Tipo seleccionado:', tipo);
     
-    // Mostrar/ocultar selector de aula
+    // Desactivar todas
+    const opciones = document.querySelectorAll('.listado-option');
+    console.log('  📋 Total opciones:', opciones.length);
+    
+    opciones.forEach(opt => {
+        opt.classList.remove('selected');
+    });
+    
+    // Activar seleccionada
+    const selected = document.querySelector(`[data-listado="${tipo}"]`);
+    if (selected) {
+        selected.classList.add('selected');
+        console.log('  ✅ Opción activada');
+    } else {
+        console.error('  ❌ No se encontró opción');
+        return;
+    }
+    
+    // Buscar contenedores
     const configAula = document.getElementById('config-por-aula');
-    if (configAula) {
-        if (tipo === 'por-aula') {
+    const configControl = document.getElementById('config-control-profesores');
+    
+    console.log('  📦 Contenedores:', {
+        'config-por-aula': !!configAula,
+        'config-control-profesores': !!configControl
+    });
+    
+    // Ocultar todos
+    if (configAula) configAula.classList.add('hidden');
+    if (configControl) configControl.classList.add('hidden');
+    
+    // Mostrar el específico
+    if (tipo === 'por-aula') {
+        if (configAula) {
             configAula.classList.remove('hidden');
-        } else {
-            configAula.classList.add('hidden');
+            console.log('  🔓 config-por-aula visible');
         }
+    } else if (tipo === 'control-profesores') {
+        if (configControl) {
+            configControl.classList.remove('hidden');
+            console.log('  🔓 config-control-profesores visible');
+            
+            // Cargar listas automáticamente
+            console.log('  ⏳ Cargando listas de control...');
+            if (typeof cargarListasControl === 'function') {
+                cargarListasControl();
+            } else {
+                console.error('  ❌ cargarListasControl no existe');
+            }
+        }
+    }
+    
+    // Ocultar/mostrar botón Generar
+    const btnGenerar = document.getElementById('btnGenerarListado');
+    if (btnGenerar) {
+        btnGenerar.style.display = (tipo === 'control-profesores') ? 'none' : 'inline-block';
+        console.log('  🔘 Botón Generar:', tipo === 'control-profesores' ? 'OCULTO' : 'VISIBLE');
+    }
+    
+    console.log('✅ FIN - Función completada');
+}
+
+async function cargarListasControl() {
+    console.log('📥 Cargando listas de control...');
+    
+    const container = document.getElementById('listasControlAulas');
+    if (!container) {
+        console.error('❌ No se encontró el contenedor listasControlAulas');
+        return;
+    }
+    
+    container.innerHTML = `
+        <p style="text-align: center; color: #6c757d; padding: 40px;">
+            <span style="font-size: 2rem;">⏳</span><br>
+            Cargando aulas...
+        </p>
+    `;
+    
+    try {
+        // Obtener el proceso actual (más robusto)
+        let proceso = '2025-2'; // valor por defecto
+        
+        const procesoInput = document.querySelector('[name="proceso_admision"]');
+        if (procesoInput && procesoInput.value) {
+            proceso = procesoInput.value;
+        } else {
+            // Intentar obtenerlo del footer o header
+            const procesoElement = document.querySelector('.header span strong, .footer span strong');
+            if (procesoElement) {
+                proceso = procesoElement.textContent.trim();
+            }
+        }
+        
+        const url = `/api/aulas-con-asignaciones?proceso=${proceso}&formato=simple`;
+        console.log('🌐 Fetch:', url);
+        
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const aulas = await response.json();
+        console.log('✅ Aulas recibidas:', aulas);
+        
+        if (!aulas || aulas.length === 0) {
+            container.innerHTML = `
+                <div style="text-align: center; padding: 40px; color: #6c757d;">
+                    <span style="font-size: 3rem;">📭</span>
+                    <h4 style="margin: 16px 0 8px 0;">No hay aulas con asignaciones</h4>
+                    <p style="margin: 0; font-size: 0.9rem;">Primero debe generar las hojas de respuesta.</p>
+                </div>
+            `;
+            return;
+        }
+        
+        let html = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px;">';
+        
+        aulas.forEach(aula => {
+            html += `
+                <a href="/api/lista-control-aula/${aula.id}?proceso=${proceso}" 
+                   target="_blank"
+                   class="btn btn-outline"
+                   style="display: flex; align-items: center; justify-content: space-between; text-decoration: none; padding: 16px; height: auto; min-height: 80px;">
+                    <div style="display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.5rem;">🏫</span>
+                        <div style="text-align: left;">
+                            <strong style="display: block; font-size: 1rem; margin-bottom: 4px;">${aula.codigo}</strong>
+                            <small style="color: #6c757d; font-size: 0.85rem;">${aula.nombre || 'Sin nombre'}</small>
+                        </div>
+                    </div>
+                    <span style="background: #e9ecef; padding: 6px 12px; border-radius: 12px; font-size: 0.85em; font-weight: 600; white-space: nowrap;">
+                        ${aula.total} alumnos
+                    </span>
+                </a>
+            `;
+        });
+        
+        html += '</div>';
+        
+        container.innerHTML = html;
+        console.log('✅ Listas de control cargadas correctamente');
+        
+    } catch (error) {
+        console.error('❌ Error cargando listas de control:', error);
+        container.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #dc3545;">
+                <span style="font-size: 3rem;">❌</span>
+                <h4 style="margin: 16px 0 8px 0;">Error al cargar las aulas</h4>
+                <p style="margin: 0 0 16px 0; font-size: 0.9rem;">${error.message}</p>
+                <button type="button" class="btn btn-outline" onclick="cargarListasControl()">🔄 Reintentar</button>
+            </div>
+        `;
+    }
+}
+
+async function abrirTodasLasListasControl() {
+    if (!confirm('Esta acción abrirá todas las listas de control en pestañas separadas.\n\nPodrá imprimir cada una con Ctrl+P.\n\n¿Continuar?')) {
+        return;
+    }
+    
+    try {
+        // Obtener el proceso actual
+        let proceso = '2025-2';
+        const procesoInput = document.querySelector('[name="proceso_admision"]');
+        if (procesoInput && procesoInput.value) {
+            proceso = procesoInput.value;
+        } else {
+            const procesoElement = document.querySelector('.header span strong, .footer span strong');
+            if (procesoElement) {
+                proceso = procesoElement.textContent.trim();
+            }
+        }
+        
+        const response = await fetch(`/api/aulas-con-asignaciones?proceso=${proceso}&formato=simple`);
+        const aulas = await response.json();
+        
+        if (!aulas || aulas.length === 0) {
+            alert('No hay aulas con asignaciones');
+            return;
+        }
+        
+        console.log(`📥 Abriendo ${aulas.length} listas de control...`);
+        
+        aulas.forEach((aula, index) => {
+            setTimeout(() => {
+                const url = `/api/lista-control-aula/${aula.id}?proceso=${proceso}`;
+                console.log(`🔗 Abriendo: ${url}`);
+                window.open(url, '_blank');
+            }, index * 500);
+        });
+        
+    } catch (error) {
+        alert('Error al abrir listas: ' + error.message);
     }
 }
 
@@ -553,3 +742,330 @@ document.addEventListener('DOMContentLoaded', () => {
     
     document.getElementById('prefijoAula')?.addEventListener('change', actualizarPreviewCodigo);
 });
+
+
+/* ============================================================
+   CONTROL DE ASISTENCIA - DASHBOARD COORDINADOR
+   static/js/admin/dashboard_coordinador.js 
+   ============================================================ */  
+// ============================================================================
+// GESTIÓN DE ASISTENCIA
+// ============================================================================
+
+/**
+ * Carga las aulas disponibles en el selector de asistencia
+ */
+async function cargarAulasAsistencia() {
+    console.log('📥 Cargando aulas para asistencia...');
+    
+    try {
+        const proceso = document.querySelector('[name="proceso_admision"]')?.value || '2025-2';
+        const response = await fetch(`/api/aulas-con-asignaciones?proceso=${proceso}&formato=simple`);
+        const aulas = await response.json();
+        
+        const select = document.getElementById('aulaAsistencia');
+        if (!select) return;
+        
+        select.innerHTML = '<option value="">-- Seleccione un aula --</option>';
+        
+        aulas.forEach(aula => {
+            const option = document.createElement('option');
+            option.value = aula.id;
+            option.textContent = `${aula.codigo} - ${aula.nombre || 'Sin nombre'} (${aula.total} postulantes)`;
+            select.appendChild(option);
+        });
+        
+        console.log(`✅ ${aulas.length} aulas cargadas`);
+        
+    } catch (error) {
+        console.error('❌ Error cargando aulas:', error);
+        alert('Error al cargar aulas: ' + error.message);
+    }
+}
+
+/**
+ * Carga los postulantes del aula seleccionada
+ */
+async function cargarPostulantesAsistencia() {
+    console.log('📥 Cargando postulantes para asistencia...');
+    
+    const select = document.getElementById('aulaAsistencia');
+    const aulaId = select.value;
+    
+    if (!aulaId) {
+        document.getElementById('contenedorAsistencia').classList.add('hidden');
+        return;
+    }
+    
+    const contenedor = document.getElementById('contenedorAsistencia');
+    const infoAula = document.getElementById('infoAulaAsistencia');
+    const lista = document.getElementById('listaPostulantesAsistencia');
+    
+    // Mostrar loading
+    contenedor.classList.remove('hidden');
+    lista.innerHTML = `
+        <div style="text-align: center; padding: 40px;">
+            <div class="spinner"></div>
+            <p style="margin-top: 10px;">Cargando postulantes...</p>
+        </div>
+    `;
+    
+    try {
+        const proceso = document.querySelector('[name="proceso_admision"]')?.value || '2025-2';
+        const response = await fetch(`/api/obtener-postulantes-aula/${aulaId}?proceso=${proceso}`);
+        
+        if (!response.ok) {
+            throw new Error('Error al obtener postulantes');
+        }
+        
+        const data = await response.json();
+        
+        console.log('✅ Postulantes recibidos:', data.total_postulantes);
+        
+        // Mostrar info del aula
+        let infoHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px;">
+                <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid var(--primary-color);">
+                    <strong>🏫 Aula:</strong><br>${data.aula.codigo} - ${data.aula.nombre}
+                </div>
+                <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid #28a745;">
+                    <strong>👥 Total postulantes:</strong><br>${data.total_postulantes}
+                </div>
+                <div style="background: #fff; padding: 12px; border-radius: 8px; border-left: 4px solid ${data.asistencia_registrada ? '#28a745' : '#ffc107'};">
+                    <strong>📊 Estado:</strong><br>${data.asistencia_registrada ? '✅ Ya registrada' : '⏳ Sin registrar'}
+                </div>
+            </div>
+        `;
+        
+        if (data.asistencia_registrada) {
+            infoHTML += `
+                <div style="margin-top: 12px; padding: 12px; background: #d1ecf1; border-radius: 8px; border-left: 4px solid #17a2b8;">
+                    <strong>ℹ️ Última actualización:</strong> ${new Date(data.hora_ultimo_registro).toLocaleString('es-PE')} 
+                    por ${data.registrado_por}
+                </div>
+            `;
+        }
+        
+        infoAula.innerHTML = infoHTML;
+        
+        // Generar lista de postulantes
+        let listaHTML = `
+            <!-- Alerta fija -->
+            <div class="alerta-marcar">
+                ⚠️ MARQUE SOLO LOS POSTULANTES AUSENTES
+            </div>
+            
+            <!-- Contador dinámico de ausentes -->
+            <div class="contador-ausentes" id="contadorAusentes" style="display: none;">
+                <div class="numero" id="numeroAusentes">0</div>
+                <div class="texto">
+                    POSTULANTES AUSENTES<br>
+                    <small style="opacity: 0.9;">Marcados con checkbox</small>
+                </div>
+            </div>
+            
+            <!-- Grid de postulantes -->
+            <div class="grid-postulantes">
+        `;
+        
+        data.postulantes.forEach(p => {
+            const checked = !p.asistio ? 'checked' : '';
+            const clase = !p.asistio ? 'ausente' : '';
+            
+            listaHTML += `
+                <label class="postulante-checkbox ${clase}" data-dni="${p.dni}">
+                    <input type="checkbox" ${checked} onchange="toggleAusente(this, '${p.dni}')">
+                    <span class="orden-badge">${p.orden.toString().padStart(2, '0')}</span>
+                    <span class="postulante-info">
+                        <strong>${p.apellido_paterno} ${p.apellido_materno}</strong>
+                        <small>${p.nombres}</small>
+                        <small>DNI: ${p.dni}</small>
+                    </span>
+                    <span class="estado-badge">${!p.asistio ? '❌ AUSENTE' : '✅ PRESENTE'}</span>
+                </label>
+            `;
+        });
+        
+        listaHTML += '</div>';
+        lista.innerHTML = listaHTML;
+        
+        // Actualizar contador inicial
+        actualizarContadorAusentes();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        lista.innerHTML = `
+            <div style="text-align: center; padding: 40px; color: #dc3545;">
+                <h4>❌ Error al cargar postulantes</h4>
+                <p>${error.message}</p>
+                <button class="btn btn-outline" onclick="cargarPostulantesAsistencia()">🔄 Reintentar</button>
+            </div>
+        `;
+    }
+}
+
+/**
+ * Actualiza el contador de ausentes
+ */
+function actualizarContadorAusentes() {
+    const checkboxes = document.querySelectorAll('#listaPostulantesAsistencia input[type="checkbox"]:checked');
+    const contador = document.getElementById('contadorAusentes');
+    const numero = document.getElementById('numeroAusentes');
+    
+    if (!contador || !numero) return;
+    
+    const totalAusentes = checkboxes.length;
+    
+    numero.textContent = totalAusentes;
+    
+    if (totalAusentes > 0) {
+        contador.style.display = 'flex';
+    } else {
+        contador.style.display = 'none';
+    }
+}
+
+/**
+ * Toggle estado de asistencia de un postulante
+ */
+function toggleAusente(checkbox, dni) {
+    const label = checkbox.closest('.postulante-checkbox');
+    const estadoBadge = label.querySelector('.estado-badge');
+    
+    if (checkbox.checked) {
+        // Marcado como AUSENTE
+        label.classList.add('ausente');
+        estadoBadge.textContent = '❌ AUSENTE';
+    } else {
+        // Marcado como PRESENTE
+        label.classList.remove('ausente');
+        estadoBadge.textContent = '✅ PRESENTE';
+    }
+    
+    // Actualizar contador
+    actualizarContadorAusentes();
+}
+
+/**
+ * Marca todos como presentes
+ */
+function marcarTodosPresentes() {
+    const checkboxes = document.querySelectorAll('#listaPostulantesAsistencia input[type="checkbox"]');
+    
+    checkboxes.forEach(checkbox => {
+        if (checkbox.checked) {
+            checkbox.checked = false;
+            toggleAusente(checkbox, checkbox.closest('.postulante-checkbox').dataset.dni);
+        }
+    });
+    
+    alert('✅ Todos marcados como PRESENTES');
+}
+
+/**
+ * Guarda la asistencia
+ */
+async function guardarAsistencia() {
+    const select = document.getElementById('aulaAsistencia');
+    const aulaId = select.value;
+    
+    if (!aulaId) {
+        alert('Debe seleccionar un aula');
+        return;
+    }
+    
+    // Obtener DNIs de ausentes (checkboxes marcados)
+    const checkboxes = document.querySelectorAll('#listaPostulantesAsistencia input[type="checkbox"]:checked');
+    const ausentesDNI = Array.from(checkboxes).map(cb => {
+        return cb.closest('.postulante-checkbox').dataset.dni;
+    });
+    
+    const totalPostulantes = document.querySelectorAll('#listaPostulantesAsistencia .postulante-checkbox').length;
+    const totalAusentes = ausentesDNI.length;
+    const totalPresentes = totalPostulantes - totalAusentes;
+    
+    // Confirmación
+    const mensaje = `¿CONFIRMAR REGISTRO DE ASISTENCIA?
+
+📊 Resumen:
+- Total postulantes: ${totalPostulantes}
+- Presentes: ${totalPresentes}
+- Ausentes: ${totalAusentes}
+
+Esta acción actualizará el registro en la base de datos.`;
+    
+    if (!confirm(mensaje)) {
+        return;
+    }
+    
+    // Obtener usuario actual (desde el header)
+    const usuarioElement = document.querySelector('.user-badge');
+    const usuarioNombre = usuarioElement ? usuarioElement.textContent.replace('👤 ', '').trim() : 'Sistema';
+    
+    try {
+        const proceso = document.querySelector('[name="proceso_admision"]')?.value || '2025-2';
+        
+        const response = await fetch('/api/registrar-asistencia', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                aula_id: parseInt(aulaId),
+                proceso_admision: proceso,
+                ausentes_dni: ausentesDNI,
+                registrado_por: usuarioNombre
+            })
+        });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            throw new Error(error.detail || 'Error al guardar asistencia');
+        }
+        
+        const data = await response.json();
+        
+        console.log('✅ Asistencia guardada:', data);
+        
+        alert(`✅ ASISTENCIA REGISTRADA CORRECTAMENTE
+
+📊 Resumen:
+- Aula: ${data.aula_codigo}
+- Total: ${data.total_postulantes}
+- Presentes: ${data.total_presentes}
+- Ausentes: ${data.total_ausentes}
+- Registrado por: ${data.registrado_por}
+- Hora: ${new Date(data.hora_registro).toLocaleString('es-PE')}`);
+        
+        // Recargar la lista para mostrar estado actualizado
+        await cargarPostulantesAsistencia();
+        
+    } catch (error) {
+        console.error('❌ Error:', error);
+        alert('❌ Error al guardar asistencia:\n\n' + error.message);
+    }
+}
+
+/**
+ * Inicializar pestaña de asistencia
+ */
+function inicializarAsistencia() {
+    // Cargar aulas cuando se abre la pestaña
+    const tabAsistencia = document.querySelector('[data-tab="tab-asistencia"]');
+    if (tabAsistencia) {
+        tabAsistencia.addEventListener('click', function() {
+            // Solo cargar si el select está vacío
+            const select = document.getElementById('aulaAsistencia');
+            if (select && select.options.length <= 1) {
+                cargarAulasAsistencia();
+            }
+        });
+    }
+}
+
+// Inicializar cuando el DOM esté listo
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', inicializarAsistencia);
+} else {
+    inicializarAsistencia();
+}
