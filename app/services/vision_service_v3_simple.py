@@ -148,10 +148,10 @@ def detectar_dni_manuscrito_preciso(response) -> str:
     #            = ~715-742 puntos desde abajo
     
     dni_zone = {
-        'x_min': page_width * 0.25,   # 25% desde izquierda (más centrado)
-        'x_max': page_width * 0.75,   # 75% desde izquierda (más centrado)
-        'y_min': page_height * 0.84,  # 84% desde abajo (zona DNI)
-        'y_max': page_height * 0.91   # 91% desde abajo
+        'x_min': page_width * 0.25,
+        'x_max': page_width * 0.75,
+        'y_min': page_height * 0.05,  # ← 5% desde ARRIBA = 95% desde abajo
+        'y_max': page_height * 0.12   # ← 12% desde ARRIBA = 88% desde abajo
     }
     
     print(f"  📍 Zona búsqueda:")
