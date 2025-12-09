@@ -79,6 +79,8 @@ class HojaRespuesta(Base):
     
     # ← AGREGAR ESTA LÍNEA:
     logs_anulacion = relationship("LogAnulacionHoja", foreign_keys="[LogAnulacionHoja.hoja_respuesta_id]", back_populates="hoja_respuesta")
+
+    validacion_dni = relationship("ValidacionDNI", back_populates="hoja_respuesta", uselist=False)
     
     def __repr__(self):
         return f"<HojaRespuesta(id={self.id}, codigo_hoja='{self.codigo_hoja}', postulante_id={self.postulante_id}, estado='{self.estado}')>"

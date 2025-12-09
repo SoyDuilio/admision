@@ -31,6 +31,8 @@ class Postulante(Base):
     # Código único del postulante (formato: AULA-PUESTO-DNI)
     # Ejemplo: A01-P15-72345678
     codigo_unico = Column(String(20), unique=True)
+
+    tipo = Column(String(20), default='regular', index=True)  # regular, invitado
     
     # Información adicional
     #email = Column(String(200), nullable=True)
