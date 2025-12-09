@@ -12,6 +12,7 @@ from app.models.asignacion_examen import AsignacionExamen
 from app.models.venta_carpeta import VentaCarpeta
 from app.models.verificacion_certificado import VerificacionCertificado
 from app.models.log_anulacion import LogAnulacionHoja
+from app.models.validacion_dni import ValidacionDNI
 
 __all__ = [
     "Aula",
@@ -25,5 +26,6 @@ __all__ = [
     "AsignacionExamen",  # ← AGREGAR
     "VentaCarpeta",
     "VerificacionCertificado",
-    "LogAnulacionHoja"
+    "LogAnulacionHoja",
+    "ValidacionDNI"
 ]
