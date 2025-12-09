@@ -1,10 +1,5 @@
 """
-Vision Service V3 - SIMPLE (DNI manuscrito + Validación)
-
-MEJORA CRÍTICA:
-- Detecta DNI manuscrito en ZONA PRECISA (8 rectángulos superiores)
-- VALIDA que coincida con postulante.dni de la hoja
-- Registra alerta si no coincide
+Vision Service V3 - SIMPLE con detección precisa de DNI
 """
 
 import re
@@ -31,7 +26,7 @@ except Exception as e:
 
 async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
     """
-    Procesa hoja SIMPLE: código + DNI manuscrito + 100 respuestas
+    Procesa hoja genérica: código + DNI manuscrito + 100 respuestas
     """
     
     if not VISION_AVAILABLE:
@@ -70,11 +65,11 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         # Detectar código de hoja (impreso)
         codigo_hoja = detectar_codigo_hoja(full_text)
         
-        # Detectar DNI manuscrito (MEJORADO)
-        dni_postulante = detectar_dni_manuscrito_preciso(response, full_text)
+        # Detectar DNI manuscrito (MEJORADO - coordenadas precisas)
+        dni_postulante = detectar_dni_manuscrito_preciso(response)
         
         # Detectar 100 respuestas
-        respuestas = detectar_respuestas_manuscritas(response, full_text)
+        respuestas = detectar_respuestas_manuscritas(response)
         
         print(f"✅ Código hoja: {codigo_hoja}")
         print(f"✅ DNI: {dni_postulante if dni_postulante else '(no detectado)'}")
@@ -119,15 +114,15 @@ def detectar_codigo_hoja(texto: str) -> str:
     raise Exception("No se detectó código de hoja válido")
 
 
-def detectar_dni_manuscrito_preciso(response, texto: str) -> str:
+def detectar_dni_manuscrito_preciso(response) -> str:
     """
     DETECCIÓN PRECISA DE DNI EN ZONA DE 8 RECTÁNGULOS
     
-    Basado en la imagen compartida:
-    - Los 8 rectángulos están en la parte SUPERIOR
-    - Están en HORIZONTAL (fila)
-    - Ancho aproximado: 40% del ancho de la página
-    - Altura: 15% desde arriba
+    Basado en pdf_generator_simple.py:
+    - Rectángulos: 8 × 0.9cm con espaciado 0.15cm
+    - Total ancho: 8.25 cm (centrados)
+    - Ubicación: ~3.5-4.5 cm desde arriba
+    - Altura rectángulos: 0.65 cm
     """
     
     print(f"\n🔍 Buscando DNI en zona precisa...")
@@ -140,16 +135,28 @@ def detectar_dni_manuscrito_preciso(response, texto: str) -> str:
     page_width = page.width
     page_height = page.height
     
+    print(f"  📏 Dimensiones página: {page_width}px × {page_height}px")
+    
     # ========================================================================
-    # ZONA PRECISA DE LOS 8 RECTÁNGULOS (ajustar según tu imagen)
+    # COORDENADAS PRECISAS BASADAS EN PDF
     # ========================================================================
     
+    # A4 en puntos: 595.28 × 841.89
+    # Márgenes: 1.5cm ext + 0.5cm marco = 2cm = ~56.7 puntos
+    # Rectángulos DNI centrados, 8.25cm de ancho total
+    # Posición Y: ~3.5-4.5cm desde arriba = ~99-127 puntos desde arriba
+    #            = ~715-742 puntos desde abajo
+    
     dni_zone = {
-        'x_min': page_width * 0.30,   # 30% desde izquierda
-        'x_max': page_width * 0.70,   # 70% desde izquierda
-        'y_min': page_height * 0.75,  # 75% desde abajo (= 25% desde arriba)
-        'y_max': page_height * 0.90   # 90% desde abajo (= 10% desde arriba)
+        'x_min': page_width * 0.25,   # 25% desde izquierda (más centrado)
+        'x_max': page_width * 0.75,   # 75% desde izquierda (más centrado)
+        'y_min': page_height * 0.84,  # 84% desde abajo (zona DNI)
+        'y_max': page_height * 0.91   # 91% desde abajo
     }
+    
+    print(f"  📍 Zona búsqueda:")
+    print(f"     X: {dni_zone['x_min']:.0f} - {dni_zone['x_max']:.0f} px")
+    print(f"     Y: {dni_zone['y_min']:.0f} - {dni_zone['y_max']:.0f} px")
     
     digitos_encontrados = []
     
@@ -171,10 +178,10 @@ def detectar_dni_manuscrito_preciso(response, texto: str) -> str:
                     for char in texto_word:
                         if char.isdigit():
                             digitos_encontrados.append((x, char))
+                            print(f"     ✓ Dígito '{char}' en X={x:.0f}, Y={y:.0f}")
     
     if not digitos_encontrados:
         print(f"  ⚠️ No se encontraron dígitos en zona DNI")
-        print(f"     Zona: X({dni_zone['x_min']:.0f}-{dni_zone['x_max']:.0f}), Y({dni_zone['y_min']:.0f}-{dni_zone['y_max']:.0f})")
         return ""
     
     # Ordenar por posición X (izquierda a derecha)
@@ -185,16 +192,16 @@ def detectar_dni_manuscrito_preciso(response, texto: str) -> str:
     dni = ''.join(dni_digitos)
     
     if len(dni) == 8:
-        print(f"  ✅ DNI detectado en zona precisa: {dni}")
-        print(f"     Dígitos encontrados en zona: {len(digitos_encontrados)}")
+        print(f"  ✅ DNI detectado: {dni}")
+        print(f"     Total dígitos en zona: {len(digitos_encontrados)}")
         return dni
     else:
-        print(f"  ⚠️ DNI incompleto: {dni} ({len(dni)} dígitos)")
+        print(f"  ⚠️ DNI incompleto: {dni} ({len(dni)}/8 dígitos)")
         return ""
 
 
-def detectar_respuestas_manuscritas(response, texto: str) -> List[str]:
-    """Detecta 100 respuestas manuscritas"""
+def detectar_respuestas_manuscritas(response) -> List[str]:
+    """Detecta 100 respuestas manuscritas (A-E)"""
     
     respuestas = []
     letras_validas = ['A', 'B', 'C', 'D', 'E']
@@ -212,8 +219,8 @@ def detectar_respuestas_manuscritas(response, texto: str) -> List[str]:
                     y_pos = sum(v.y for v in vertices) / len(vertices)
                     x_pos = sum(v.x for v in vertices) / len(vertices)
                     
-                    # Solo zona de respuestas (debajo del encabezado)
-                    if y_pos > page.height * 0.35:
+                    # Solo zona de respuestas (debajo del 35% superior)
+                    if y_pos < page.height * 0.65:  # 65% desde abajo = 35% desde arriba
                         if texto_word in letras_validas:
                             palabras_ordenadas.append({
                                 'texto': texto_word,
@@ -221,7 +228,8 @@ def detectar_respuestas_manuscritas(response, texto: str) -> List[str]:
                                 'x': x_pos
                             })
         
-        palabras_ordenadas.sort(key=lambda w: (w['y'], w['x']))
+        # Ordenar: primero por Y descendente (arriba a abajo), luego por X
+        palabras_ordenadas.sort(key=lambda w: (-w['y'], w['x']))
         respuestas = [p['texto'] for p in palabras_ordenadas[:100]]
     
     while len(respuestas) < 100:
@@ -278,6 +286,7 @@ async def procesar_y_guardar_respuestas(hoja_respuesta_id: int, resultado_api: D
 async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, db):
     """Califica con gabarito"""
     from app.models import Respuesta, ClaveRespuesta
+    from sqlalchemy import text
     
     respuestas = db.query(Respuesta).filter(
         Respuesta.hoja_respuesta_id == hoja_respuesta_id
@@ -290,8 +299,7 @@ async def calificar_hoja_con_gabarito(hoja_respuesta_id: int, gabarito_id: int, 
     if not gabarito:
         raise Exception("Gabarito no disponible")
     
-    # Buscar todas las claves del proceso
-    from sqlalchemy import text
+    # Obtener todas las claves del proceso
     query = text("""
         SELECT numero_pregunta, respuesta_correcta
         FROM clave_respuestas
