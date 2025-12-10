@@ -5,35 +5,9 @@ Usa schema estructurado para extracción precisa
 import os
 import google.generativeai as genai
 from typing import Dict, TypedDict, List
-from PIL import Image
 from pathlib import Path
 import json
-import re
 from app.services.gemini_extractor_structured import extract_data_compatible
-
-
-# ============================================================================
-# CLASES TIPADAS PARA SCHEMAS
-# ============================================================================
-
-# Para zoom DNI (estructura anidada igual que hoja completa)
-class CodigosDNI(TypedDict):
-    dniPostulante: str
-
-class DNIResponse(TypedDict):
-    codes: CodigosDNI
-
-# Para hoja completa
-class CodigosHoja(TypedDict):
-    codigoDeHoja: str
-
-class RespuestaItem(TypedDict):
-    questionNumber: int
-    answer: str
-
-class HojaResponse(TypedDict):
-    codes: CodigosHoja
-    answers: List[RespuestaItem]
 
 # ============================================================================
 # FUNCIÓN: Extraer DNI con zoom
@@ -41,11 +15,9 @@ class HojaResponse(TypedDict):
 async def extraer_dni_con_zoom(image_path: str) -> str:
     """
     Extrae SOLO el DNI con zoom a la zona superior de la hoja.
-    NOTA: Asume que genai ya está configurado.
     """
+    # Importar PIL aquí para asegurar disponibilidad
     from PIL import Image
-    import google.generativeai as genai
-    from pathlib import Path
     
     try:
         print(f"\n🔍 EXTRACCIÓN OPTIMIZADA DE DNI (con zoom)")
@@ -81,25 +53,42 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         print(f"✅ Archivo subido: {uploaded_file.name}")
         
         # ================================================================
-        # 3. PROMPT (sin pedir JSON explícitamente)
+        # 3. PROMPT
         # ================================================================
         
         prompt = """Extrae los códigos de esta imagen.
-
 En los 8 rectángulos horizontales está el DNI del postulante (8 dígitos).
-
 Lee los dígitos de izquierda a derecha."""
 
         # ================================================================
-        # 4. CONFIGURAR MODELO (schema IGUAL al de hoja completa)
+        # 4. CONFIGURAR MODELO (CORRECCIÓN APLICADA AQUÍ)
         # ================================================================
+        
+        # DEFINICIÓN EXPLÍCITA DEL SCHEMA COMO DICCIONARIO (NO TypedDict)
+        # Esto soluciona el problema de que el modelo devuelva texto plano.
+        dni_schema = {
+            "type": "object",
+            "properties": {
+                "codes": {
+                    "type": "object",
+                    "properties": {
+                        "dniPostulante": {
+                            "type": "string",
+                            "description": "Los 8 dígitos del DNI"
+                        }
+                    },
+                    "required": ["dniPostulante"]
+                }
+            },
+            "required": ["codes"]
+        }
         
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
-            response_schema=DNIResponse,  # ✅ Estructura anidada
-            temperature=0.1,  # ✅ Igual que hoja completa
+            response_schema=dni_schema,  # Usamos el dict explícito
+            temperature=0.1,
             top_p=0.95,
-            top_k=40,  # ✅ Igual que hoja completa
+            top_k=40,
             max_output_tokens=100,
         )
         
@@ -126,8 +115,15 @@ Lee los dígitos de izquierda a derecha."""
             dni = resultado.get("codes", {}).get("dniPostulante", "")
             print(f"✅ DNI: {dni}")
         except Exception as e:
-            print(f"❌ Error: {e}")
-            dni = ""
+            print(f"❌ Error al parsear JSON DNI: {e}")
+            # Intento de fallback manual si el JSON falla pero el texto contiene el número
+            import re
+            match = re.search(r'\d{8}', response.text)
+            if match:
+                dni = match.group(0)
+                print(f"⚠️ DNI recuperado por Regex: {dni}")
+            else:
+                dni = ""
         
         # ================================================================
         # 6. LIMPIAR
@@ -145,26 +141,20 @@ Lee los dígitos de izquierda a derecha."""
         return dni
         
     except Exception as e:
-        print(f"❌ Error: {e}")
+        print(f"❌ Error general en zoom: {e}")
         return ""
 
 
 async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
     """
-    Procesa hoja de respuestas con Gemini 2.0 Flash.
+    Procesa hoja de respuestas con Gemini 2.5 Flash.
     Usa doble pasada: zoom en DNI + hoja completa para respuestas.
-    
-    ESTRATEGIA:
-    1. Primera pasada: Zoom 15% superior para extraer DNI con alta precisión
-    2. Segunda pasada: Hoja completa para código y 100 respuestas
-    3. Combina resultados priorizando DNI de zoom
     """
     
     import google.generativeai as genai
     from pathlib import Path
     import json
     import os
-    from datetime import datetime
     
     print(f"\n{'='*70}")
     print(f"🤖 EXTRAYENDO CON GEMINI + SCHEMA ESTRUCTURADO")
@@ -199,19 +189,16 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         print(f"{'='*70}")
         print(f"📸 Imagen: {Path(imagen_path).name}")
         
-        # Verificar archivo
         if not Path(imagen_path).exists():
             return {
                 "success": False,
                 "error": f"Archivo no encontrado: {imagen_path}"
             }
         
-        # Info del archivo
         file_size = Path(imagen_path).stat().st_size / 1024
         print(f"📄 Mime type: image/jpeg")
         print(f"📊 Tamaño: {file_size:.1f} KB")
         
-        # Subir imagen completa
         print(f"📤 Subiendo imagen a Gemini...")
         
         uploaded_file = genai.upload_file(
@@ -222,7 +209,7 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         print(f"✅ Archivo subido: {uploaded_file.name}")
         
         # ================================================================
-        # 4. SCHEMA DE RESPUESTA (solo código + respuestas)
+        # 4. SCHEMA DE RESPUESTA
         # ================================================================
         
         response_schema = {
@@ -233,76 +220,39 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
                     "properties": {
                         "codigoDeHoja": {
                             "type": "string",
-                            "description": "Código alfanumérico de la hoja (formato: 3 letras + 5 números + 1 letra)"
+                            "description": "Código alfanumérico de la hoja"
                         }
                     },
                     "required": ["codigoDeHoja"]
                 },
                 "answers": {
                     "type": "array",
-                    "description": "Exactamente 100 respuestas",
+                    "description": "Lista de respuestas",
                     "items": {
                         "type": "object",
                         "properties": {
                             "questionNumber": {
-                                "type": "integer",
-                                "description": "Número de pregunta (1-100)"
+                                "type": "integer"
                             },
                             "answer": {
-                                "type": "string",
-                                "description": "Respuesta marcada: A, B, C, D, E o vacío"
+                                "type": "string"
                             }
                         },
                         "required": ["questionNumber", "answer"]
                     }
-                    # ❌ ELIMINAR: minItems y maxItems no son soportados
                 }
             },
             "required": ["codes", "answers"]
         }
         
         # ================================================================
-        # 5. PROMPT OPTIMIZADO (sin DNI)
+        # 5. PROMPT
         # ================================================================
         
-        prompt = """EXTRAE INFORMACIÓN DE ESTA HOJA DE RESPUESTAS DE EXAMEN.
-
-SECCIÓN 1: CÓDIGO DE HOJA
-
-Ubicación: Esquina superior derecha
-Formato: 3 letras MAYÚSCULAS + 5 números + 1 letra MAYÚSCULA
-Ejemplo: "ABC12345D", "NEQ44946U", "XYZ98765K"
-Este código está IMPRESO (no manuscrito)
-
-SECCIÓN 2: RESPUESTAS (100 preguntas)
-
-- 100 preguntas numeradas del 1 al 100
-- Cada pregunta tiene 5 opciones: A, B, C, D, E
-- Las respuestas se marcan en RECTÁNGULOS
-- Instrucciones:
-  * Busca marcas dentro de los rectángulos
-  * Las marcas pueden ser: relleno, X, check, línea
-  * Acepta mayúsculas (A,B,C,D,E) o minúsculas (a,b,c,d,e)
-  * Convierte SIEMPRE a MAYÚSCULA
-  * Si está vacío, devuelve cadena vacía ""
-  * Si hay múltiples marcas, toma la más clara
-
-FORMATO DE SALIDA:
-
-{
-  "codes": {
-    "codigoDeHoja": "ABC12345D"
-  },
-  "answers": [
-    {"questionNumber": 1, "answer": "A"},
-    {"questionNumber": 2, "answer": "B"},
-    {"questionNumber": 3, "answer": ""},
-    ...
-    {"questionNumber": 100, "answer": "E"}
-  ]
-}
-
-Procesa la imagen y devuelve el JSON estructurado."""
+        prompt = """EXTRAE INFORMACIÓN DE ESTA HOJA DE RESPUESTAS.
+1. CÓDIGO DE HOJA (Esquina superior derecha).
+2. 100 RESPUESTAS (Marcas en rectángulos).
+"""
 
         # ================================================================
         # 6. CONFIGURAR MODELO Y GENERAR
@@ -337,9 +287,16 @@ Procesa la imagen y devuelve el JSON estructurado."""
         # 7. PARSEAR RESPUESTA
         # ================================================================
         
-        resultado_json = json.loads(response.text)
+        try:
+            resultado_json = json.loads(response.text)
+        except json.JSONDecodeError:
+            # Fallback extremo si falla el JSON
+            if "```json" in response.text:
+                clean_text = response.text.split("```json")[1].split("```")[0]
+                resultado_json = json.loads(clean_text)
+            else:
+                raise
         
-        # Preview
         preview = response.text[:300] if len(response.text) > 300 else response.text
         print(f"📄 Respuesta (primeros 300 chars):")
         print(preview)
@@ -351,28 +308,22 @@ Procesa la imagen y devuelve el JSON estructurado."""
         codes = resultado_json.get("codes", {})
         answers = resultado_json.get("answers", [])
         
-        # Código de hoja
         codigo_hoja = codes.get("codigoDeHoja", "")
-        
-        # DNI: Priorizar el del zoom
         dni_postulante = dni_optimizado if dni_optimizado else ""
         
-        # Validar cantidad de respuestas
         if len(answers) != 100:
-            return {
-                "success": False,
-                "error": f"Se esperaban 100 respuestas, se recibieron {len(answers)}"
-            }
-        
+            print(f"⚠️ Advertencia: Se recibieron {len(answers)} respuestas en lugar de 100")
+
         # Normalizar respuestas
         respuestas_normalizadas = []
         respuestas_validas = 0
         respuestas_vacias = 0
         
-        for item in answers:
-            respuesta = item.get("answer", "").strip().upper()
-            
-            # Validar A, B, C, D, E o vacío
+        # Aseguramos el orden 1-100 si vienen desordenadas o completamos
+        mapa_respuestas = {item.get("questionNumber"): item.get("answer", "").strip().upper() for item in answers}
+        
+        for i in range(1, 101):
+            respuesta = mapa_respuestas.get(i, "")
             if respuesta and respuesta not in ["A", "B", "C", "D", "E"]:
                 respuesta = ""
             
@@ -390,29 +341,20 @@ Procesa la imagen y devuelve el JSON estructurado."""
         dni_valido = dni_postulante.isdigit() and len(dni_postulante) == 8
         
         print(f"✅ Validación exitosa:")
-        print(f"   DNI (zoom): {dni_postulante} ({len(dni_postulante)} dígitos) {'✅' if dni_valido else '⚠️'}")
+        print(f"   DNI (zoom): {dni_postulante} {'✅' if dni_valido else '⚠️'}")
         print(f"   Código hoja: {codigo_hoja}")
-        print(f"   - Respuestas: {len(answers)}/100")
         print(f"   - Válidas: {respuestas_validas}")
         print(f"   - Vacías: {respuestas_vacias}")
-        
-        # ================================================================
-        # 10. LIMPIAR ARCHIVOS TEMPORALES
-        # ================================================================
         
         try:
             genai.delete_file(uploaded_file.name)
             print(f"🗑️  Archivo temporal eliminado")
-        except Exception as e:
-            print(f"⚠️  No se pudo eliminar archivo: {e}")
+        except:
+            pass
         
         print(f"{'='*70}")
         print(f"✅ EXTRACCIÓN COMPLETADA")
         print(f"{'='*70}\n")
-        
-        # ================================================================
-        # 11. RETORNAR RESULTADO
-        # ================================================================
         
         return {
             "success": True,
@@ -433,14 +375,14 @@ Procesa la imagen y devuelve el JSON estructurado."""
         }
         
     except json.JSONDecodeError as e:
-        print(f"❌ Error al parsear JSON: {e}")
+        print(f"❌ Error al parsear JSON hoja completa: {e}")
         return {
             "success": False,
-            "error": f"Error al parsear respuesta JSON: {str(e)}"
+            "error": f"Error JSON: {str(e)}"
         }
         
     except Exception as e:
-        print(f"❌ Error en procesar_hoja_completa_v3: {e}")
+        print(f"❌ Error crítico: {e}")
         import traceback
         traceback.print_exc()
         return {
