@@ -151,15 +151,13 @@ async def procesar_hoja_completa(
             raise HTTPException(
                 status_code=400,
                 detail={
-                    "titulo": "HOJA YA CAPTURADA",
-                    "mensaje": f"Este DNI ya tiene una hoja capturada.",
-                    "icono": "⚠️",
-                    "detalles": (
-                        f"DNI: {dni_manuscrito}\n"
-                        f"Postulante: {hoja_duplicada.nombres} {hoja_duplicada.apellido_paterno}\n"
-                        f"Código anterior: {hoja_duplicada.codigo_hoja}\n"
-                        f"Fecha captura: {hoja_duplicada.fecha_captura}"
-                    )
+                    "error": "HOJA_YA_CAPTURADA",
+                    "titulo": "⚠️ HOJA YA CAPTURADA",
+                    "mensaje": f"El DNI {dni_manuscrito} ya tiene una hoja procesada.",
+                    "postulante": f"{hoja_duplicada.nombres} {hoja_duplicada.apellido_paterno} {hoja_duplicada.apellido_materno}",
+                    "codigo_anterior": hoja_duplicada.codigo_hoja,
+                    "fecha_captura": str(hoja_duplicada.fecha_captura),
+                    "sugerencia": "Esta hoja ya fue capturada anteriormente. No se puede volver a capturar."
                 }
             )
         
