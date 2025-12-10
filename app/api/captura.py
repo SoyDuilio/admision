@@ -237,6 +237,9 @@ async def procesar_hoja_completa(
         
         # Generar código único basado en timestamp
         codigo_unico = f"DEMO-{timestamp}-{unique_id[:4].upper()}"
+
+        if len(codigo_unico) > 20:
+            codigo_unico = codigo_unico[:20]
         
         hoja = HojaRespuesta(
             codigo_hoja=codigo_unico,  # ← Código autogenerado, NO el detectado
