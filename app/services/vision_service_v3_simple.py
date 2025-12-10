@@ -83,26 +83,24 @@ CONTEXTO:
 Esta es la parte superior de una hoja de examen con el DNI escrito a mano en 8 rectángulos consecutivos.
 
 ESTRATEGIA DE LECTURA:
-1. Localiza los 8 rectángulos horizontales
+1. Localiza los 8 rectángulos horizontales en la parte superior
 2. Lee cada dígito de IZQUIERDA a DERECHA  
 3. IDENTIFICA DÍGITOS REPETIDOS:
-   - Busca dígitos que tengan la misma forma
    - Si el dígito 1 y el dígito 3 se ven IDÉNTICOS, son el mismo número
-   - Si el dígito 1 y el dígito 3 son DIFERENTES, anota esa diferencia
+   - Compara formas manuscritas entre dígitos
 
 4. DIFERENCIA ENTRE 4 Y 7:
    - El "4" tiene forma triangular con ángulo recto arriba
-   - El "7" tiene forma de "L invertida" o puede tener línea horizontal en el medio
-   - Si dudas entre 4 y 7, observa si hay OTROS dígitos iguales en el DNI
+   - El "7" tiene forma de "L invertida" con línea horizontal
+   - Si dudas, busca otros dígitos iguales como referencia
 
 5. VALIDACIÓN CRUZADA:
-   - DNI real: 73733606 tiene patrón: 7-3-7-3-3-6-0-6
-   - Nota los dígitos repetidos en posiciones 1-3 (iguales), 2-4-5 (iguales), 6-8 (iguales)
+   - Verifica consistencia entre dígitos repetidos
+   - Ejemplo: si posiciones 1 y 3 son idénticas, deben ser el mismo número
 
-REGLA DE ORO:
-Si el primer dígito y el tercer dígito tienen LA MISMA FORMA MANUSCRITA, deben ser el mismo número.
+IMPORTANTE: Devuelve EXACTAMENTE 8 dígitos. Si alguno no es legible, usa tu mejor estimación basada en dígitos similares.
 
-Devuelve SOLO el DNI en formato JSON:
+Devuelve en formato JSON:
 {
   "dniPostulante": "73733606"
 }"""
@@ -114,7 +112,7 @@ Devuelve SOLO el DNI en formato JSON:
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
             response_schema=response_schema,
-            temperature=0.0,  # ← Temperatura a 0 para máxima precisión
+            temperature=0.0,
             top_p=0.95,
             top_k=20,
             max_output_tokens=100,
@@ -132,18 +130,43 @@ Devuelve SOLO el DNI en formato JSON:
             prompt
         ])
         
-        resultado = json.loads(response.text)
-        dni = resultado.get("dniPostulante", "")
+        # ================================================================
+        # 6. PARSEAR RESPUESTA CON MANEJO DE ERRORES
+        # ================================================================
+        
+        if not response or not response.text:
+            print(f"⚠️  Respuesta vacía de Gemini")
+            return ""
+        
+        # Debug: Mostrar respuesta cruda
+        print(f"📄 Respuesta cruda: {response.text[:200]}")
+        
+        try:
+            resultado = json.loads(response.text)
+            dni = resultado.get("dniPostulante", "")
+        except json.JSONDecodeError as e:
+            print(f"⚠️  Error al parsear JSON: {e}")
+            print(f"   Respuesta completa: {response.text}")
+            
+            # Intento de extracción manual como fallback
+            import re
+            match = re.search(r'"dniPostulante"\s*:\s*"(\d{8})"', response.text)
+            if match:
+                dni = match.group(1)
+                print(f"✅ DNI extraído con regex: {dni}")
+            else:
+                print(f"❌ No se pudo extraer DNI")
+                return ""
         
         print(f"✅ DNI detectado: {dni} ({len(dni)} dígitos)")
         
         # ================================================================
-        # 6. LIMPIAR
+        # 7. LIMPIAR
         # ================================================================
         
         try:
             genai.delete_file(uploaded_file.name)
-            temp_path.unlink()  # Eliminar imagen temporal
+            temp_path.unlink()
             print(f"🗑️  Archivos temporales eliminados")
         except Exception as e:
             print(f"⚠️  Error al limpiar: {e}")
@@ -156,7 +179,7 @@ Devuelve SOLO el DNI en formato JSON:
         print(f"❌ Error en extracción de DNI con zoom: {e}")
         import traceback
         traceback.print_exc()
-        return ""
+        return ""  # ← Devolver vacío en caso de error, no lanzar excepción
 
 
 async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
