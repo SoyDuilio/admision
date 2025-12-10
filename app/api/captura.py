@@ -127,9 +127,11 @@ async def procesar_hoja_completa(
         # 3. BUSCAR O CREAR HOJA (SIN VALIDAR CÓDIGO)
         # ================================================================
         
-        print(f"\n📋 Modo piloto: Creando hoja automática...")
+        print(f"\n📋 Modo piloto: Validando duplicados...")
         
-        # Verificar si ya existe una hoja con este DNI en estado completado
+        # ================================================================
+        # VALIDACIÓN 1: Verificar si DNI ya tiene hoja completada
+        # ================================================================
         query_hoja_existente = text("""
             SELECT h.id, h.codigo_hoja, h.estado, h.fecha_captura,
                    p.nombres, p.apellido_paterno, p.apellido_materno
@@ -137,7 +139,7 @@ async def procesar_hoja_completa(
             JOIN postulantes p ON h.postulante_id = p.id
             WHERE p.dni = :dni 
               AND h.proceso_admision = :proceso
-              AND h.estado = 'completado'
+              AND h.estado IN ('completado', 'calificado')
             ORDER BY h.fecha_captura DESC
             LIMIT 1
         """)
@@ -152,12 +154,12 @@ async def procesar_hoja_completa(
                 status_code=400,
                 detail={
                     "error": "HOJA_YA_CAPTURADA",
-                    "titulo": "⚠️ HOJA YA CAPTURADA",
+                    "titulo": "⚠️ DNI YA TIENE HOJA CAPTURADA",
                     "mensaje": f"El DNI {dni_manuscrito} ya tiene una hoja procesada.",
                     "postulante": f"{hoja_duplicada.nombres} {hoja_duplicada.apellido_paterno} {hoja_duplicada.apellido_materno}",
                     "codigo_anterior": hoja_duplicada.codigo_hoja,
                     "fecha_captura": str(hoja_duplicada.fecha_captura),
-                    "sugerencia": "Esta hoja ya fue capturada anteriormente. No se puede volver a capturar."
+                    "sugerencia": "Esta persona ya rindió el examen. No se puede capturar otra hoja con el mismo DNI."
                 }
             )
         
@@ -190,7 +192,9 @@ async def procesar_hoja_completa(
         else:
             print(f"  ✅ Postulante encontrado: {postulante.nombres} {postulante.apellido_paterno}")
         
-        # Buscar hoja por código
+        # ================================================================
+        # VALIDACIÓN 2: Verificar si código de hoja ya fue procesado
+        # ================================================================
         hoja = db.query(HojaRespuesta).filter(
             HojaRespuesta.codigo_hoja == codigo_hoja
         ).first()
@@ -225,30 +229,42 @@ async def procesar_hoja_completa(
             db.flush()
             
             print(f"  ✅ Hoja creada (ID: {hoja.id}, Orden: {nuevo_orden})")
-        else:
-            # Hoja existe
-            print(f"  ✅ Hoja encontrada (ID: {hoja.id})")
             
-            # Validar estado
+        else:
+            # Hoja existe - VALIDAR ESTADO
+            print(f"  ✅ Hoja encontrada (ID: {hoja.id}, Estado: {hoja.estado})")
+            
+            # ============================================================
+            # CRÍTICO: Validar que no esté ya procesada
+            # ============================================================
             if hoja.estado in ["completado", "calificado"]:
+                # Obtener datos del postulante que procesó esta hoja
+                postulante_anterior = db.query(Postulante).filter(
+                    Postulante.id == hoja.postulante_id
+                ).first()
+                
                 raise HTTPException(
                     status_code=400,
                     detail={
-                        "titulo": "HOJA YA PROCESADA",
-                        "mensaje": f"Esta hoja ya fue procesada anteriormente.",
-                        "icono": "⚠️",
-                        "detalles": (
-                            f"Código: {codigo_hoja}\n"
-                            f"Estado: {hoja.estado}\n"
-                            f"Fecha captura: {hoja.fecha_captura}"
-                        )
+                        "error": "CODIGO_HOJA_YA_PROCESADO",
+                        "titulo": "⚠️ CÓDIGO DE HOJA YA PROCESADO",
+                        "mensaje": f"El código {codigo_hoja} ya fue capturado anteriormente.",
+                        "codigo_hoja": codigo_hoja,
+                        "estado": hoja.estado,
+                        "dni_anterior": postulante_anterior.dni if postulante_anterior else "N/A",
+                        "postulante_anterior": f"{postulante_anterior.nombres} {postulante_anterior.apellido_paterno}" if postulante_anterior else "N/A",
+                        "fecha_captura_anterior": str(hoja.fecha_captura),
+                        "dni_intentado": dni_manuscrito,
+                        "sugerencia": "Esta hoja física ya fue escaneada. Verifica que sea la hoja correcta."
                     }
                 )
             
-            # Actualizar postulante si es diferente
-            if hoja.postulante_id != postulante.id:
-                print(f"  ⚠️ Actualizando postulante de hoja...")
-                hoja.postulante_id = postulante.id
+            # Si la hoja existe pero está en estado "generada", permitir captura
+            # y actualizar postulante si es necesario
+            if hoja.postulante_id and hoja.postulante_id != postulante.id:
+                print(f"  ⚠️ Hoja pre-asignada a otro postulante, usando DNI manuscrito...")
+            
+            hoja.postulante_id = postulante.id
         
         postulante_final = postulante
         alerta_discrepancia = None
