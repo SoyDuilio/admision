@@ -15,57 +15,35 @@ from app.services.gemini_extractor_structured import extract_data_compatible
 async def extraer_dni_con_zoom(image_path: str) -> str:
     """
     Extrae SOLO el DNI con zoom a la zona superior de la hoja.
+    Incluye limpieza robusta de JSON para evitar errores 'Here is...'.
     """
-    # Importar PIL aquí para asegurar disponibilidad
     from PIL import Image
+    import json
+    import re
     
     try:
         print(f"\n🔍 EXTRACCIÓN OPTIMIZADA DE DNI (con zoom)")
         print(f"{'='*70}")
         
-        # ================================================================
         # 1. RECORTAR IMAGEN
-        # ================================================================
-        
         img = Image.open(image_path)
         width, height = img.size
-        
         crop_height = int(height * 0.15)
         dni_zone = img.crop((0, 0, width, crop_height))
         
         temp_path = Path(image_path).parent / f"dni_zone_{Path(image_path).stem}.jpg"
         dni_zone.save(temp_path, "JPEG", quality=95)
         
-        print(f"📐 Imagen original: {width}x{height}")
-        print(f"✂️  Zona DNI recortada: {width}x{crop_height}")
-        
-        # ================================================================
         # 2. SUBIR
-        # ================================================================
-        
         print(f"📤 Subiendo zona DNI...")
+        uploaded_file = genai.upload_file(path=str(temp_path), mime_type="image/jpeg")
         
-        uploaded_file = genai.upload_file(
-            path=str(temp_path),
-            mime_type="image/jpeg"
-        )
-        
-        print(f"✅ Archivo subido: {uploaded_file.name}")
-        
-        # ================================================================
-        # 3. PROMPT
-        # ================================================================
-        
-        prompt = """Extrae los códigos de esta imagen.
-En los 8 rectángulos horizontales está el DNI del postulante (8 dígitos).
-Lee los dígitos de izquierda a derecha."""
+        # 3. PROMPT ESTRICTO
+        prompt = """Analyze this image crop.
+        Find the DNI number (8 digits) inside the boxes.
+        Return ONLY valid JSON. No Markdown. No introduction."""
 
-        # ================================================================
-        # 4. CONFIGURAR MODELO (CORRECCIÓN APLICADA AQUÍ)
-        # ================================================================
-        
-        # DEFINICIÓN EXPLÍCITA DEL SCHEMA COMO DICCIONARIO (NO TypedDict)
-        # Esto soluciona el problema de que el modelo devuelva texto plano.
+        # 4. CONFIGURAR MODELO
         dni_schema = {
             "type": "object",
             "properties": {
@@ -74,7 +52,7 @@ Lee los dígitos de izquierda a derecha."""
                     "properties": {
                         "dniPostulante": {
                             "type": "string",
-                            "description": "Los 8 dígitos del DNI"
+                            "description": "8 digit number found in the boxes"
                         }
                     },
                     "required": ["dniPostulante"]
@@ -85,63 +63,56 @@ Lee los dígitos de izquierda a derecha."""
         
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
-            response_schema=dni_schema,  # Usamos el dict explícito
-            temperature=0.1,
-            top_p=0.95,
-            top_k=40,
-            max_output_tokens=100,
+            response_schema=dni_schema,
+            temperature=0.0, # Temperatura 0 para máxima precisión
         )
         
+        # AÑADIMOS SYSTEM INSTRUCTION PARA FORZAR COMPORTAMIENTO ROBÓTICO
         model = genai.GenerativeModel(
             model_name="gemini-2.5-flash",
-            generation_config=generation_config
+            generation_config=generation_config,
+            system_instruction="You are a strict JSON extraction engine. You never output conversational text. You output only raw JSON."
         )
         
         print(f"🚀 Enviando request...")
+        response = model.generate_content([uploaded_file, prompt])
         
-        response = model.generate_content([
-            uploaded_file,
-            prompt
-        ])
+        # 5. PARSEAR CON LIMPIEZA (SANITIZACIÓN)
+        print(f"📄 Respuesta cruda: {response.text[:100]}...")
         
-        # ================================================================
-        # 5. PARSEAR
-        # ================================================================
+        json_str = response.text
         
-        print(f"📄 Respuesta: {response.text[:150]}")
+        # Lógica de limpieza: Encontrar el primer '{' y el último '}'
+        # Esto elimina el "Here is the..." del principio y cualquier basura al final
+        start_idx = json_str.find('{')
+        end_idx = json_str.rfind('}')
+        
+        if start_idx != -1 and end_idx != -1:
+            json_str = json_str[start_idx : end_idx + 1]
         
         try:
-            resultado = json.loads(response.text)
+            resultado = json.loads(json_str)
             dni = resultado.get("codes", {}).get("dniPostulante", "")
-            print(f"✅ DNI: {dni}")
+            
+            # Limpieza adicional del valor (por si el modelo pone espacios o guiones)
+            dni = re.sub(r'\D', '', dni) 
+            
+            print(f"✅ DNI Detectado: {dni}")
         except Exception as e:
-            print(f"❌ Error al parsear JSON DNI: {e}")
-            # Intento de fallback manual si el JSON falla pero el texto contiene el número
-            import re
-            match = re.search(r'\d{8}', response.text)
-            if match:
-                dni = match.group(0)
-                print(f"⚠️ DNI recuperado por Regex: {dni}")
-            else:
-                dni = ""
+            print(f"❌ Error al parsear JSON después de limpieza: {e}")
+            dni = ""
         
-        # ================================================================
-        # 6. LIMPIAR
-        # ================================================================
-        
+        # 6. LIMPIAR ARCHIVOS
         try:
             genai.delete_file(uploaded_file.name)
             temp_path.unlink()
-            print(f"🗑️  Limpieza OK")
         except:
             pass
-        
-        print(f"{'='*70}\n")
-        
+            
         return dni
-        
+
     except Exception as e:
-        print(f"❌ Error general en zoom: {e}")
+        print(f"❌ Error crítico en zoom: {e}")
         return ""
 
 
