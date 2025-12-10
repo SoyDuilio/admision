@@ -25,24 +25,27 @@ async def procesar_hoja_completa(
     metadata_captura: str = Form(None),
     image_hash: str = Form(None),
     api: str = Form("auto"),
-    dni_manual: str = Form(None), 
+    dni_manual: str = Form(None),  # ← DNI corregido manualmente
     db: Session = Depends(get_db)
 ):
     """
     Procesamiento COMPLETO - VERSIÓN PILOTO
     
-    CAMBIO PRINCIPAL:
-    - NO valida si código de hoja existe en BD
-    - Crea hoja automáticamente si no existe
-    - Solo requiere DNI manuscrito válido
+    LÓGICA SIMPLIFICADA:
+    - El código de hoja se IGNORA completamente
+    - Solo valida DNI (8 dígitos obligatorios)
+    - Un DNI = Una hoja (no puede repetirse)
+    - Crea invitados automáticamente
     
     FLUJO:
     1. Guardar imagen
     2. Extraer código hoja + DNI manuscrito + respuestas (Gemini)
-    3. Buscar/crear postulante por DNI
-    4. Buscar/crear hoja por código
-    5. Guardar respuestas
-    6. Calificar si hay gabarito
+    3. Validar DNI (8 dígitos o solicitar corrección manual)
+    4. Verificar que DNI NO tenga hoja procesada
+    5. Crear/buscar postulante
+    6. Crear hoja nueva (siempre, el código no importa)
+    7. Guardar respuestas
+    8. Calificar si hay gabarito
     """
     
     from app.services.vision_service_v3_simple import (
@@ -93,28 +96,27 @@ async def procesar_hoja_completa(
         
         datos_vision = resultado_vision.get("datos", {})
         respuestas_array = datos_vision.get("respuestas", [])
-        codigo_hoja = datos_vision.get("codigo_hoja")
+        codigo_hoja = datos_vision.get("codigo_hoja")  # Se extrae pero NO se usa
         dni_manuscrito = datos_vision.get("dni_postulante", "")
-
-        # ============================================================
-        # PRIORIZAR DNI MANUAL si fue enviado
-        # ============================================================
+        
+        # ================================================================
+        # 3. PRIORIZAR DNI MANUAL si fue enviado
+        # ================================================================
         if dni_manual:
             print(f"  ✏️ DNI corregido manualmente: {dni_manuscrito} → {dni_manual}")
             dni_manuscrito = dni_manual
         
-        # Validaciones básicas
+        # ================================================================
+        # 4. VALIDACIONES BÁSICAS
+        # ================================================================
+        
         if len(respuestas_array) != 100:
             raise HTTPException(
                 status_code=400,
                 detail=f"❌ Se esperaban 100 respuestas, se detectaron {len(respuestas_array)}"
             )
         
-        if not codigo_hoja:
-            raise HTTPException(
-                status_code=400,
-                detail="❌ No se detectó código de hoja"
-            )
+        # NOTA: Código de hoja se ignora, no se valida
         
         if not dni_manuscrito:
             raise HTTPException(
@@ -127,9 +129,9 @@ async def procesar_hoja_completa(
                 }
             )
         
-        # ============================================================
-        # VALIDACIÓN DE LONGITUD DNI (8 dígitos)
-        # ============================================================
+        # ================================================================
+        # 5. VALIDACIÓN DE LONGITUD DNI (8 dígitos)
+        # ================================================================
         if len(dni_manuscrito) != 8:
             raise HTTPException(
                 status_code=400,
@@ -139,25 +141,22 @@ async def procesar_hoja_completa(
                     "mensaje": f"Se detectaron solo {len(dni_manuscrito)} dígitos: {dni_manuscrito}",
                     "dni_detectado": dni_manuscrito,
                     "digitos_faltantes": 8 - len(dni_manuscrito),
-                    "sugerencia": "El DNI debe tener exactamente 8 dígitos. Verifica la imagen y vuelve a capturar con mejor iluminación.",
+                    "sugerencia": "El DNI debe tener exactamente 8 dígitos. Por favor, ingrésalo manualmente.",
                     "icono": "🔢",
-                    "requiere_recaptura": True
+                    "requiere_recaptura": False
                 }
             )
         
-        print(f"✅ Código de hoja: {codigo_hoja}")
         print(f"✅ DNI manuscrito: {dni_manuscrito}")
         print(f"✅ Respuestas: {len(respuestas_array)}/100")
+        print(f"ℹ️  Código de hoja detectado: {codigo_hoja} (se ignora)")
         
         # ================================================================
-        # 3. BUSCAR O CREAR HOJA (SIN VALIDAR CÓDIGO)
+        # 6. VALIDAR SI DNI YA TIENE HOJA COMPLETADA
         # ================================================================
         
-        print(f"\n📋 Modo piloto: Validando duplicados...")
+        print(f"\n📋 Validando DNI único...")
         
-        # ================================================================
-        # VALIDACIÓN 1: Verificar si DNI ya tiene hoja completada
-        # ================================================================
         query_hoja_existente = text("""
             SELECT h.id, h.codigo_hoja, h.estado, h.fecha_captura,
                    p.nombres, p.apellido_paterno, p.apellido_materno
@@ -189,7 +188,10 @@ async def procesar_hoja_completa(
                 }
             )
         
-        # Buscar o crear postulante
+        # ================================================================
+        # 7. BUSCAR O CREAR POSTULANTE
+        # ================================================================
+        
         postulante = db.query(Postulante).filter(
             Postulante.dni == dni_manuscrito
         ).first()
@@ -219,84 +221,45 @@ async def procesar_hoja_completa(
             print(f"  ✅ Postulante encontrado: {postulante.nombres} {postulante.apellido_paterno}")
         
         # ================================================================
-        # VALIDACIÓN 2: Verificar si código de hoja ya fue procesado
+        # 8. CREAR HOJA NUEVA (SIEMPRE)
         # ================================================================
-        hoja = db.query(HojaRespuesta).filter(
-            HojaRespuesta.codigo_hoja == codigo_hoja
-        ).first()
         
-        if not hoja:
-            # Crear hoja temporal
-            print(f"  📄 Creando hoja temporal con código {codigo_hoja}...")
-            
-            # Obtener último orden_aula
-            query_max_orden = text("""
-                SELECT COALESCE(MAX(orden_aula), 0) 
-                FROM hojas_respuestas
-                WHERE proceso_admision = :proceso
-            """)
-            max_orden = db.execute(query_max_orden, {"proceso": "2025-2"}).scalar()
-            nuevo_orden = max_orden + 1
-            
-            hoja = HojaRespuesta(
-                codigo_hoja=codigo_hoja,
-                postulante_id=postulante.id,
-                proceso_admision="2025-2",
-                orden_aula=nuevo_orden,
-                codigo_aula="PILOTO",
-                dni_profesor="00000000",
-                estado="generada",
-                respuestas_detectadas=0,
-                created_at=datetime.now(),
-                updated_at=datetime.now()
-            )
-            
-            db.add(hoja)
-            db.flush()
-            
-            print(f"  ✅ Hoja creada (ID: {hoja.id}, Orden: {nuevo_orden})")
-            
-        else:
-            # Hoja existe - VALIDAR ESTADO
-            print(f"  ✅ Hoja encontrada (ID: {hoja.id}, Estado: {hoja.estado})")
-            
-            # ============================================================
-            # CRÍTICO: Validar que no esté ya procesada
-            # ============================================================
-            if hoja.estado in ["completado", "calificado"]:
-                # Obtener datos del postulante que procesó esta hoja
-                postulante_anterior = db.query(Postulante).filter(
-                    Postulante.id == hoja.postulante_id
-                ).first()
-                
-                raise HTTPException(
-                    status_code=400,
-                    detail={
-                        "error": "CODIGO_HOJA_YA_PROCESADO",
-                        "titulo": "⚠️ CÓDIGO DE HOJA YA PROCESADO",
-                        "mensaje": f"El código {codigo_hoja} ya fue capturado anteriormente.",
-                        "codigo_hoja": codigo_hoja,
-                        "estado": hoja.estado,
-                        "dni_anterior": postulante_anterior.dni if postulante_anterior else "N/A",
-                        "postulante_anterior": f"{postulante_anterior.nombres} {postulante_anterior.apellido_paterno}" if postulante_anterior else "N/A",
-                        "fecha_captura_anterior": str(hoja.fecha_captura),
-                        "dni_intentado": dni_manuscrito,
-                        "sugerencia": "Esta hoja física ya fue escaneada. Verifica que sea la hoja correcta."
-                    }
-                )
-            
-            # Si la hoja existe pero está en estado "generada", permitir captura
-            # y actualizar postulante si es necesario
-            if hoja.postulante_id and hoja.postulante_id != postulante.id:
-                print(f"  ⚠️ Hoja pre-asignada a otro postulante, usando DNI manuscrito...")
-            
-            hoja.postulante_id = postulante.id
+        print(f"  📄 Creando hoja nueva...")
+        
+        # Obtener último orden_aula
+        query_max_orden = text("""
+            SELECT COALESCE(MAX(orden_aula), 0) 
+            FROM hojas_respuestas
+            WHERE proceso_admision = :proceso
+        """)
+        max_orden = db.execute(query_max_orden, {"proceso": "2025-2"}).scalar()
+        nuevo_orden = max_orden + 1
+        
+        # Generar código único basado en timestamp
+        codigo_unico = f"DEMO-{timestamp}-{unique_id[:4].upper()}"
+        
+        hoja = HojaRespuesta(
+            codigo_hoja=codigo_unico,  # ← Código autogenerado, NO el detectado
+            postulante_id=postulante.id,
+            proceso_admision="2025-2",
+            orden_aula=nuevo_orden,
+            codigo_aula="PILOTO",
+            dni_profesor="00000000",
+            estado="generada",
+            respuestas_detectadas=0,
+            created_at=datetime.now(),
+            updated_at=datetime.now()
+        )
+        
+        db.add(hoja)
+        db.flush()
+        
+        print(f"  ✅ Hoja creada (ID: {hoja.id}, Orden: {nuevo_orden}, Código: {codigo_unico})")
         
         postulante_final = postulante
-        alerta_discrepancia = None
         
         # ================================================================
-        # 4. REGISTRAR VALIDACIÓN DNI (para trazabilidad)
+        # 9. REGISTRAR VALIDACIÓN DNI (para trazabilidad)
         # ================================================================
         
         validacion = ValidacionDNI(
@@ -308,7 +271,7 @@ async def procesar_hoja_completa(
         db.add(validacion)
         
         # ================================================================
-        # 5. ACTUALIZAR HOJA
+        # 10. ACTUALIZAR HOJA
         # ================================================================
         
         tiempo_procesamiento = (datetime.now() - inicio).total_seconds()
@@ -324,7 +287,9 @@ async def procesar_hoja_completa(
             "api": resultado_vision.get("api"),
             "modelo": resultado_vision.get("modelo"),
             "dni_manuscrito_detectado": dni_manuscrito,
-            "alerta": alerta_discrepancia
+            "dni_manual": bool(dni_manual),
+            "codigo_hoja_detectado": codigo_hoja,
+            "codigo_hoja_usado": codigo_unico
         }
         
         hoja.imagen_url = imagen_url
@@ -340,10 +305,12 @@ async def procesar_hoja_completa(
         db.flush()
         
         print(f"\n💾 Hoja actualizada")
-        print(f"   Postulante final: {postulante_final.dni} - {postulante_final.nombres} {postulante_final.apellido_paterno}")
+        print(f"   Postulante: {postulante_final.dni} - {postulante_final.nombres} {postulante_final.apellido_paterno}")
+        print(f"   Código detectado (ignorado): {codigo_hoja}")
+        print(f"   Código generado (usado): {codigo_unico}")
         
         # ================================================================
-        # 6. GUARDAR RESPUESTAS
+        # 11. GUARDAR RESPUESTAS
         # ================================================================
         
         print(f"\n💾 Guardando 100 respuestas...")
@@ -365,7 +332,7 @@ async def procesar_hoja_completa(
         print(f"   Vacías: {stats.get('vacias', 0)}")
         
         # ================================================================
-        # 7. CALIFICAR SI HAY GABARITO
+        # 12. CALIFICAR SI HAY GABARITO
         # ================================================================
         
         gabarito = db.query(ClaveRespuesta).filter(
@@ -424,14 +391,14 @@ async def procesar_hoja_completa(
             print(f"✅ Nota: {calificacion_data['nota']}/20")
         
         # ================================================================
-        # 8. MARCAR EXAMEN RENDIDO
+        # 13. MARCAR EXAMEN RENDIDO
         # ================================================================
         
         postulante_final.examen_rendido = True
         db.commit()
         
         # ================================================================
-        # 9. RESPUESTA
+        # 14. RESPUESTA
         # ================================================================
         
         print(f"\n{'='*70}")
@@ -442,7 +409,7 @@ async def procesar_hoja_completa(
             "success": True,
             "message": "Hoja procesada exitosamente",
             "hoja_respuesta_id": hoja.id,
-            "codigo_hoja": codigo_hoja,
+            "codigo_hoja": codigo_unico,  # ← Código generado, NO el detectado
             "postulante": {
                 "id": postulante_final.id,
                 "dni": postulante_final.dni,
@@ -451,18 +418,15 @@ async def procesar_hoja_completa(
                 "tipo": getattr(postulante_final, 'tipo', 'regular')
             },
             "procesamiento": {
-                "api": "gemini-2.5-flash",
+                "api": "gemini-2.0-flash-exp",
                 "tiempo": round(tiempo_procesamiento, 2),
-                "dni_detectado": bool(dni_manuscrito)
+                "dni_detectado": bool(dni_manuscrito),
+                "dni_manual": bool(dni_manual)
             },
             "respuestas_detectadas": len(respuestas_array),
             "detalle": stats,
             "calificacion": calificacion_data
         }
-        
-        # Agregar alerta si existe
-        if alerta_discrepancia:
-            respuesta_final["alerta"] = alerta_discrepancia
         
         return respuesta_final
         
