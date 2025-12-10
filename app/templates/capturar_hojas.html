@@ -1076,18 +1076,74 @@ async function procesarHoja() {
         
         const resultado = await response.json();
         
-        // SI HAY ERROR
-        if (!resultado.success || resultado.error) {
-            mostrarError(resultado.error || {
-                titulo: "Error",
-                mensaje: resultado.detail || "Ocurrió un error desconocido",
-                icono: "⚠️"
+        // ============================================================
+        // MANEJO DE ERRORES MEJORADO
+        // ============================================================
+        if (!response.ok) {
+            // El servidor devolvió un error HTTP (400, 404, 500, etc)
+            
+            // Caso 1: HTTPException con detail estructurado (objeto)
+            if (resultado.detail && typeof resultado.detail === 'object') {
+                mostrarError({
+                    titulo: resultado.detail.titulo || 'Error',
+                    mensaje: resultado.detail.mensaje || 'Ocurrió un error',
+                    icono: resultado.detail.icono || '⚠️',
+                    detalles_tecnicos: resultado.detail.sugerencia || 
+                                     resultado.detail.detalles_tecnicos ||
+                                     (resultado.detail.postulante ? 
+                                        `Postulante: ${resultado.detail.postulante}\n` +
+                                        `Código anterior: ${resultado.detail.codigo_anterior || 'N/A'}\n` +
+                                        `Fecha captura: ${resultado.detail.fecha_captura || 'N/A'}` 
+                                     : null)
+                });
+                return;
+            }
+            
+            // Caso 2: HTTPException con detail simple (string)
+            if (resultado.detail && typeof resultado.detail === 'string') {
+                mostrarError({
+                    titulo: 'Error',
+                    mensaje: resultado.detail,
+                    icono: '⚠️'
+                });
+                return;
+            }
+            
+            // Caso 3: Estructura error anidada
+            if (resultado.error && typeof resultado.error === 'object') {
+                mostrarError({
+                    titulo: resultado.error.titulo || 'Error',
+                    mensaje: resultado.error.mensaje || 'Ocurrió un error',
+                    icono: resultado.error.icono || '⚠️',
+                    detalles_tecnicos: resultado.error.detalles_tecnicos
+                });
+                return;
+            }
+            
+            // Caso 4: Error genérico
+            mostrarError({
+                titulo: `Error ${response.status}`,
+                mensaje: resultado.message || 'Ocurrió un error inesperado',
+                icono: '⚠️',
+                detalles_tecnicos: JSON.stringify(resultado, null, 2)
             });
             return;
         }
         
-        // SI ES EXITOSO
-        mostrarResultado(resultado);
+        // ============================================================
+        // RESPUESTA EXITOSA
+        // ============================================================
+        if (resultado.success) {
+            mostrarResultado(resultado);
+        } else if (resultado.error) {
+            // Error retornado con success: false
+            mostrarError({
+                titulo: resultado.error.titulo || 'Error',
+                mensaje: resultado.error.mensaje || 'Ocurrió un error',
+                icono: resultado.error.icono || '⚠️',
+                detalles_tecnicos: resultado.error.detalles_tecnicos
+            });
+        }
         
     } catch (error) {
         document.getElementById('loadingOverlay').classList.remove('active');
@@ -1096,7 +1152,8 @@ async function procesarHoja() {
         mostrarError({
             titulo: "Error de Conexión",
             mensaje: "No se pudo conectar con el servidor. Verifica tu conexión a internet.",
-            icono: "📡"
+            icono: "📡",
+            detalles_tecnicos: error.message
         });
     }
 }
