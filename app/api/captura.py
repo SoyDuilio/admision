@@ -25,6 +25,7 @@ async def procesar_hoja_completa(
     metadata_captura: str = Form(None),
     image_hash: str = Form(None),
     api: str = Form("auto"),
+    dni_manual: str = Form(None), 
     db: Session = Depends(get_db)
 ):
     """
@@ -94,6 +95,13 @@ async def procesar_hoja_completa(
         respuestas_array = datos_vision.get("respuestas", [])
         codigo_hoja = datos_vision.get("codigo_hoja")
         dni_manuscrito = datos_vision.get("dni_postulante", "")
+
+        # ============================================================
+        # PRIORIZAR DNI MANUAL si fue enviado
+        # ============================================================
+        if dni_manual:
+            print(f"  ✏️ DNI corregido manualmente: {dni_manuscrito} → {dni_manual}")
+            dni_manuscrito = dni_manual
         
         # Validaciones básicas
         if len(respuestas_array) != 100:
@@ -116,6 +124,24 @@ async def procesar_hoja_completa(
                     "mensaje": "No se pudo leer el DNI manuscrito.",
                     "icono": "❌",
                     "sugerencia": "Verifica que el DNI esté escrito claramente en los 8 rectángulos."
+                }
+            )
+        
+        # ============================================================
+        # VALIDACIÓN DE LONGITUD DNI (8 dígitos)
+        # ============================================================
+        if len(dni_manuscrito) != 8:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "error": "DNI_INCOMPLETO",
+                    "titulo": "⚠️ DNI INCOMPLETO",
+                    "mensaje": f"Se detectaron solo {len(dni_manuscrito)} dígitos: {dni_manuscrito}",
+                    "dni_detectado": dni_manuscrito,
+                    "digitos_faltantes": 8 - len(dni_manuscrito),
+                    "sugerencia": "El DNI debe tener exactamente 8 dígitos. Verifica la imagen y vuelve a capturar con mejor iluminación.",
+                    "icono": "🔢",
+                    "requiere_recaptura": True
                 }
             )
         
