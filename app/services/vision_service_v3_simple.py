@@ -2,24 +2,33 @@
 Vision Service V3 - SIMPLE usando Gemini 2.5 Flash
 Usa schema estructurado para extracción precisa
 """
-
 import os
-from typing import Dict
+import google.generativeai as genai
+from typing import Dict, TypedDict
+from PIL import Image
+from pathlib import Path
+import json
+import re
 from app.services.gemini_extractor_structured import extract_data_compatible
 
 
+# ============================================================================
+# CLASE TIPADA PARA DNI (response_schema correcto)
+# ============================================================================
+class DNIResponse(TypedDict):
+    dniPostulante: str
 
+# ============================================================================
+# FUNCIÓN: Extraer DNI con zoom
+# ============================================================================
 async def extraer_dni_con_zoom(image_path: str) -> str:
     """
     Extrae SOLO el DNI con zoom a la zona superior de la hoja.
-    Recorta la imagen a los primeros 15% de altura para mejor precisión.
-    
     NOTA: Asume que genai ya está configurado.
     """
     from PIL import Image
     import google.generativeai as genai
     from pathlib import Path
-    import json
     
     try:
         print(f"\n🔍 EXTRACCIÓN OPTIMIZADA DE DNI (con zoom)")
@@ -29,15 +38,12 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         # 1. RECORTAR IMAGEN A ZONA DEL DNI
         # ================================================================
         
-        # Abrir imagen original
         img = Image.open(image_path)
         width, height = img.size
         
-        # Recortar solo el 15% superior (donde está el DNI)
         crop_height = int(height * 0.15)
         dni_zone = img.crop((0, 0, width, crop_height))
         
-        # Guardar imagen recortada temporalmente
         temp_path = Path(image_path).parent / f"dni_zone_{Path(image_path).stem}.jpg"
         dni_zone.save(temp_path, "JPEG", quality=95)
         
@@ -46,7 +52,7 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         print(f"💾 Guardada en: {temp_path.name}")
         
         # ================================================================
-        # 2. SUBIR IMAGEN RECORTADA A GEMINI
+        # 2. SUBIR IMAGEN
         # ================================================================
         
         print(f"📤 Subiendo zona DNI a Gemini...")
@@ -59,59 +65,29 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         print(f"✅ Archivo subido: {uploaded_file.name}")
         
         # ================================================================
-        # 3. SCHEMA SOLO PARA DNI
+        # 3. PROMPT OPTIMIZADO
         # ================================================================
         
-        response_schema = {
-            "type": "object",
-            "properties": {
-                "dniPostulante": {
-                    "type": "string",
-                    "description": "DNI manuscrito del postulante (exactamente 8 dígitos)"
-                }
-            },
-            "required": ["dniPostulante"]
-        }
-        
-        # ================================================================
-        # 4. PROMPT OPTIMIZADO SOLO PARA DNI
-        # ================================================================
-        
-        prompt = """LEE EL DNI MANUSCRITO EN ESTA IMAGEN.
+        prompt = """Extrae el DNI manuscrito de esta imagen.
 
-CONTEXTO:
-Esta es la parte superior de una hoja de examen con el DNI escrito a mano en 8 rectángulos consecutivos.
+El DNI está escrito en 8 rectángulos horizontales en la parte superior.
 
-ESTRATEGIA DE LECTURA:
-1. Localiza los 8 rectángulos horizontales en la parte superior
-2. Lee cada dígito de IZQUIERDA a DERECHA  
-3. IDENTIFICA DÍGITOS REPETIDOS:
-   - Si el dígito 1 y el dígito 3 se ven IDÉNTICOS, son el mismo número
-   - Compara formas manuscritas entre dígitos
+Lee los 8 dígitos de izquierda a derecha.
 
-4. DIFERENCIA ENTRE 4 Y 7:
-   - El "4" tiene forma triangular con ángulo recto arriba
-   - El "7" tiene forma de "L invertida" con línea horizontal
-   - Si dudas, busca otros dígitos iguales como referencia
+IMPORTANTE:
+- Si el primer y tercer dígito tienen la misma forma manuscrita, son el mismo número
+- El "7" tiene forma de L invertida, puede tener línea horizontal
+- El "4" tiene forma triangular con ángulo recto arriba
 
-5. VALIDACIÓN CRUZADA:
-   - Verifica consistencia entre dígitos repetidos
-   - Ejemplo: si posiciones 1 y 3 son idénticas, deben ser el mismo número
-
-IMPORTANTE: Devuelve EXACTAMENTE 8 dígitos. Si alguno no es legible, usa tu mejor estimación basada en dígitos similares.
-
-Devuelve en formato JSON:
-{
-  "dniPostulante": "73733606"
-}"""
+Devuelve exactamente 8 dígitos."""
 
         # ================================================================
-        # 5. CONFIGURAR MODELO Y GENERAR
+        # 4. CONFIGURAR MODELO CON TypedDict (correcto)
         # ================================================================
         
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
-            response_schema=response_schema,
+            response_schema=DNIResponse,  # ✅ Clase TypedDict, NO dict
             temperature=0.0,
             top_p=0.95,
             top_k=20,
@@ -123,7 +99,7 @@ Devuelve en formato JSON:
             generation_config=generation_config
         )
         
-        print(f"🚀 Enviando request (solo DNI)...")
+        print(f"🚀 Enviando request con TypedDict schema...")
         
         response = model.generate_content([
             uploaded_file,
@@ -131,37 +107,29 @@ Devuelve en formato JSON:
         ])
         
         # ================================================================
-        # 6. PARSEAR RESPUESTA CON MANEJO DE ERRORES
+        # 5. PARSEAR RESPUESTA
         # ================================================================
         
-        if not response or not response.text:
-            print(f"⚠️  Respuesta vacía de Gemini")
-            return ""
-        
-        # Debug: Mostrar respuesta cruda
-        print(f"📄 Respuesta cruda: {response.text[:200]}")
+        print(f"📄 Respuesta cruda: {response.text[:100]}")
         
         try:
             resultado = json.loads(response.text)
             dni = resultado.get("dniPostulante", "")
+            print(f"✅ DNI detectado: {dni} ({len(dni)} dígitos)")
         except json.JSONDecodeError as e:
-            print(f"⚠️  Error al parsear JSON: {e}")
-            print(f"   Respuesta completa: {response.text}")
+            print(f"⚠️  Error JSON: {e}")
+            print(f"   Respuesta: {response.text}")
             
-            # Intento de extracción manual como fallback
-            import re
+            # Fallback regex
             match = re.search(r'"dniPostulante"\s*:\s*"(\d{8})"', response.text)
             if match:
                 dni = match.group(1)
                 print(f"✅ DNI extraído con regex: {dni}")
             else:
-                print(f"❌ No se pudo extraer DNI")
-                return ""
-        
-        print(f"✅ DNI detectado: {dni} ({len(dni)} dígitos)")
+                dni = ""
         
         # ================================================================
-        # 7. LIMPIAR
+        # 6. LIMPIAR
         # ================================================================
         
         try:
@@ -176,10 +144,10 @@ Devuelve en formato JSON:
         return dni
         
     except Exception as e:
-        print(f"❌ Error en extracción de DNI con zoom: {e}")
+        print(f"❌ Error en extracción de DNI: {e}")
         import traceback
         traceback.print_exc()
-        return ""  # ← Devolver vacío en caso de error, no lanzar excepción
+        return ""
 
 
 async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
