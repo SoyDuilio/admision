@@ -121,7 +121,7 @@ Devuelve SOLO el DNI en formato JSON:
         )
         
         model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp",
+            model_name="gemini-2.5-flash",
             generation_config=generation_config
         )
         
@@ -250,6 +250,7 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
                 },
                 "answers": {
                     "type": "array",
+                    "description": "Exactamente 100 respuestas",
                     "items": {
                         "type": "object",
                         "properties": {
@@ -263,9 +264,8 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
                             }
                         },
                         "required": ["questionNumber", "answer"]
-                    },
-                    "minItems": 100,
-                    "maxItems": 100
+                    }
+                    # ❌ ELIMINAR: minItems y maxItems no son soportados
                 }
             },
             "required": ["codes", "answers"]
@@ -318,7 +318,7 @@ Procesa la imagen y devuelve el JSON estructurado."""
         # 6. CONFIGURAR MODELO Y GENERAR
         # ================================================================
         
-        print(f"🔧 Configurando modelo gemini-2.0-flash-exp...")
+        print(f"🔧 Configurando modelo gemini-2.5-flash...")
         
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
@@ -330,7 +330,7 @@ Procesa la imagen y devuelve el JSON estructurado."""
         )
         
         model = genai.GenerativeModel(
-            model_name="gemini-2.0-flash-exp",
+            model_name="gemini-2.5-flash",
             generation_config=generation_config
         )
         
@@ -427,7 +427,7 @@ Procesa la imagen y devuelve el JSON estructurado."""
         return {
             "success": True,
             "api": "gemini-structured",
-            "modelo": "gemini-2.0-flash-exp",
+            "modelo": "gemini-2.5-flash",
             "datos": {
                 "dni_postulante": dni_postulante,
                 "codigo_hoja": codigo_hoja,
