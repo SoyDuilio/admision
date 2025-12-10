@@ -418,7 +418,7 @@ async def procesar_hoja_completa(
                 "tipo": getattr(postulante_final, 'tipo', 'regular')
             },
             "procesamiento": {
-                "api": "gemini-2.0-flash-exp",
+                "api": "gemini-2.5-flash",
                 "tiempo": round(tiempo_procesamiento, 2),
                 "dni_detectado": bool(dni_manuscrito),
                 "dni_manual": bool(dni_manual)
