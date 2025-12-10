@@ -905,16 +905,19 @@ function toggleVoz() {
 // ============================================================================
 function hablar(texto) {
     if ('speechSynthesis' in window) {
-        // Cancelar cualquier habla en curso
+        // CRÍTICO: Cancelar TODO antes de hablar
         window.speechSynthesis.cancel();
         
-        const utterance = new SpeechSynthesisUtterance(texto);
-        utterance.lang = 'es-ES';
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        utterance.volume = 1.0;
-        
-        window.speechSynthesis.speak(utterance);
+        // Pequeño delay para evitar que se cancele a sí mismo
+        setTimeout(() => {
+            const utterance = new SpeechSynthesisUtterance(texto);
+            utterance.lang = 'es-ES';
+            utterance.rate = 1.0;
+            utterance.pitch = 1.0;
+            utterance.volume = 1.0;
+            
+            window.speechSynthesis.speak(utterance);
+        }, 100);
     }
 }
 
@@ -1134,6 +1137,12 @@ async function procesarHoja() {
         if (!response.ok) {
             // El servidor devolvió un error HTTP (400, 404, 500, etc)
             
+            // ⭐ CASO ESPECIAL: DNI INCOMPLETO (NUEVO)
+            if (resultado.detail && resultado.detail.error === 'DNI_INCOMPLETO') {
+                mostrarModalDNIIncompleto(resultado.detail);
+                return;
+            }
+            
             // Caso 1: HTTPException con detail estructurado (objeto)
             if (resultado.detail && typeof resultado.detail === 'object') {
                 mostrarError({
@@ -1141,12 +1150,12 @@ async function procesarHoja() {
                     mensaje: resultado.detail.mensaje || 'Ocurrió un error',
                     icono: resultado.detail.icono || '⚠️',
                     detalles_tecnicos: resultado.detail.sugerencia || 
-                                     resultado.detail.detalles_tecnicos ||
-                                     (resultado.detail.postulante ? 
+                                    resultado.detail.detalles_tecnicos ||
+                                    (resultado.detail.postulante ? 
                                         `Postulante: ${resultado.detail.postulante}\n` +
                                         `Código anterior: ${resultado.detail.codigo_anterior || 'N/A'}\n` +
                                         `Fecha captura: ${resultado.detail.fecha_captura || 'N/A'}` 
-                                     : null)
+                                    : null)
                 });
                 return;
             }
@@ -1181,7 +1190,7 @@ async function procesarHoja() {
             });
             return;
         }
-        
+
         // ============================================================
         // RESPUESTA EXITOSA
         // ============================================================
@@ -1298,6 +1307,296 @@ function mostrarError(error) {
     
     document.body.insertAdjacentHTML('beforeend', errorHTML);
 }
+
+
+// ============================================================================
+// MODAL DNI INCOMPLETO CON CORRECCIÓN MANUAL
+// ============================================================================
+function mostrarModalDNIIncompleto(detalle) {
+    document.getElementById('loadingOverlay').classList.remove('active');
+    
+    // Verificar si ya existe modal
+    const existingModal = document.querySelector('.dni-modal');
+    if (existingModal) {
+        existingModal.remove();
+    }
+    
+    const modalHTML = `
+        <div class="dni-modal" style="
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            padding: 20px;
+        ">
+            <div class="dni-content" style="
+                background: white;
+                border-radius: 16px;
+                padding: 32px;
+                max-width: 450px;
+                width: 100%;
+                text-align: center;
+            ">
+                <div style="font-size: 64px; margin-bottom: 16px;">🔢</div>
+                
+                <h2 style="color: #1e293b; margin-bottom: 12px; font-size: 1.5rem;">
+                    DNI Incompleto
+                </h2>
+                
+                <p style="color: #64748b; margin-bottom: 16px;">
+                    Se detectaron solo <strong>${detalle.dni_detectado.length} dígitos</strong>:
+                </p>
+                
+                <div style="
+                    background: #fef3c7;
+                    border: 2px dashed #f59e0b;
+                    padding: 16px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    font-size: 2rem;
+                    font-weight: 700;
+                    color: #92400e;
+                    letter-spacing: 4px;
+                ">${detalle.dni_detectado}</div>
+                
+                <p style="color: #64748b; margin-bottom: 20px; font-size: 0.875rem;">
+                    El DNI debe tener <strong>8 dígitos</strong>. 
+                    Faltan <strong>${detalle.digitos_faltantes} dígito(s)</strong>.
+                </p>
+                
+                <div style="
+                    background: #f1f5f9;
+                    padding: 16px;
+                    border-radius: 8px;
+                    margin-bottom: 20px;
+                    text-align: left;
+                ">
+                    <label style="
+                        display: block;
+                        font-size: 0.875rem;
+                        font-weight: 600;
+                        color: #475569;
+                        margin-bottom: 8px;
+                    ">Ingresa el DNI completo (8 dígitos):</label>
+                    
+                    <input 
+                        type="tel" 
+                        id="dniManual" 
+                        maxlength="8"
+                        placeholder="Ej: 73733606"
+                        value="${detalle.dni_detectado}"
+                        style="
+                            width: 100%;
+                            padding: 12px;
+                            font-size: 1.25rem;
+                            font-weight: 700;
+                            text-align: center;
+                            border: 2px solid #cbd5e1;
+                            border-radius: 8px;
+                            letter-spacing: 4px;
+                            font-family: monospace;
+                        "
+                        autofocus
+                    />
+                    
+                    <p style="
+                        color: #64748b;
+                        font-size: 0.75rem;
+                        margin-top: 8px;
+                    ">
+                        ℹ️ Lee el DNI de la hoja física e ingrésalo manualmente
+                    </p>
+                </div>
+                
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="cancelarDNIManual()" style="
+                        flex: 1;
+                        padding: 14px;
+                        background: #e2e8f0;
+                        color: #475569;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        font-size: 1rem;
+                    ">Recapturar</button>
+                    
+                    <button onclick="confirmarDNIManual()" style="
+                        flex: 1;
+                        padding: 14px;
+                        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                        color: white;
+                        border: none;
+                        border-radius: 8px;
+                        font-weight: 600;
+                        cursor: pointer;
+                        font-size: 1rem;
+                    ">Confirmar</button>
+                </div>
+            </div>
+        </div>
+    `;
+    
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+    
+    // Auto-focus en el input
+    const input = document.getElementById('dniManual');
+    input.focus();
+    input.select();
+    
+    // Validar solo números
+    input.addEventListener('input', (e) => {
+        e.target.value = e.target.value.replace(/[^0-9]/g, '');
+    });
+    
+    // Enter para confirmar
+    input.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && input.value.length === 8) {
+            confirmarDNIManual();
+        }
+    });
+    
+    // Feedback de voz
+    hablar(`Se detectaron solo ${detalle.dni_detectado.length} dígitos. Por favor, ingresa el DNI completo de 8 dígitos.`);
+}
+
+// ============================================================================
+// CANCELAR CORRECCIÓN DE DNI
+// ============================================================================
+function cancelarDNIManual() {
+    const modal = document.querySelector('.dni-modal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    // Volver a modo cámara para recapturar
+    resetearACamara();
+    hablar('Por favor, recaptura la hoja con mejor iluminación');
+}
+
+// ============================================================================
+// CONFIRMAR DNI MANUAL
+// ============================================================================
+async function confirmarDNIManual() {
+    const input = document.getElementById('dniManual');
+    const dniManual = input.value.trim();
+    
+    // Validar
+    if (dniManual.length !== 8) {
+        input.style.borderColor = '#ef4444';
+        input.focus();
+        hablar('El DNI debe tener exactamente 8 dígitos');
+        return;
+    }
+    
+    // Cerrar modal
+    const modal = document.querySelector('.dni-modal');
+    if (modal) {
+        modal.remove();
+    }
+    
+    // RE-ENVIAR con DNI corregido
+    document.getElementById('loadingOverlay').classList.add('active');
+    
+    try {
+        const formData = new FormData();
+        formData.append('file', photoBlob, 'hoja.jpg');
+        formData.append('metadata_captura', JSON.stringify(metadataCaptura));
+        formData.append('image_hash', await generarDeviceFingerprint());
+        formData.append('dni_manual', dniManual); // ← DNI CORREGIDO
+        
+        const response = await fetch('/api/procesar-hoja-completa', {
+            method: 'POST',
+            body: formData
+        });
+        
+        const resultado = await response.json();
+        
+        // ============================================================
+        // MISMO MANEJO DE ERRORES QUE procesarHoja()
+        // ============================================================
+        if (!response.ok) {
+            // DNI INCOMPLETO de nuevo (recursivo - no debería pasar)
+            if (resultado.detail && resultado.detail.error === 'DNI_INCOMPLETO') {
+                mostrarModalDNIIncompleto(resultado.detail);
+                return;
+            }
+            
+            // Error estructurado (objeto)
+            if (resultado.detail && typeof resultado.detail === 'object') {
+                mostrarError({
+                    titulo: resultado.detail.titulo || 'Error',
+                    mensaje: resultado.detail.mensaje || 'Ocurrió un error',
+                    icono: resultado.detail.icono || '⚠️',
+                    detalles_tecnicos: resultado.detail.sugerencia || 
+                                     resultado.detail.detalles_tecnicos
+                });
+                return;
+            }
+            
+            // Error simple (string)
+            if (resultado.detail && typeof resultado.detail === 'string') {
+                mostrarError({
+                    titulo: 'Error',
+                    mensaje: resultado.detail,
+                    icono: '⚠️'
+                });
+                return;
+            }
+            
+            // Error anidado
+            if (resultado.error && typeof resultado.error === 'object') {
+                mostrarError({
+                    titulo: resultado.error.titulo || 'Error',
+                    mensaje: resultado.error.mensaje || 'Ocurrió un error',
+                    icono: resultado.error.icono || '⚠️',
+                    detalles_tecnicos: resultado.error.detalles_tecnicos
+                });
+                return;
+            }
+            
+            // Error genérico
+            mostrarError({
+                titulo: `Error ${response.status}`,
+                mensaje: resultado.message || 'Ocurrió un error inesperado',
+                icono: '⚠️',
+                detalles_tecnicos: JSON.stringify(resultado, null, 2)
+            });
+            return;
+        }
+        
+        // ÉXITO
+        if (resultado.success) {
+            mostrarResultado(resultado);
+        } else if (resultado.error) {
+            mostrarError({
+                titulo: resultado.error.titulo || 'Error',
+                mensaje: resultado.error.mensaje || 'Ocurrió un error',
+                icono: resultado.error.icono || '⚠️',
+                detalles_tecnicos: resultado.error.detalles_tecnicos
+            });
+        }
+        
+    } catch (error) {
+        document.getElementById('loadingOverlay').classList.remove('active');
+        console.error('Error en confirmarDNIManual:', error);
+        
+        mostrarError({
+            titulo: "Error de Conexión",
+            mensaje: "No se pudo conectar con el servidor.",
+            icono: "📡",
+            detalles_tecnicos: error.message
+        });
+    }
+}
+
+
 
 function cerrarError() {
     const modal = document.querySelector('.error-modal');
