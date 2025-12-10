@@ -876,6 +876,9 @@ function iniciarReconocimientoVoz() {
     };
 }
 
+// ============================================================================
+// TOGGLE VOZ - CON FEEDBACK MEJORADO
+// ============================================================================
 function toggleVoz() {
     vozActiva = !vozActiva;
     const btn = document.getElementById('btnVoiceToggle');
@@ -883,11 +886,35 @@ function toggleVoz() {
     if (vozActiva) {
         btn.classList.add('active');
         btn.textContent = '🎤 Activo';
+        
+        // FEEDBACK DE VOZ
+        hablar('Reconocimiento de voz activado. Diga "capturar" para tomar una foto.');
+        
         recognition.start();
     } else {
         btn.classList.remove('active');
         btn.textContent = '🎤 Usar Voz';
         recognition.stop();
+        
+        hablar('Reconocimiento de voz desactivado');
+    }
+}
+
+// ============================================================================
+// FUNCIÓN PARA HABLAR (TEXT-TO-SPEECH)
+// ============================================================================
+function hablar(texto) {
+    if ('speechSynthesis' in window) {
+        // Cancelar cualquier habla en curso
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(texto);
+        utterance.lang = 'es-ES';
+        utterance.rate = 1.0;
+        utterance.pitch = 1.0;
+        utterance.volume = 1.0;
+        
+        window.speechSynthesis.speak(utterance);
     }
 }
 
@@ -924,9 +951,16 @@ async function iniciarCamara() {
 }
 
 // ============================================================================
-// CAMBIAR CÁMARA
+// CAMBIAR CÁMARA - MEJORADO
 // ============================================================================
 async function cambiarCamara() {
+    // Si está en preview, volver a captura
+    if (document.getElementById('photoPreview').style.display === 'block') {
+        resetearACamara();
+        return;
+    }
+    
+    // Si está en modo cámara, cambiar cámara frontal/trasera
     if (stream) {
         // Apagar linterna antes de cambiar
         if (torchEnabled) {
@@ -937,7 +971,9 @@ async function cambiarCamara() {
         stream.getTracks().forEach(track => track.stop());
         
         // Obtener cámara actual
-        const currentFacing = stream.getVideoTracks()[0].getSettings().facingMode;
+        const tracks = stream.getVideoTracks();
+        const currentFacing = tracks.length > 0 ? 
+            tracks[0].getSettings().facingMode : 'environment';
         const newFacing = currentFacing === 'environment' ? 'user' : 'environment';
         
         // Iniciar nueva cámara
@@ -958,6 +994,7 @@ async function cambiarCamara() {
         }, { once: true });
     }
 }
+
 
 // ============================================================================
 // DETENER CÁMARA
@@ -991,7 +1028,7 @@ window.addEventListener('load', async () => {
 });
 
 // ============================================================================
-// EVENTOS BOTONES
+// EVENTOS BOTONES - MEJORADOS
 // ============================================================================
 document.getElementById('btnCapture').addEventListener('click', function() {
     if (this.classList.contains('confirm')) {
@@ -1001,16 +1038,25 @@ document.getElementById('btnCapture').addEventListener('click', function() {
     }
 });
 
-document.getElementById('btnSwitchCam').addEventListener('click', cambiarCamara);
+document.getElementById('btnSwitchCam').addEventListener('click', async () => {
+    try {
+        await cambiarCamara();
+    } catch (error) {
+        console.error('Error al cambiar cámara:', error);
+        hablar('Error al cambiar de cámara');
+    }
+});
 
 document.getElementById('btnVoiceToggle').addEventListener('click', toggleVoz);
 
+
 // ============================================================================
-// CAPTURA CON VALIDACIÓN DE CALIDAD
+// CAPTURA CON VALIDACIÓN DE CALIDAD - MEJORADO
 // ============================================================================
 function capturarFoto() {
     if (!gpsObtenido) {
         document.getElementById('gpsAlert').classList.add('active');
+        hablar('Se requiere activar el GPS para continuar');
         return;
     }
 
@@ -1023,6 +1069,7 @@ function capturarFoto() {
     
     if (canvas.width < 640 || canvas.height < 480) {
         alert('⚠️ Resolución muy baja. Intenta con otra cámara.');
+        hablar('Resolución muy baja. Intenta con otra cámara.');
         return;
     }
     
@@ -1041,6 +1088,7 @@ function capturarFoto() {
         
         if (sizeMB < 0.3) {
             if (!confirm('⚠️ Calidad baja (' + sizeMB.toFixed(2) + 'MB). ¿Continuar?\n\nRecomendación: mejor iluminación')) {
+                hablar('Foto rechazada. Mejora la iluminación.');
                 return;
             }
         }
@@ -1054,6 +1102,10 @@ function capturarFoto() {
         const btn = document.getElementById('btnCapture');
         btn.classList.add('confirm');
         btn.textContent = '✅ Confirmar';
+        
+        // Feedback de voz
+        hablar('Foto capturada. Presiona confirmar para procesar.');
+        
     }, 'image/jpeg', quality);
 }
 
@@ -1252,6 +1304,31 @@ function cerrarError() {
     if (modal) {
         modal.remove();
     }
+    
+    // VOLVER A MODO CAPTURA (no a preview)
+    resetearACamara();
+}
+
+// ============================================================================
+// RESETEAR A CÁMARA
+// ============================================================================
+function resetearACamara() {
+    // Ocultar preview, mostrar cámara
+    document.getElementById('photoPreview').style.display = 'none';
+    document.getElementById('cameraView').style.display = 'block';
+    
+    // Resetear botón de captura
+    const btnCapture = document.getElementById('btnCapture');
+    btnCapture.classList.remove('confirm');
+    btnCapture.textContent = '📸 Capturar';
+    
+    // Limpiar foto guardada
+    photoBlob = null;
+    
+    // Reiniciar cámara si está detenida
+    if (!stream || !stream.active) {
+        iniciarCamara();
+    }
 }
 
 // ============================================================================
@@ -1321,6 +1398,7 @@ function verDetalles() {
     alert('📊 Vista de detalles en desarrollo');
 }
 
+/*
 function siguienteHoja() {
     document.getElementById('resultadoModal').classList.remove('active');
     document.getElementById('photoPreview').style.display = 'none';
@@ -1332,5 +1410,15 @@ function siguienteHoja() {
     
     photoBlob = null;
 }
+*/
+
+// ============================================================================
+// SIGUIENTE HOJA - MEJORADO
+// ============================================================================
+function siguienteHoja() {
+    document.getElementById('resultadoModal').classList.remove('active');
+    resetearACamara();
+}
+
 </script>
 {% endblock %}
