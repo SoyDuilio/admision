@@ -84,21 +84,34 @@ RESPONSE_SCHEMA = {
 
 EXTRACTION_PROMPT = """Analyze the provided image of a completed exam answer sheet.
 
-Extract the following four codes: 'DNI-POSTULANTE', 'COD-AULA', 'DNI-PROFESOR', and 'CODIGO DE HOJA'.
+CRITICAL - READ CAREFULLY:
 
-Also, extract all 100 answers from the numbered boxes. The answer is the character or symbol written inside each box.
+1. HANDWRITTEN DNI (8 DIGITS IN BOXES AT TOP):
+   - Look at the TOP of the page
+   - You will see 8 empty boxes labeled "DNI-POSTULANTE"
+   - Inside these boxes, someone has HANDWRITTEN 8 digits (one per box)
+   - READ these handwritten digits VERY CAREFULLY
+   - This is the MOST IMPORTANT field - the student's ID number
+   - Return this as "dniPostulante"
 
-If a box is empty, the answer should be an empty string. If the mark is illegible, make the best guess or represent it as a symbol.
+2. PRINTED CODES (find these printed codes):
+   - "COD-AULA" (may be empty or printed)
+   - "DNI-PROFESOR" (may be empty or handwritten at bottom)
+   - "CODIGO DE HOJA" (always printed, format: ABC12345D)
 
-Return the data strictly in the specified JSON format. Ensure there are exactly 100 answer entries, from 1 to 100.
+3. 100 ANSWERS (handwritten letters in boxes):
+   - Read each numbered box (1 to 100)
+   - Valid answers: A, B, C, D, E
+   - Empty boxes = empty string ""
+   - If illegible, make best guess
 
 IMPORTANT:
-- Look carefully at each numbered box
-- Read handwritten letters precisely
-- Valid answers are typically: A, B, C, D, E
-- Empty boxes should have answer as empty string ""
-- If you see any mark but can't determine the letter, use your best judgment
-"""
+- The DNI-POSTULANTE is HANDWRITTEN by the student
+- Read handwritten digits carefully: 0,1,2,3,4,5,6,7,8,9
+- Must be exactly 8 digits
+- Focus on the TOP section of the page for the DNI boxes
+
+Return data in the specified JSON format with exactly 100 answers."""
 
 
 # ============================================================================

@@ -432,7 +432,6 @@ async def extraer_parte2_con_claude(imagen_path: str) -> Dict:
 async def extraer_parte1_con_gemini(imagen_path: str) -> Dict:
     """
     Extrae metadatos + respuestas 1-50 con Gemini.
-    Usado como fallback si Claude falla.
     """
     try:
         # Subir imagen a Gemini
