@@ -1,6 +1,7 @@
 """
 POSTULANDO - API de Captura de Hojas
-VERSIÓN DEFINITIVA con validación de DNI manuscrito
+VERSIÓN PILOTO - Sin validación de código de hoja
+Solo se valida DNI manuscrito
 """
 
 from fastapi import APIRouter, UploadFile, File, Form, Depends, HTTPException
@@ -27,16 +28,20 @@ async def procesar_hoja_completa(
     db: Session = Depends(get_db)
 ):
     """
-    Procesamiento COMPLETO con validación de DNI manuscrito
+    Procesamiento COMPLETO - VERSIÓN PILOTO
+    
+    CAMBIO PRINCIPAL:
+    - NO valida si código de hoja existe en BD
+    - Crea hoja automáticamente si no existe
+    - Solo requiere DNI manuscrito válido
     
     FLUJO:
     1. Guardar imagen
-    2. Extraer código hoja + DNI manuscrito + respuestas (Vision API)
-    3. Buscar hoja por código
-    4. Validar DNI manuscrito vs postulante asignado
-    5. Asociar/crear postulante según necesidad
-    6. Guardar respuestas
-    7. Calificar si hay gabarito
+    2. Extraer código hoja + DNI manuscrito + respuestas (Gemini)
+    3. Buscar/crear postulante por DNI
+    4. Buscar/crear hoja por código
+    5. Guardar respuestas
+    6. Calificar si hay gabarito
     """
     
     from app.services.vision_service_v3_simple import (
@@ -72,7 +77,7 @@ async def procesar_hoja_completa(
         print(f"📁 Archivo guardado: {filename}")
         
         # ================================================================
-        # 2. PROCESAR CON VISION API
+        # 2. PROCESAR CON GEMINI 2.5 FLASH
         # ================================================================
         
         print(f"\n🔍 Extrayendo datos con Vision API...")
@@ -103,164 +108,167 @@ async def procesar_hoja_completa(
                 detail="❌ No se detectó código de hoja"
             )
         
+        if not dni_manuscrito:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "titulo": "DNI NO DETECTADO",
+                    "mensaje": "No se pudo leer el DNI manuscrito.",
+                    "icono": "❌",
+                    "sugerencia": "Verifica que el DNI esté escrito claramente en los 8 rectángulos."
+                }
+            )
+        
         print(f"✅ Código de hoja: {codigo_hoja}")
-        print(f"✅ DNI manuscrito: {dni_manuscrito if dni_manuscrito else '(no detectado)'}")
+        print(f"✅ DNI manuscrito: {dni_manuscrito}")
         print(f"✅ Respuestas: {len(respuestas_array)}/100")
         
         # ================================================================
-        # 3. BUSCAR HOJA EXISTENTE
+        # 3. BUSCAR O CREAR HOJA (SIN VALIDAR CÓDIGO)
         # ================================================================
         
-        print(f"\n🔍 Buscando hoja en base de datos...")
+        print(f"\n📋 Modo piloto: Creando hoja automática...")
         
+        # Verificar si ya existe una hoja con este DNI en estado completado
+        query_hoja_existente = text("""
+            SELECT h.id, h.codigo_hoja, h.estado, h.fecha_captura,
+                   p.nombres, p.apellido_paterno, p.apellido_materno
+            FROM hojas_respuestas h
+            JOIN postulantes p ON h.postulante_id = p.id
+            WHERE p.dni = :dni 
+              AND h.proceso_admision = :proceso
+              AND h.estado = 'completado'
+            ORDER BY h.fecha_captura DESC
+            LIMIT 1
+        """)
+        
+        hoja_duplicada = db.execute(query_hoja_existente, {
+            "dni": dni_manuscrito,
+            "proceso": "2025-2"
+        }).fetchone()
+        
+        if hoja_duplicada:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "titulo": "HOJA YA CAPTURADA",
+                    "mensaje": f"Este DNI ya tiene una hoja capturada.",
+                    "icono": "⚠️",
+                    "detalles": (
+                        f"DNI: {dni_manuscrito}\n"
+                        f"Postulante: {hoja_duplicada.nombres} {hoja_duplicada.apellido_paterno}\n"
+                        f"Código anterior: {hoja_duplicada.codigo_hoja}\n"
+                        f"Fecha captura: {hoja_duplicada.fecha_captura}"
+                    )
+                }
+            )
+        
+        # Buscar o crear postulante
+        postulante = db.query(Postulante).filter(
+            Postulante.dni == dni_manuscrito
+        ).first()
+        
+        if not postulante:
+            # Crear postulante invitado
+            print(f"  📝 Creando postulante invitado para DNI {dni_manuscrito}...")
+            
+            postulante = Postulante(
+                dni=dni_manuscrito,
+                nombres="INVITADO",
+                apellido_paterno=f"DNI-{dni_manuscrito}",
+                apellido_materno="",
+                codigo_unico=f"INV-{dni_manuscrito}",
+                programa_educativo="INVITADO",
+                proceso_admision="2025-2",
+                tipo="invitado",
+                activo=True,
+                examen_rendido=False
+            )
+            
+            db.add(postulante)
+            db.flush()
+            
+            print(f"  ✅ Invitado creado (ID: {postulante.id})")
+        else:
+            print(f"  ✅ Postulante encontrado: {postulante.nombres} {postulante.apellido_paterno}")
+        
+        # Buscar hoja por código
         hoja = db.query(HojaRespuesta).filter(
             HojaRespuesta.codigo_hoja == codigo_hoja
         ).first()
         
         if not hoja:
-            raise HTTPException(
-                status_code=404,
-                detail={
-                    "titulo": "HOJA NO ENCONTRADA",
-                    "mensaje": f"El código '{codigo_hoja}' no existe en el sistema.",
-                    "icono": "🔍"
-                }
-            )
-        
-        # Validar estado
-        if hoja.estado in ["completado", "calificado"]:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "titulo": "HOJA YA PROCESADA",
-                    "mensaje": f"Esta hoja ya fue procesada anteriormente.",
-                    "icono": "⚠️",
-                    "detalles": (
-                        f"Código: {codigo_hoja}\n"
-                        f"Estado: {hoja.estado}\n"
-                        f"Fecha captura: {hoja.fecha_captura}"
-                    )
-                }
-            )
-        
-        print(f"✅ Hoja encontrada (ID: {hoja.id})")
-        
-        # ================================================================
-        # 4. VALIDAR Y ASOCIAR POSTULANTE
-        # ================================================================
-        
-        postulante_final = None
-        alerta_discrepancia = None
-        
-        if dni_manuscrito:
-            print(f"\n🔍 Validando DNI manuscrito: {dni_manuscrito}")
+            # Crear hoja temporal
+            print(f"  📄 Creando hoja temporal con código {codigo_hoja}...")
             
-            # Buscar postulante por DNI manuscrito
-            postulante_por_dni = db.query(Postulante).filter(
-                Postulante.dni == dni_manuscrito
-            ).first()
+            # Obtener último orden_aula
+            query_max_orden = text("""
+                SELECT COALESCE(MAX(orden_aula), 0) 
+                FROM hojas_respuestas
+                WHERE proceso_admision = :proceso
+            """)
+            max_orden = db.execute(query_max_orden, {"proceso": "2025-2"}).scalar()
+            nuevo_orden = max_orden + 1
             
-            if postulante_por_dni:
-                print(f"  ✅ Postulante encontrado: {postulante_por_dni.nombres} {postulante_por_dni.apellido_paterno}")
-                
-                # Verificar si coincide con el pre-asignado
-                if hoja.postulante_id and hoja.postulante_id != postulante_por_dni.id:
-                    # DISCREPANCIA DETECTADA
-                    postulante_asignado = db.query(Postulante).filter(
-                        Postulante.id == hoja.postulante_id
-                    ).first()
-                    
-                    alerta_discrepancia = {
-                        "tipo": "discrepancia_dni",
-                        "dni_manuscrito": dni_manuscrito,
-                        "postulante_manuscrito": f"{postulante_por_dni.nombres} {postulante_por_dni.apellido_paterno}",
-                        "dni_asignado": postulante_asignado.dni if postulante_asignado else None,
-                        "postulante_asignado": f"{postulante_asignado.nombres} {postulante_asignado.apellido_paterno}" if postulante_asignado else None
-                    }
-                    
-                    print(f"  ⚠️ DISCREPANCIA DETECTADA:")
-                    print(f"     Hoja asignada a: {alerta_discrepancia['postulante_asignado']} (DNI: {alerta_discrepancia['dni_asignado']})")
-                    print(f"     DNI manuscrito: {dni_manuscrito} ({alerta_discrepancia['postulante_manuscrito']})")
-                    print(f"  ✅ Usando DNI manuscrito (tiene prioridad)")
-                
-                # Usar postulante detectado (prioridad)
-                postulante_final = postulante_por_dni
-                hoja.postulante_id = postulante_por_dni.id
-                
-            else:
-                # DNI manuscrito NO existe en BD → Crear invitado
-                print(f"  ⚠️ DNI {dni_manuscrito} no registrado")
-                print(f"  📝 Creando postulante invitado...")
-                
-                postulante_invitado = Postulante(
-                    dni=dni_manuscrito,
-                    nombres="INVITADO",
-                    apellido_paterno=f"DNI-{dni_manuscrito}",
-                    apellido_materno="",
-                    codigo_unico=f"INV-{dni_manuscrito}",
-                    programa_educativo="INVITADO",
-                    proceso_admision=hoja.proceso_admision,
-                    tipo="invitado",  # ← Campo nuevo
-                    activo=True,
-                    examen_rendido=False
-                )
-                
-                db.add(postulante_invitado)
-                db.flush()
-                
-                postulante_final = postulante_invitado
-                hoja.postulante_id = postulante_invitado.id
-                
-                alerta_discrepancia = {
-                    "tipo": "postulante_invitado",
-                    "dni_manuscrito": dni_manuscrito,
-                    "mensaje": "Postulante no registrado - Creado como invitado"
-                }
-                
-                print(f"  ✅ Invitado creado (ID: {postulante_invitado.id})")
-        
+            hoja = HojaRespuesta(
+                codigo_hoja=codigo_hoja,
+                postulante_id=postulante.id,
+                proceso_admision="2025-2",
+                orden_aula=nuevo_orden,
+                codigo_aula="PILOTO",
+                dni_profesor="00000000",
+                estado="generada",
+                respuestas_detectadas=0,
+                created_at=datetime.now(),
+                updated_at=datetime.now()
+            )
+            
+            db.add(hoja)
+            db.flush()
+            
+            print(f"  ✅ Hoja creada (ID: {hoja.id}, Orden: {nuevo_orden})")
         else:
-            # DNI NO detectado
-            print(f"\n⚠️ DNI manuscrito no detectado")
+            # Hoja existe
+            print(f"  ✅ Hoja encontrada (ID: {hoja.id})")
             
-            if hoja.postulante_id:
-                # Usar postulante pre-asignado
-                postulante_final = db.query(Postulante).filter(
-                    Postulante.id == hoja.postulante_id
-                ).first()
-                
-                print(f"  ℹ️ Usando postulante pre-asignado: {postulante_final.nombres if postulante_final else 'N/A'}")
-                
-                alerta_discrepancia = {
-                    "tipo": "dni_no_detectado",
-                    "mensaje": "DNI manuscrito no se pudo leer - usando postulante pre-asignado"
-                }
-            else:
-                # Sin DNI y sin pre-asignación → ERROR
+            # Validar estado
+            if hoja.estado in ["completado", "calificado"]:
                 raise HTTPException(
                     status_code=400,
                     detail={
-                        "titulo": "DNI NO DETECTADO",
-                        "mensaje": "No se pudo leer el DNI manuscrito y la hoja no tiene postulante asignado.",
-                        "icono": "❌"
+                        "titulo": "HOJA YA PROCESADA",
+                        "mensaje": f"Esta hoja ya fue procesada anteriormente.",
+                        "icono": "⚠️",
+                        "detalles": (
+                            f"Código: {codigo_hoja}\n"
+                            f"Estado: {hoja.estado}\n"
+                            f"Fecha captura: {hoja.fecha_captura}"
+                        )
                     }
                 )
+            
+            # Actualizar postulante si es diferente
+            if hoja.postulante_id != postulante.id:
+                print(f"  ⚠️ Actualizando postulante de hoja...")
+                hoja.postulante_id = postulante.id
+        
+        postulante_final = postulante
+        alerta_discrepancia = None
         
         # ================================================================
-        # 5. REGISTRAR VALIDACIÓN DNI (para trazabilidad)
+        # 4. REGISTRAR VALIDACIÓN DNI (para trazabilidad)
         # ================================================================
         
-        if dni_manuscrito:
-            validacion = ValidacionDNI(
-                hoja_respuesta_id=hoja.id,
-                dni=dni_manuscrito,
-                estado="detectado" if not alerta_discrepancia else alerta_discrepancia["tipo"],
-                fecha_captura=datetime.now()
-            )
-            db.add(validacion)
+        validacion = ValidacionDNI(
+            hoja_respuesta_id=hoja.id,
+            dni=dni_manuscrito,
+            estado="detectado",
+            fecha_captura=datetime.now()
+        )
+        db.add(validacion)
         
         # ================================================================
-        # 6. ACTUALIZAR HOJA
+        # 5. ACTUALIZAR HOJA
         # ================================================================
         
         tiempo_procesamiento = (datetime.now() - inicio).total_seconds()
@@ -295,7 +303,7 @@ async def procesar_hoja_completa(
         print(f"   Postulante final: {postulante_final.dni} - {postulante_final.nombres} {postulante_final.apellido_paterno}")
         
         # ================================================================
-        # 7. GUARDAR RESPUESTAS
+        # 6. GUARDAR RESPUESTAS
         # ================================================================
         
         print(f"\n💾 Guardando 100 respuestas...")
@@ -317,7 +325,7 @@ async def procesar_hoja_completa(
         print(f"   Vacías: {stats.get('vacias', 0)}")
         
         # ================================================================
-        # 8. CALIFICAR SI HAY GABARITO
+        # 7. CALIFICAR SI HAY GABARITO
         # ================================================================
         
         gabarito = db.query(ClaveRespuesta).filter(
@@ -376,14 +384,14 @@ async def procesar_hoja_completa(
             print(f"✅ Nota: {calificacion_data['nota']}/20")
         
         # ================================================================
-        # 9. MARCAR EXAMEN RENDIDO
+        # 8. MARCAR EXAMEN RENDIDO
         # ================================================================
         
         postulante_final.examen_rendido = True
         db.commit()
         
         # ================================================================
-        # 10. RESPUESTA
+        # 9. RESPUESTA
         # ================================================================
         
         print(f"\n{'='*70}")
@@ -403,7 +411,7 @@ async def procesar_hoja_completa(
                 "tipo": getattr(postulante_final, 'tipo', 'regular')
             },
             "procesamiento": {
-                "api": "google_vision",
+                "api": "gemini-2.5-flash",
                 "tiempo": round(tiempo_procesamiento, 2),
                 "dni_detectado": bool(dni_manuscrito)
             },
