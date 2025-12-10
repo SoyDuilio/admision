@@ -4,7 +4,7 @@ Usa schema estructurado para extracción precisa
 """
 import os
 import google.generativeai as genai
-from typing import Dict, TypedDict
+from typing import Dict, TypedDict, List
 from PIL import Image
 from pathlib import Path
 import json
@@ -13,10 +13,27 @@ from app.services.gemini_extractor_structured import extract_data_compatible
 
 
 # ============================================================================
-# CLASE TIPADA PARA DNI (response_schema correcto)
+# CLASES TIPADAS PARA SCHEMAS
 # ============================================================================
-class DNIResponse(TypedDict):
+
+# Para zoom DNI (estructura anidada igual que hoja completa)
+class CodigosDNI(TypedDict):
     dniPostulante: str
+
+class DNIResponse(TypedDict):
+    codes: CodigosDNI
+
+# Para hoja completa
+class CodigosHoja(TypedDict):
+    codigoDeHoja: str
+
+class RespuestaItem(TypedDict):
+    questionNumber: int
+    answer: str
+
+class HojaResponse(TypedDict):
+    codes: CodigosHoja
+    answers: List[RespuestaItem]
 
 # ============================================================================
 # FUNCIÓN: Extraer DNI con zoom
@@ -35,7 +52,7 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         print(f"{'='*70}")
         
         # ================================================================
-        # 1. RECORTAR IMAGEN A ZONA DEL DNI
+        # 1. RECORTAR IMAGEN
         # ================================================================
         
         img = Image.open(image_path)
@@ -48,14 +65,13 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         dni_zone.save(temp_path, "JPEG", quality=95)
         
         print(f"📐 Imagen original: {width}x{height}")
-        print(f"✂️  Zona DNI recortada: {width}x{crop_height} (15% superior)")
-        print(f"💾 Guardada en: {temp_path.name}")
+        print(f"✂️  Zona DNI recortada: {width}x{crop_height}")
         
         # ================================================================
-        # 2. SUBIR IMAGEN
+        # 2. SUBIR
         # ================================================================
         
-        print(f"📤 Subiendo zona DNI a Gemini...")
+        print(f"📤 Subiendo zona DNI...")
         
         uploaded_file = genai.upload_file(
             path=str(temp_path),
@@ -65,32 +81,25 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         print(f"✅ Archivo subido: {uploaded_file.name}")
         
         # ================================================================
-        # 3. PROMPT OPTIMIZADO
+        # 3. PROMPT (sin pedir JSON explícitamente)
         # ================================================================
         
-        prompt = """Extrae el DNI manuscrito de esta imagen.
+        prompt = """Extrae los códigos de esta imagen.
 
-El DNI está escrito en 8 rectángulos horizontales en la parte superior.
+En los 8 rectángulos horizontales está el DNI del postulante (8 dígitos).
 
-Lee los 8 dígitos de izquierda a derecha.
-
-IMPORTANTE:
-- Si el primer y tercer dígito tienen la misma forma manuscrita, son el mismo número
-- El "7" tiene forma de L invertida, puede tener línea horizontal
-- El "4" tiene forma triangular con ángulo recto arriba
-
-Devuelve exactamente 8 dígitos."""
+Lee los dígitos de izquierda a derecha."""
 
         # ================================================================
-        # 4. CONFIGURAR MODELO CON TypedDict (correcto)
+        # 4. CONFIGURAR MODELO (schema IGUAL al de hoja completa)
         # ================================================================
         
         generation_config = genai.GenerationConfig(
             response_mime_type="application/json",
-            response_schema=DNIResponse,  # ✅ Clase TypedDict, NO dict
-            temperature=0.0,
+            response_schema=DNIResponse,  # ✅ Estructura anidada
+            temperature=0.1,  # ✅ Igual que hoja completa
             top_p=0.95,
-            top_k=20,
+            top_k=40,  # ✅ Igual que hoja completa
             max_output_tokens=100,
         )
         
@@ -99,7 +108,7 @@ Devuelve exactamente 8 dígitos."""
             generation_config=generation_config
         )
         
-        print(f"🚀 Enviando request con TypedDict schema...")
+        print(f"🚀 Enviando request...")
         
         response = model.generate_content([
             uploaded_file,
@@ -107,26 +116,18 @@ Devuelve exactamente 8 dígitos."""
         ])
         
         # ================================================================
-        # 5. PARSEAR RESPUESTA
+        # 5. PARSEAR
         # ================================================================
         
-        print(f"📄 Respuesta cruda: {response.text[:100]}")
+        print(f"📄 Respuesta: {response.text[:150]}")
         
         try:
             resultado = json.loads(response.text)
-            dni = resultado.get("dniPostulante", "")
-            print(f"✅ DNI detectado: {dni} ({len(dni)} dígitos)")
-        except json.JSONDecodeError as e:
-            print(f"⚠️  Error JSON: {e}")
-            print(f"   Respuesta: {response.text}")
-            
-            # Fallback regex
-            match = re.search(r'"dniPostulante"\s*:\s*"(\d{8})"', response.text)
-            if match:
-                dni = match.group(1)
-                print(f"✅ DNI extraído con regex: {dni}")
-            else:
-                dni = ""
+            dni = resultado.get("codes", {}).get("dniPostulante", "")
+            print(f"✅ DNI: {dni}")
+        except Exception as e:
+            print(f"❌ Error: {e}")
+            dni = ""
         
         # ================================================================
         # 6. LIMPIAR
@@ -135,18 +136,16 @@ Devuelve exactamente 8 dígitos."""
         try:
             genai.delete_file(uploaded_file.name)
             temp_path.unlink()
-            print(f"🗑️  Archivos temporales eliminados")
-        except Exception as e:
-            print(f"⚠️  Error al limpiar: {e}")
+            print(f"🗑️  Limpieza OK")
+        except:
+            pass
         
         print(f"{'='*70}\n")
         
         return dni
         
     except Exception as e:
-        print(f"❌ Error en extracción de DNI: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Error: {e}")
         return ""
 
 
