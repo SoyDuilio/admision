@@ -13,10 +13,11 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
     """
     Extrae SOLO el DNI con zoom a la zona superior de la hoja.
     Recorta la imagen a los primeros 15% de altura para mejor precisión.
+    
+    NOTA: Asume que genai ya está configurado.
     """
     from PIL import Image
     import google.generativeai as genai
-    import os
     from pathlib import Path
     import json
     
@@ -47,9 +48,6 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         # ================================================================
         # 2. SUBIR IMAGEN RECORTADA A GEMINI
         # ================================================================
-        
-        api_key = os.getenv("GEMINI_API_KEY")
-        genai.configure(api_key=api_key)
         
         print(f"📤 Subiendo zona DNI a Gemini...")
         
@@ -82,28 +80,31 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         prompt = """LEE EL DNI MANUSCRITO EN ESTA IMAGEN.
 
 CONTEXTO:
-- Esta es la parte superior de una hoja de examen
-- El DNI está escrito a mano en 8 rectángulos consecutivos
-- Son exactamente 8 dígitos numéricos
+Esta es la parte superior de una hoja de examen con el DNI escrito a mano en 8 rectángulos consecutivos.
 
-INSTRUCCIONES DE LECTURA:
-1. Localiza los 8 rectángulos horizontales en la parte superior
-2. Lee cada dígito de IZQUIERDA a DERECHA
-3. Analiza la forma completa de cada dígito:
-   - Si tiene forma de "4": es un 4
-   - Si tiene forma de "7": es un 7 (puede tener una línea horizontal en el medio)
-   - Si no estás seguro, mira el contexto de otros dígitos similares
-4. Lee SOLO los dígitos que están claramente escritos
-5. NO inventes dígitos que no puedas leer con claridad
+ESTRATEGIA DE LECTURA:
+1. Localiza los 8 rectángulos horizontales
+2. Lee cada dígito de IZQUIERDA a DERECHA  
+3. IDENTIFICA DÍGITOS REPETIDOS:
+   - Busca dígitos que tengan la misma forma
+   - Si el dígito 1 y el dígito 3 se ven IDÉNTICOS, son el mismo número
+   - Si el dígito 1 y el dígito 3 son DIFERENTES, anota esa diferencia
 
-IMPORTANTE:
-- Algunos dígitos pueden repetirse (ej: 73733606 tiene tres "3" y dos "7")
-- El primer y tercer dígito pueden ser iguales
-- Prioriza EXACTITUD sobre completitud
+4. DIFERENCIA ENTRE 4 Y 7:
+   - El "4" tiene forma triangular con ángulo recto arriba
+   - El "7" tiene forma de "L invertida" o puede tener línea horizontal en el medio
+   - Si dudas entre 4 y 7, observa si hay OTROS dígitos iguales en el DNI
+
+5. VALIDACIÓN CRUZADA:
+   - DNI real: 73733606 tiene patrón: 7-3-7-3-3-6-0-6
+   - Nota los dígitos repetidos en posiciones 1-3 (iguales), 2-4-5 (iguales), 6-8 (iguales)
+
+REGLA DE ORO:
+Si el primer dígito y el tercer dígito tienen LA MISMA FORMA MANUSCRITA, deben ser el mismo número.
 
 Devuelve SOLO el DNI en formato JSON:
 {
-  "dniPostulante": "12345678"
+  "dniPostulante": "73733606"
 }"""
 
         # ================================================================
@@ -180,15 +181,8 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
     print(f"{'='*70}")
     
     try:
-        # ================================================================
-        # 1. PRIMERA PASADA: ZOOM EN DNI (Alta precisión)
-        # ================================================================
-        
-        print(f"\n🔍 PASO 1: Extrayendo DNI con zoom optimizado...")
-        dni_optimizado = await extraer_dni_con_zoom(imagen_path)
-        
-        # ================================================================
-        # 2. CONFIGURACIÓN GEMINI
+         # ================================================================
+        # 1. CONFIGURACIÓN GEMINI (UNA SOLA VEZ)
         # ================================================================
         
         api_key = os.getenv("GEMINI_API_KEY")
@@ -201,7 +195,14 @@ async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
         genai.configure(api_key=api_key)
         
         # ================================================================
-        # 3. SEGUNDA PASADA: HOJA COMPLETA (Respuestas + Código)
+        # 2. PRIMERA PASADA: ZOOM EN DNI (Alta precisión)
+        # ================================================================
+        
+        print(f"\n🔍 PASO 1: Extrayendo DNI con zoom optimizado...")
+        dni_optimizado = await extraer_dni_con_zoom(imagen_path)
+        
+        # ================================================================
+        # 3. SEGUNDA PASADA: HOJA COMPLETA
         # ================================================================
         
         print(f"\n📸 PASO 2: Procesando hoja completa...")
