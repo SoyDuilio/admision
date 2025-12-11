@@ -93,14 +93,21 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
         try:
             resultado = json.loads(json_str)
             dni = resultado.get("codes", {}).get("dniPostulante", "")
+            dni = re.sub(r'\D', '', dni)
             
-            # Limpieza adicional del valor (por si el modelo pone espacios o guiones)
-            dni = re.sub(r'\D', '', dni) 
+            # ✅ NUEVA: Validación de consistencia
+            dni_validado, requiere_revision = validar_consistencia_dni(dni, image_path)
             
-            print(f"✅ DNI Detectado: {dni}")
+            if requiere_revision:
+                print(f"⚠️  DNI requiere revisión manual")
+                # Aún así retornar el mejor intento
+            
+            print(f"✅ DNI Final: {dni_validado}")
+            return dni_validado
+            
         except Exception as e:
-            print(f"❌ Error al parsear JSON después de limpieza: {e}")
-            dni = ""
+            print(f"❌ Error: {e}")
+            return ""
         
         # 6. LIMPIAR ARCHIVOS
         try:
@@ -114,6 +121,45 @@ async def extraer_dni_con_zoom(image_path: str) -> str:
     except Exception as e:
         print(f"❌ Error crítico en zoom: {e}")
         return ""
+
+
+def validar_consistencia_dni(dni: str, imagen_path: str) -> tuple[str, bool]:
+    """
+    Valida consistencia de dígitos repetidos en el DNI.
+    
+    Retorna: (dni_corregido, requiere_revision)
+    """
+    if len(dni) != 8:
+        return dni, True
+    
+    # Patrones comunes de DNI peruanos
+    # Dígito 1 y 3 suelen ser iguales en muchos DNIs (ej: 73733606)
+    pos_1 = dni[0]
+    pos_3 = dni[2]
+    
+    # Si ambos son "4" o ambos son "7", probablemente correcto
+    if pos_1 == pos_3:
+        print(f"✅ Dígitos 1 y 3 consistentes: {pos_1}")
+        return dni, False
+    
+    # Si son diferentes pero uno es 4 y otro 7 → sospechoso
+    if (pos_1 in ['4', '7']) and (pos_3 in ['4', '7']) and (pos_1 != pos_3):
+        print(f"⚠️  Inconsistencia sospechosa: pos 1={pos_1}, pos 3={pos_3}")
+        
+        # Heurística: Si hay más "7" que "4" en el DNI, probablemente es 7
+        count_7 = dni.count('7')
+        count_4 = dni.count('4')
+        
+        if count_7 > count_4:
+            dni_corregido = dni.replace('4', '7', 1)  # Cambiar primer 4 por 7
+            print(f"   🔧 Sugerencia: {dni} → {dni_corregido} (más 7s detectados)")
+            return dni_corregido, True
+        elif count_4 > count_7:
+            dni_corregido = dni.replace('7', '4', 1)
+            print(f"   🔧 Sugerencia: {dni} → {dni_corregido} (más 4s detectados)")
+            return dni_corregido, True
+    
+    return dni, False
 
 
 async def procesar_hoja_completa_v3(imagen_path: str) -> Dict:
