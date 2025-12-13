@@ -100,9 +100,9 @@ def generar_hoja_generica(
     y -= 0.45*cm
     
     # Rectángulos más altos
-    rect_ancho = 0.9*cm
-    rect_alto = 0.65*cm  # ← Aumentado de 0.55cm
-    espaciado = 0.15*cm
+    rect_ancho = 1.0*cm      # 10mm (antes 9mm)
+    rect_alto = 0.85*cm      # 8.5mm (antes 6.5mm) ← +30%
+    espaciado = 0.18*cm      # Más espacio entre rectángulos
     
     total_ancho_dni = (8 * rect_ancho) + (7 * espaciado)
     dni_start_x = x_start + (content_width - total_ancho_dni) / 2
