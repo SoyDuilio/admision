@@ -457,7 +457,7 @@ async def asignar_y_generar_hojas(
     from io import BytesIO
     from datetime import datetime
     from fastapi.responses import StreamingResponse
-    from app.services.pdf_generator_v3 import generar_hoja_respuestas_v3
+    from app.services.pdf_generator_simple import generar_hoja_generica
     from app.utils import generar_codigo_hoja_unico
     
     temp_dir = None
@@ -608,14 +608,12 @@ async def asignar_y_generar_hojas(
                     filename = f"hoja_{asig.dni}_{codigo_hoja}.pdf"
                     filepath = os.path.join(aula_dir, filename)
                     
-                    generar_hoja_respuestas_v3(
+                    generar_hoja_generica(
                         output_path=filepath,
-                        dni_postulante=asig.dni,
-                        codigo_aula=aula_codigo,
-                        dni_profesor=asig.profesor_dni,
+                        numero_hoja=asig.orden_alfabetico,
                         codigo_hoja=codigo_hoja,
                         proceso=proceso,
-                        orden_aula=asig.orden_alfabetico  # ← PASAR ORDEN AL PDF
+                        descripcion="Examen de Admisión"
                     )
                     
                     if not os.path.exists(filepath):
