@@ -11,6 +11,12 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, or_, text
 
+from datetime import datetime
+import pytz
+
+# Definir zona horaria de Perú
+PERU_TZ = pytz.timezone('America/Lima')
+
 from app.database import get_db
 from app.models import (
     Postulante, HojaRespuesta, ClaveRespuesta,
@@ -112,8 +118,10 @@ async def pagina_resultados(
     Más recientes primero.
     """
     
-    # Query base
-    query = db.query(HojaRespuesta)
+    # Query base (CORREGIDO - solo hojas capturadas)
+    query = db.query(HojaRespuesta).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado'])
+    )
     
     # Aplicar filtros si existen
     if codigo:
@@ -129,6 +137,9 @@ async def pagina_resultados(
     hojas = query.order_by(desc(HojaRespuesta.created_at)).limit(50).all()
     
     # Calcular estadísticas para cada hoja
+    # ========================================================================
+    # CALCULAR ESTADÍSTICAS PARA CADA HOJA
+    # ========================================================================
     hojas_con_stats = []
     
     for hoja in hojas:
@@ -137,8 +148,16 @@ async def pagina_resultados(
             Respuesta.hoja_respuesta_id == hoja.id
         ).all()
         
+        # Contar correctamente
         validas = sum(1 for r in respuestas if r.respuesta_marcada in ['A', 'B', 'C', 'D', 'E'])
-        vacias = sum(1 for r in respuestas if r.respuesta_marcada == 'VACIO')
+        
+        # ✅ CORRECCIÓN: Contar vacías correctamente
+        vacias = sum(1 for r in respuestas if (
+            r.respuesta_marcada is None or 
+            r.respuesta_marcada == '' or 
+            r.respuesta_marcada == 'VACIO'
+        ))
+        
         problematicas = sum(1 for r in respuestas if r.respuesta_marcada in ['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE'])
         
         # Obtener DNI del postulante
@@ -148,32 +167,60 @@ async def pagina_resultados(
             if postulante:
                 dni_postulante = postulante.dni
         
+        # ✅ CORRECCIÓN: Convertir fecha a zona horaria de Perú
+        fecha_captura_peru = hoja.created_at
+        if fecha_captura_peru and fecha_captura_peru.tzinfo is None:
+            # Si la fecha no tiene timezone, asumirla UTC y convertir a Perú
+            fecha_captura_peru = pytz.UTC.localize(fecha_captura_peru).astimezone(PERU_TZ)
+        elif fecha_captura_peru:
+            # Si ya tiene timezone, convertir a Perú
+            fecha_captura_peru = fecha_captura_peru.astimezone(PERU_TZ)
+        
         hojas_con_stats.append({
             'id': hoja.id,
             'codigo_hoja': hoja.codigo_hoja,
             'dni_postulante': dni_postulante or '—',
             'codigo_aula': hoja.codigo_aula or '—',
             'api_utilizada': hoja.api_utilizada or 'N/A',
-            'tiempo_procesamiento': hoja.tiempo_procesamiento or 0,
-            'fecha_captura': hoja.created_at,
+            'tiempo_procesamiento': round(hoja.tiempo_procesamiento, 1) if hoja.tiempo_procesamiento else 0,
+            'fecha_captura': fecha_captura_peru,  # ← Ahora en hora Perú
             'stats': {
                 'validas': validas,
-                'vacias': vacias,
+                'vacias': vacias,  # ← Ahora cuenta correctamente
                 'problematicas': problematicas
             }
         })
     
-    # Estadísticas globales
-    total_hojas = db.query(func.count(HojaRespuesta.id)).scalar()
+    # ========================================================================
+    # ESTADÍSTICAS GLOBALES (CORREGIDO)
+    # ========================================================================
     
-    total_respuestas = db.query(Respuesta).count()
-    total_validas = db.query(Respuesta).filter(
+    # Solo contar hojas capturadas (completado o calificado)
+    total_hojas = db.query(func.count(HojaRespuesta.id)).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado'])
+    ).scalar()
+    
+    # Respuestas solo de hojas capturadas
+    total_respuestas = db.query(Respuesta).join(HojaRespuesta).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado'])
+    ).count()
+    
+    total_validas = db.query(Respuesta).join(HojaRespuesta).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado']),
         Respuesta.respuesta_marcada.in_(['A', 'B', 'C', 'D', 'E'])
     ).count()
-    total_vacias = db.query(Respuesta).filter(
-        Respuesta.respuesta_marcada == 'VACIO'
+    
+    total_vacias = db.query(Respuesta).join(HojaRespuesta).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado']),
+        or_(
+            Respuesta.respuesta_marcada == None,
+            Respuesta.respuesta_marcada == '',
+            Respuesta.respuesta_marcada == 'VACIO'
+        )
     ).count()
-    total_problematicas = db.query(Respuesta).filter(
+    
+    total_problematicas = db.query(Respuesta).join(HojaRespuesta).filter(
+        HojaRespuesta.estado.in_(['completado', 'calificado']),
         Respuesta.respuesta_marcada.in_(['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE'])
     ).count()
     
@@ -221,22 +268,30 @@ async def pagina_estadisticas(request: Request, db: Session = Depends(get_db)):
     Página de estadísticas generales y ranking.
     """
     
-    # Estadísticas generales
+    # ========================================================================
+    # ESTADÍSTICAS GENERALES
+    # ========================================================================
+    
     total_postulantes = db.query(func.count(Postulante.id)).scalar()
     
+    # Exámenes calificados (con nota_final)
     examenes_calificados = db.query(func.count(HojaRespuesta.id)).filter(
-        HojaRespuesta.estado == "calificado"
+        HojaRespuesta.estado.in_(['completado', 'calificado']),
+        HojaRespuesta.nota_final.isnot(None)
     ).scalar()
     
-    calificaciones = db.query(Calificacion).all()
+    # Obtener notas
+    notas_query = db.query(HojaRespuesta.nota_final).filter(
+        HojaRespuesta.nota_final.isnot(None)
+    ).all()
     
-    if calificaciones:
-        notas = [c.nota for c in calificaciones]
+    if notas_query:
+        notas = [float(n.nota_final) for n in notas_query]
         nota_promedio = sum(notas) / len(notas)
         nota_maxima = max(notas)
         nota_minima = min(notas)
-        aprobados = sum(1 for c in calificaciones if c.aprobado)
-        desaprobados = len(calificaciones) - aprobados
+        aprobados = sum(1 for n in notas if n >= 55)
+        desaprobados = len(notas) - aprobados
     else:
         nota_promedio = 0
         nota_maxima = 0
@@ -247,54 +302,74 @@ async def pagina_estadisticas(request: Request, db: Session = Depends(get_db)):
     stats = {
         "total_postulantes": total_postulantes or 0,
         "examenes_calificados": examenes_calificados or 0,
-        "nota_promedio": nota_promedio,
+        "nota_promedio": round(nota_promedio, 2),
         "nota_maxima": nota_maxima,
         "nota_minima": nota_minima,
         "aprobados": aprobados,
         "desaprobados": desaprobados
     }
     
-    # Ranking
-    try:
-        # Intentar usar la vista
-        ranking_query = text("""
-            SELECT * FROM vw_ranking_postulantes
-            ORDER BY ranking ASC
-            LIMIT 50
-        """)
-        ranking = db.execute(ranking_query).fetchall()
-        
-        # Convertir a lista de dicts
-        ranking_list = []
-        for row in ranking:
-            ranking_list.append({
-                "ranking": row.ranking,
-                "dni": row.dni,
-                "nombre_completo": row.nombre_completo,
-                "programa_educativo": row.programa_educativo,
-                "nota": row.nota,
-                "respuestas_correctas": row.respuestas_correctas
-            })
-    except:
-        # Si no existe la vista, calcular manualmente
-        ranking_data = db.query(
-            Postulante,
-            Calificacion
-        ).join(
-            Calificacion, Postulante.id == Calificacion.postulante_id
+    # ========================================================================
+    # RANKING - TODOS LOS POSTULANTES (con o sin examen)
+    # ========================================================================
+    
+    # Si NO hay hojas calificadas, mostrar todos los postulantes
+    if examenes_calificados == 0:
+        # Todos los postulantes ordenados alfabéticamente
+        postulantes_query = db.query(
+            Postulante.dni,
+            Postulante.nombres,
+            Postulante.apellido_paterno,
+            Postulante.apellido_materno,
+            Postulante.programa_educativo
         ).order_by(
-            Calificacion.nota.desc()
+            Postulante.apellido_paterno,
+            Postulante.apellido_materno,
+            Postulante.nombres
+        ).all()
+        
+        # Todos en puesto 1 (empate)
+        ranking_list = []
+        for row in postulantes_query:
+            ranking_list.append({
+                "ranking": 1,  # ← Todos en puesto 1
+                "dni": row.dni,
+                "nombre_completo": f"{row.apellido_paterno} {row.apellido_materno}, {row.nombres}",
+                "programa_educativo": row.programa_educativo,
+                "nota": None,  # ← Sin nota
+                "respuestas_correctas": 0,
+                "estado": "DESAPROBADO"
+            })
+    
+    else:
+        # Si hay exámenes calificados, ranking normal
+        ranking_query = db.query(
+            HojaRespuesta.nota_final,
+            HojaRespuesta.respuestas_correctas_count,
+            Postulante.dni,
+            Postulante.nombres,
+            Postulante.apellido_paterno,
+            Postulante.apellido_materno,
+            Postulante.programa_educativo
+        ).join(
+            Postulante, HojaRespuesta.postulante_id == Postulante.id
+        ).filter(
+            HojaRespuesta.nota_final.isnot(None)
+        ).order_by(
+            HojaRespuesta.nota_final.desc(),
+            HojaRespuesta.respuestas_correctas_count.desc()
         ).limit(50).all()
         
         ranking_list = []
-        for i, (postulante, calificacion) in enumerate(ranking_data, 1):
+        for i, row in enumerate(ranking_query, 1):
             ranking_list.append({
                 "ranking": i,
-                "dni": postulante.dni,
-                "nombre_completo": f"{postulante.apellido_paterno} {postulante.apellido_materno}, {postulante.nombres}",
-                "programa_educativo": postulante.programa_educativo,
-                "nota": calificacion.nota,
-                "respuestas_correctas": calificacion.correctas
+                "dni": row.dni,
+                "nombre_completo": f"{row.apellido_paterno} {row.apellido_materno}, {row.nombres}",
+                "programa_educativo": row.programa_educativo,
+                "nota": float(row.nota_final),
+                "respuestas_correctas": row.respuestas_correctas_count or 0,
+                "estado": "APROBADO" if row.nota_final >= 55 else "DESAPROBADO"
             })
     
     return templates.TemplateResponse("estadisticas.html", {
