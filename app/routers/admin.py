@@ -799,42 +799,69 @@ async def resultados_page(
     calificacion_info = verificar_calificacion(db, proceso)
     publicacion_info = verificar_publicacion(db, proceso)
     
-    # Estadísticas
+    # ========================================================================
+    # ESTADÍSTICAS GENERALES (CORREGIDO)
+    # ========================================================================
     stats = db.execute(text("""
         SELECT 
             COUNT(*) as total,
             COUNT(CASE WHEN nota_final IS NOT NULL THEN 1 END) as calificados,
-            COUNT(CASE WHEN nota_final >= 50 THEN 1 END) as ingresantes,
+            COUNT(CASE WHEN nota_final >= 55 THEN 1 END) as ingresantes,
             AVG(nota_final) as promedio
         FROM hojas_respuestas
         WHERE proceso_admision = :proceso
+          AND estado IN ('completado', 'calificado')  -- ← SOLO CAPTURADAS
     """), {"proceso": proceso}).fetchone()
     
-    # Hojas pendientes de revisión
+    # ========================================================================
+    # HOJAS PENDIENTES DE REVISIÓN (CORREGIDO)
+    # ========================================================================
     revision_pendiente = db.execute(text("""
         SELECT COUNT(*) as total
         FROM hojas_respuestas
         WHERE proceso_admision = :proceso
-        AND (estado = 'REQUIERE_REVISION' OR observaciones IS NOT NULL)
+          AND estado IN ('completado', 'calificado')  -- ← SOLO CAPTURADAS
+          AND (estado = 'REQUIERE_REVISION' OR observaciones IS NOT NULL)
     """), {"proceso": proceso}).fetchone()
     
-    # Resumen por programa
+    # ========================================================================
+    # RESUMEN POR PROGRAMA (CORREGIDO)
+    # ========================================================================
     programas_resumen = db.execute(text("""
         SELECT 
             p.programa_educativo as nombre,
             COUNT(*) as total,
             COUNT(CASE WHEN hr.nota_final >= 50 THEN 1 END) as ingresantes,
             MIN(CASE WHEN hr.nota_final >= 50 THEN hr.nota_final END) as nota_minima,
-            30 as vacantes  -- Esto debería venir de configuración
+            30 as vacantes
         FROM hojas_respuestas hr
         JOIN postulantes p ON p.id = hr.postulante_id
         WHERE hr.proceso_admision = :proceso
-        AND hr.nota_final IS NOT NULL
+          AND hr.estado IN ('completado', 'calificado')  -- ← SOLO CAPTURADAS
+          AND hr.nota_final IS NOT NULL
         GROUP BY p.programa_educativo
         ORDER BY p.programa_educativo
     """), {"proceso": proceso}).fetchall()
     
-    nota_corte = 50  # Configurable
+    # ========================================================================
+    # ESTADÍSTICAS ADICIONALES (RESPUESTAS)
+    # ========================================================================
+    stats_respuestas = db.execute(text("""
+        SELECT 
+            COUNT(*) as total_respuestas,
+            COUNT(CASE WHEN respuesta_marcada IS NOT NULL 
+                       AND respuesta_marcada IN ('A','B','C','D','E') 
+                  THEN 1 END) as respuestas_validas,
+            COUNT(CASE WHEN respuesta_marcada IS NULL 
+                       OR respuesta_marcada = '' 
+                  THEN 1 END) as respuestas_vacias
+        FROM respuestas r
+        JOIN hojas_respuestas h ON r.hoja_respuesta_id = h.id
+        WHERE h.proceso_admision = :proceso
+          AND h.estado IN ('completado', 'calificado')  -- ← SOLO CAPTURADAS
+    """), {"proceso": proceso}).fetchone()
+    
+    nota_corte = 50
     
     return templates.TemplateResponse(
         "admin/resultados/publicar.html",
@@ -847,7 +874,7 @@ async def resultados_page(
             "calificacion_ok": calificacion_info["ejecutada"],
             "todas_calificadas": stats.calificados == stats.total,
             "hojas_calificadas": stats.calificados or 0,
-            "total_hojas": stats.total or 0,
+            "total_hojas": stats.total or 0,  # Ahora solo cuenta capturadas
             "sin_revision_pendiente": (revision_pendiente.total or 0) == 0,
             "hojas_pendientes_revision": revision_pendiente.total or 0,
             "puede_publicar": gabarito_info["existe"] and calificacion_info["ejecutada"],
@@ -861,10 +888,12 @@ async def resultados_page(
             "total_no_ingresaron": (stats.total or 0) - (stats.ingresantes or 0),
             "promedio": stats.promedio or 0,
             "nota_corte": nota_corte,
-            "programas_resumen": programas_resumen
+            "programas_resumen": programas_resumen,
+            # Nuevas estadísticas de respuestas
+            "respuestas_validas": stats_respuestas.respuestas_validas or 0,
+            "respuestas_vacias": stats_respuestas.respuestas_vacias or 0
         }
     )
-
 
 @router.post("/api/resultados/publicar")
 async def publicar_resultados(
