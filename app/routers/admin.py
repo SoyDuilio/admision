@@ -581,8 +581,8 @@ async def calificacion_page(
                 "80_89": dist_result.rango_80_89 or 0,
                 "70_79": dist_result.rango_70_79 or 0,
                 "60_69": dist_result.rango_60_69 or 0,
-                "50_59": dist_result.rango_50_59 or 0,
-                "menos_50": dist_result.rango_menos_50 or 0
+                "55_59": dist_result.rango_55_59 or 0,
+                "menos_55": dist_result.rango_menos_55 or 0
             }
     
     # Calcular porcentajes para las barras
