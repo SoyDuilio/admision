@@ -87,8 +87,8 @@
                         ('80-89', stats_generales.rango_80_89 or 0, '#3b82f6', 'Muy Bueno'),
                         ('70-79', stats_generales.rango_70_79 or 0, '#8b5cf6', 'Bueno'),
                         ('60-69', stats_generales.rango_60_69 or 0, '#f59e0b', 'Regular'),
-                        ('50-59', stats_generales.rango_50_59 or 0, '#f97316', 'Aprobado'),
-                        ('<50', stats_generales.rango_menos_50 or 0, '#ef4444', 'Desaprobado')
+                        ('55-59', stats_generales.rango_55_59 or 0, '#f97316', 'Aprobado'),
+                        ('<55', stats_generales.rango_menos_55 or 0, '#ef4444', 'Desaprobado')
                     ] %}
                     
                     {% set max_valor = [rangos[0][1], rangos[1][1], rangos[2][1], rangos[3][1], rangos[4][1], rangos[5][1]] | max %}
@@ -112,8 +112,8 @@
                 <div class="legend-item"><span class="legend-color" style="background: #3b82f6;"></span> Muy Bueno (80-89)</div>
                 <div class="legend-item"><span class="legend-color" style="background: #8b5cf6;"></span> Bueno (70-79)</div>
                 <div class="legend-item"><span class="legend-color" style="background: #f59e0b;"></span> Regular (60-69)</div>
-                <div class="legend-item"><span class="legend-color" style="background: #f97316;"></span> Aprobado (50-59)</div>
-                <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span> Desaprobado (&lt;50)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #f97316;"></span> Aprobado (55-59)</div>
+                <div class="legend-item"><span class="legend-color" style="background: #ef4444;"></span> Desaprobado (&lt;55)</div>
             </div>
         </div>
 
