@@ -757,7 +757,7 @@ async def ranking_page(
     """), {"proceso": proceso}).fetchone()
     
     # Nota aprobatoria (puede venir de configuración)
-    nota_aprobatoria = 50  # Por defecto
+    nota_aprobatoria = 55  # Por defecto
     
     return templates.TemplateResponse(
         "admin/resultados/ranking.html",
