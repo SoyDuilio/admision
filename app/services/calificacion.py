@@ -134,7 +134,7 @@ class CalificacionService:
             SELECT id
             FROM hojas_respuestas
             WHERE proceso_admision = :proceso
-            AND estado IN ('PROCESADO', 'procesado', 'ACTIVO', 'activo')
+            AND estado IN ('completado', 'calificado')
         """), {"proceso": proceso}).fetchall()
         
         if not hojas:
