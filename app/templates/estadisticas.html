@@ -278,7 +278,7 @@
                     <td>{{ postulante.nombre_completo }}</td>
                     <td>{{ postulante.programa_educativo }}</td>
                     <td>
-                        <span class="{% if postulante.nota and postulante.nota >= 80 %}nota-alta{% elif postulante.nota and postulante.nota >= 60 %}nota-media{% else %}nota-baja{% endif %}">
+                        <span class="{% if postulante.nota and postulante.nota >= 80 %}nota-alta{% elif postulante.nota and postulante.nota >= 55 %}nota-media{% else %}nota-baja{% endif %}">
                             {{ postulante.nota|round(2) if postulante.nota else '—' }}
                         </span>
                     </td>
