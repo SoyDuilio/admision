@@ -399,7 +399,7 @@ async def dashboard_director(request: Request, db: Session, usuario: dict, proce
             (SELECT COUNT(*) FROM clave_respuestas WHERE proceso_admision = :proceso) as gabarito_count,
             (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final IS NOT NULL) as hojas_calificadas,
             (SELECT AVG(nota_final) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final IS NOT NULL) as promedio_nota,
-            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final >= 50) as aprobados,
+            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final >= 55) as aprobados,
             (SELECT SUM(vacantes) FROM programas_educativos WHERE activo = true) as total_vacantes,
             EXISTS(SELECT 1 FROM publicaciones_resultados WHERE proceso_admision = :proceso AND estado = 'PUBLICADO') as publicado
     """), {"proceso": proceso}).fetchone()
@@ -700,7 +700,7 @@ async def ranking_page(
     request: Request,
     db: Session = Depends(get_db),
     usuario: dict = Depends(obtener_usuario_actual),
-    limit: str = "50"
+    limit: str = "55"
 ):
     """Página de ranking"""
     proceso = obtener_proceso_actual()
@@ -831,8 +831,8 @@ async def resultados_page(
         SELECT 
             p.programa_educativo as nombre,
             COUNT(*) as total,
-            COUNT(CASE WHEN hr.nota_final >= 50 THEN 1 END) as ingresantes,
-            MIN(CASE WHEN hr.nota_final >= 50 THEN hr.nota_final END) as nota_minima,
+            COUNT(CASE WHEN hr.nota_final >= 55 THEN 1 END) as ingresantes,
+            MIN(CASE WHEN hr.nota_final >= 55 THEN hr.nota_final END) as nota_minima,
             30 as vacantes
         FROM hojas_respuestas hr
         JOIN postulantes p ON p.id = hr.postulante_id
@@ -861,7 +861,7 @@ async def resultados_page(
           AND h.estado IN ('completado', 'calificado')  -- ← SOLO CAPTURADAS
     """), {"proceso": proceso}).fetchone()
     
-    nota_corte = 50
+    nota_corte = 55
     
     return templates.TemplateResponse(
         "admin/resultados/publicar.html",
@@ -1080,7 +1080,7 @@ async def stats_director(
             (SELECT COUNT(*) FROM postulantes WHERE proceso_admision = :proceso) as total_postulantes,
             (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND estado IN ('PROCESADO', 'procesado')) as hojas_procesadas,
             (SELECT AVG(nota_final) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final IS NOT NULL) as promedio_nota,
-            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final >= 50) as aprobados,
+            (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final >= 55) as aprobados,
             (SELECT COUNT(*) FROM clave_respuestas WHERE proceso_admision = :proceso) as gabarito_count,
             (SELECT COUNT(*) FROM hojas_respuestas WHERE proceso_admision = :proceso AND nota_final IS NOT NULL) as calificadas,
             EXISTS(SELECT 1 FROM publicaciones_resultados WHERE proceso_admision = :proceso AND estado = 'PUBLICADO') as publicado
