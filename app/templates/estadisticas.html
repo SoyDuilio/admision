@@ -278,13 +278,13 @@
                     <td>{{ postulante.nombre_completo }}</td>
                     <td>{{ postulante.programa_educativo }}</td>
                     <td>
-                        <span class="{% if postulante.nota and postulante.nota >= 15 %}nota-alta{% elif postulante.nota and postulante.nota >= 11 %}nota-media{% else %}nota-baja{% endif %}">
+                        <span class="{% if postulante.nota and postulante.nota >= 80 %}nota-alta{% elif postulante.nota and postulante.nota >= 60 %}nota-media{% else %}nota-baja{% endif %}">
                             {{ postulante.nota|round(2) if postulante.nota else '—' }}
                         </span>
                     </td>
                     <td>{{ postulante.respuestas_correctas }}/100</td>
                     <td>
-                        {% if postulante.nota and postulante.nota >= 10.5 %}
+                        {% if postulante.nota and postulante.nota >= 55 %}
                         <span class="badge-aprobado">APROBADO</span>
                         {% else %}
                         <span class="badge-desaprobado">DESAPROBADO</span>
