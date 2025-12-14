@@ -448,3 +448,111 @@ async def pagina_asignar_postulantes(request: Request, db: Session = Depends(get
     return templates.TemplateResponse("asignar_postulantes.html", {
         "request": request
     })
+
+
+
+# ============================================================================
+# API JSON ENDPOINTS
+# ============================================================================
+@router.get("/api/hoja/{hoja_id}/detalle")
+async def detalle_hoja_json(
+    hoja_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Retorna detalle de hoja en JSON para el modal.
+    """
+    
+    # Obtener hoja
+    hoja = db.query(HojaRespuesta).filter(HojaRespuesta.id == hoja_id).first()
+    
+    if not hoja:
+        return {"success": False, "message": "Hoja no encontrada"}
+    
+    # Obtener postulante
+    postulante = None
+    if hoja.postulante_id:
+        postulante = db.query(Postulante).filter(Postulante.id == hoja.postulante_id).first()
+    
+    # Obtener respuestas
+    respuestas = db.query(Respuesta).filter(
+        Respuesta.hoja_respuesta_id == hoja_id
+    ).order_by(Respuesta.numero_pregunta).all()
+    
+    # Obtener gabarito (si existe)
+    gabarito_dict = {}
+    if hoja.proceso_admision:
+        gabarito = db.query(ClaveRespuesta).filter(
+            ClaveRespuesta.proceso_admision == hoja.proceso_admision
+        ).all()
+        gabarito_dict = {g.numero_pregunta: g.respuesta_correcta for g in gabarito}
+    
+    # Calcular estadísticas CORRECTAMENTE
+    correctas = sum(1 for r in respuestas if r.es_correcta == True)
+    incorrectas = sum(1 for r in respuestas if r.es_correcta == False and r.respuesta_marcada in ['A', 'B', 'C', 'D', 'E'])
+    
+    # Vacías (CORREGIDO)
+    vacias = sum(1 for r in respuestas if (
+        r.respuesta_marcada is None or 
+        r.respuesta_marcada == '' or 
+        r.respuesta_marcada == 'VACIO'
+    ))
+    
+    # Inválidas
+    invalidas = sum(1 for r in respuestas if r.respuesta_marcada in ['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE'])
+    
+    # Calcular puesto (si tiene nota)
+    puesto = None
+    if hoja.nota_final is not None:
+        puestos_mayores = db.query(func.count(HojaRespuesta.id)).filter(
+            HojaRespuesta.proceso_admision == hoja.proceso_admision,
+            HojaRespuesta.nota_final.isnot(None),
+            HojaRespuesta.nota_final > hoja.nota_final
+        ).scalar()
+        
+        puesto = (puestos_mayores or 0) + 1
+    
+    # Preparar respuestas para el frontend
+    respuestas_list = []
+    for r in respuestas:
+        # Determinar resultado
+        if r.es_correcta == True:
+            resultado = "CORRECTA"
+        elif r.respuesta_marcada in ['LETRA_INVALIDA', 'GARABATO', 'MULTIPLE', 'ILEGIBLE']:
+            resultado = "INVALIDA"
+        elif not r.respuesta_marcada or r.respuesta_marcada == '' or r.respuesta_marcada == 'VACIO':
+            resultado = "VACIA"
+        else:
+            resultado = "INCORRECTA"
+        
+        respuestas_list.append({
+            "numero": r.numero_pregunta,
+            "marcada": r.respuesta_marcada or "—",
+            "correcta": gabarito_dict.get(r.numero_pregunta),
+            "resultado": resultado,
+            "confianza": r.confianza or 0
+        })
+    
+    # Preparar respuesta
+    return {
+        "success": True,
+        "hoja": {
+            "codigo": hoja.codigo_hoja,
+            "dni": postulante.dni if postulante else None,
+            "postulante": {
+                "nombres": postulante.nombres,
+                "apellidos": f"{postulante.apellido_paterno} {postulante.apellido_materno}"
+            } if postulante else None,
+            "calificacion": {
+                "puntaje": hoja.nota_final or 0,
+                "puesto": puesto
+            } if hoja.nota_final is not None else None
+        },
+        "estadisticas": {
+            "correctas": correctas,
+            "incorrectas": incorrectas,
+            "vacias": vacias,  # ← CORREGIDO
+            "invalidas": invalidas
+        },
+        "respuestas": respuestas_list
+    }
